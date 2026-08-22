@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request): Promise<Response> {
   try {
     const input = await readInput(request);
-    const listing = parseListingDraft(input);
+    const listing = parseListingDraft(input, { requireLicense: false });
     const started = await raiseListing(
       { ...listing, weekId: listing.weekId ?? currentWeekId() },
       getPolarPort(),

@@ -39,7 +39,9 @@ export default function AboutPage() {
       <p>
         Site URLs are cleaned: tracking query strings are stripped. Chat and
         invite links are rejected. Adult / NSFW hosts are rejected. Link
-        shorteners are not stored.
+        shorteners are not stored. A dentist or immigration lawyer must claim a
+        license id; we do not verify it. Operator takedown hides a listing and
+        vacates rank — we do not invent a replacement #1.
       </p>
       <p>
         <a href="/rules">Read the rules</a> for the $5 minimum, older-wins-ties,

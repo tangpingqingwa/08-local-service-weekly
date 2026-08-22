@@ -43,6 +43,11 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
             {listing.siteHost}
           </span>
         </p>
+        {listing.licenseId ? (
+          <p className="meta license" data-license="">
+            Claimed license {listing.licenseId} (not verified).
+          </p>
+        ) : null}
       </div>
     </article>
   );

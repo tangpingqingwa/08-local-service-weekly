@@ -44,7 +44,8 @@ a:hover {
 
 .site-header,
 .board,
-.error-page {
+.error-page,
+.return-page {
   width: 100%;
   max-width: var(--max);
   margin: 0 auto;
@@ -234,8 +235,13 @@ a:hover {
 }
 
 .stub-note,
-.error-page p {
+.error-page p,
+.return-page p {
   margin-top: 0.75rem;
+}
+
+.return-page {
+  padding-bottom: 3rem;
 }
 
 .error-page {

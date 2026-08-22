@@ -13,4 +13,5 @@ data/
 *.sqlite-journal
 *.sqlite-wal
 *.sqlite-shm
+tsconfig.tsbuildinfo
 

@@ -75,13 +75,15 @@ fi
 
 echo "== skeleton files =="
 for f in package.json tsconfig.json next.config.ts \
-  app/healthz/route.ts src/db.ts src/cities.ts \
+  app/healthz/route.ts app/layout.tsx src/db.ts src/cities.ts \
   src/migrations/001_cities.sql src/migrations/002_weeks.sql \
   src/migrations/003_listings.sql tests/health.test.ts; do
   [[ -f "$f" ]] || fail "missing $f"
   [[ -s "$f" ]] || fail "empty $f"
 done
 grep -q '/healthz' app/healthz/route.ts || fail "app/healthz missing /healthz"
+grep -q 'GET' app/healthz/route.ts || fail "app/healthz missing GET"
+grep -q 'getDb' app/healthz/route.ts || fail "app/healthz must probe SQLite"
 grep -q 'london' src/cities.ts || fail "src/cities.ts missing London row"
 grep -q 'CREATE TABLE cities' src/migrations/001_cities.sql || fail "cities migration missing"
 grep -q 'CREATE TABLE weeks' src/migrations/002_weeks.sql || fail "weeks migration missing"

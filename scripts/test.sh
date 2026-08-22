@@ -88,6 +88,7 @@ grep -q 'london' src/cities.ts || fail "src/cities.ts missing London row"
 grep -q 'CREATE TABLE cities' src/migrations/001_cities.sql || fail "cities migration missing"
 grep -q 'CREATE TABLE weeks' src/migrations/002_weeks.sql || fail "weeks migration missing"
 grep -q 'CREATE TABLE listings' src/migrations/003_listings.sql || fail "listings migration missing"
+grep -q 'CREATE TABLE checkouts' src/migrations/004_checkouts.sql || fail "checkouts migration missing"
 
 echo "== board UI files =="
 for f in app/page.tsx app/c/\[city\]/page.tsx app/c/\[city\]/\[category\]/page.tsx \
@@ -112,10 +113,33 @@ grep -q 'data-bid' src/ui/listing-card.tsx || fail "cards must show \$bid"
 if grep -RInE '★|⭐|top rated|review count' app src >/dev/null 2>&1; then
   fail "board UI must not render stars or review counts"
 fi
-if grep -RInE 'polar\.sh|POLAR_LIVE=1' app src tests >/dev/null 2>&1; then
-  fail "PR 2 must not add Polar checkout"
-fi
 
+echo "== polar checkout + fixture =="
+for f in src/polar/port.ts src/polar/fake.ts app/api/checkout/route.ts \
+  app/return/page.tsx tests/checkout.test.ts src/migrations/004_checkouts.sql; do
+  [[ -f "$f" ]] || fail "missing $f"
+  [[ -s "$f" ]] || fail "empty $f"
+done
+grep -q 'createCheckout' src/polar/port.ts || fail "port.ts must define createCheckout"
+grep -q 'settle' src/polar/port.ts || fail "port.ts must define settle"
+grep -q 'class FakePolarPort' src/polar/fake.ts || fail "fake.ts must export FakePolarPort"
+grep -q 'POLAR_FIXTURE_ONLY' src/polar/port.ts \
+  || fail "port.ts must honor POLAR_FIXTURE_ONLY"
+grep -q 'bid_too_low' src/polar/port.ts || fail "port.ts must emit bid_too_low"
+grep -q 'bid_not_integer' src/polar/port.ts || fail "port.ts must emit bid_not_integer"
+grep -q 'data-return' app/return/page.tsx || fail "return page must expose paid/cancelled/unknown"
+grep -q '/api/checkout' src/ui/outbid-form.tsx || fail "Outbid form must POST to /api/checkout"
+if [[ -f src/polar/live.ts ]]; then
+  fail "live Polar belongs in PR 9, not this unit"
+fi
+if [[ -d app/api/raise ]]; then
+  fail "raise-bid belongs in PR 4, not this unit"
+fi
+grep -q 'bid_too_low' tests/checkout.test.ts || fail "checkout tests must cover bid_too_low"
+grep -q 'bid_not_integer' tests/checkout.test.ts || fail "checkout tests must cover bid_not_integer"
+if grep -nE 'fetch\(|polar\.sh|api\.polar' src/polar/fake.ts src/polar/port.ts >/dev/null; then
+  fail "fixture/port must not call Polar over the network"
+fi
 if grep -RInE 'https?://([^/]*\.)?polar\.sh' app src tests >/dev/null 2>&1; then
   fail "app/src/tests must not hard-code polar.sh HTTP"
 fi
@@ -211,7 +235,79 @@ if [[ -f package.json ]]; then
   [[ "${unknown_cat_code}" == "404" ]] || fail "GET /c/london/plumbers expected 404 got ${unknown_cat_code}"
   grep -q 'category_unknown' "${unknown_cat}" || fail "unknown category must render category_unknown"
 
-  rm -f "${home_body}" "${city_body}" "${lane_body}" "${unknown_cat}"
+  echo "== fixture checkout HTTP =="
+  paid_body="$(mktemp)"
+  paid_code="$(curl -sS -o "${paid_body}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d '{"business":"North London Movers","category":"movers","city":"london","siteUrl":"https://north.example","amount":20}' \
+    "http://127.0.0.1:${port}/api/checkout")"
+  [[ "${paid_code}" == "200" ]] || fail "POST /api/checkout $20 expected 200 got ${paid_code}: $(cat "${paid_body}")"
+  grep -q '"status":"paid"' "${paid_body}" || fail "fixture checkout must return paid"
+
+  movers_paid="$(mktemp)"
+  movers_paid_code="$(curl -sS -o "${movers_paid}" -w '%{http_code}' "http://127.0.0.1:${port}/c/london/movers")"
+  [[ "${movers_paid_code}" == "200" ]] || fail "GET /c/london/movers after pay expected 200 got ${movers_paid_code}"
+  grep -q 'data-rank="1"' "${movers_paid}" || fail "paid $20 must list at rank 1"
+  grep -q 'North London Movers' "${movers_paid}" || fail "paid listing must appear on the board"
+  grep -q '\$20' "${movers_paid}" || fail "paid listing must show \$20"
+  if grep -q 'data-empty-lane="true"' "${movers_paid}"; then
+    fail "paid lane must not stay empty"
+  fi
+
+  low_body="$(mktemp)"
+  low_code="$(curl -sS -o "${low_body}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d '{"business":"Too Cheap","category":"movers","city":"london","siteUrl":"https://cheap.example","amount":4}' \
+    "http://127.0.0.1:${port}/api/checkout")"
+  [[ "${low_code}" == "400" ]] || fail "POST /api/checkout \$4 expected 400 got ${low_code}"
+  grep -q 'bid_too_low' "${low_body}" || fail "\$4 must return bid_too_low"
+
+  frac_body="$(mktemp)"
+  frac_code="$(curl -sS -o "${frac_body}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d '{"business":"Fractional","category":"movers","city":"london","siteUrl":"https://frac.example","amount":"12.5"}' \
+    "http://127.0.0.1:${port}/api/checkout")"
+  [[ "${frac_code}" == "400" ]] || fail "POST /api/checkout 12.5 expected 400 got ${frac_code}"
+  grep -q 'bid_not_integer' "${frac_body}" || fail "12.5 must return bid_not_integer"
+
+  return_unknown="$(mktemp)"
+  return_unknown_code="$(curl -sS -o "${return_unknown}" -w '%{http_code}' "http://127.0.0.1:${port}/return")"
+  [[ "${return_unknown_code}" == "200" ]] || fail "GET /return expected 200 got ${return_unknown_code}"
+  grep -q 'data-return="unknown"' "${return_unknown}" || fail "GET /return without checkout is unknown"
+
+  form_headers="$(mktemp)"
+  form_body="$(mktemp)"
+  form_code="$(curl -sS -D "${form_headers}" -o "${form_body}" -w '%{http_code}' \
+    -X POST \
+    --data-urlencode 'business=South London Movers' \
+    --data-urlencode 'category=movers' \
+    --data-urlencode 'city=london' \
+    --data-urlencode 'siteUrl=https://south.example' \
+    --data-urlencode 'amount=15' \
+    "http://127.0.0.1:${port}/api/checkout")"
+  [[ "${form_code}" == "303" ]] || fail "form POST /api/checkout expected 303 got ${form_code}: $(cat "${form_body}")"
+  location="$(awk 'BEGIN{IGNORECASE=1} /^location:/{sub("\r",""); print $2; exit}' "${form_headers}")"
+  [[ "${location}" == *"/return?checkout="* ]] || fail "form checkout must redirect to /return?checkout= got ${location}"
+  if [[ "${location}" == http* ]]; then
+    return_url="${location}"
+  else
+    return_url="http://127.0.0.1:${port}${location}"
+  fi
+
+  return_paid="$(mktemp)"
+  return_paid_code="$(curl -sS -o "${return_paid}" -w '%{http_code}' "${return_url}")"
+  [[ "${return_paid_code}" == "200" ]] || fail "GET return after form pay expected 200 got ${return_paid_code}"
+  grep -q 'data-return="paid"' "${return_paid}" || fail "fixture return must show paid"
+
+  movers_two="$(mktemp)"
+  curl -sS -o "${movers_two}" "http://127.0.0.1:${port}/c/london/movers"
+  grep -q 'South London Movers' "${movers_two}" || fail "\$15 underbid must still list"
+  grep -q 'data-rank="2"' "${movers_two}" || fail "\$15 must list below \$20"
+
+  rm -f "${home_body}" "${city_body}" "${lane_body}" "${unknown_cat}" \
+    "${paid_body}" "${movers_paid}" "${low_body}" "${frac_body}" \
+    "${return_unknown}" "${form_headers}" "${form_body}" "${return_paid}" \
+    "${movers_two}"
 fi
 
 echo "OK: buildable and testable"

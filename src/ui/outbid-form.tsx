@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState } from "react";
 import {
   CATEGORIES,
   categoryRequiresLicense,
@@ -33,7 +33,6 @@ export function OutbidForm({
   const [amount, setAmount] = useState(MIN_BID_USD);
   const [selectedCity, setSelectedCity] = useState(defaultCity);
   const [selectedCategory, setSelectedCategory] = useState(defaultCategory);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const activeCategory = lockCategory ? defaultCategory : selectedCategory;
   const licenseNeeded = categoryRequiresLicense(activeCategory);
@@ -52,15 +51,11 @@ export function OutbidForm({
     setAmount((current) => clampAmount(current + delta));
   }
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setNotice("Checkout is not live. No charge and no rank claimed.");
-  }
-
   return (
     <section className="claim" id="claim">
       <form
-        onSubmit={onSubmit}
+        method="post"
+        action="/api/checkout"
         data-bid-form=""
         data-city={lockCity ? defaultCity : selectedCity}
         data-category={activeCategory}
@@ -182,11 +177,6 @@ export function OutbidForm({
             Outbid
           </button>
         </div>
-        {notice ? (
-          <p className="stub-note" data-checkout-stub="">
-            {notice}
-          </p>
-        ) : null}
       </form>
     </section>
   );

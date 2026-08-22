@@ -33,12 +33,12 @@ test("schema has cities, weeks, listings and seeds London", () => {
 
   const tables = db
     .prepare<[], { name: string }>(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('cities', 'listings', 'weeks') ORDER BY name",
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('checkouts', 'cities', 'listings', 'weeks') ORDER BY name",
     )
     .all();
   assert.deepEqual(
     tables.map((row) => row.name),
-    ["cities", "listings", "weeks"],
+    ["checkouts", "cities", "listings", "weeks"],
   );
 
   const cityColumns = columnMap(db, "cities");
@@ -75,6 +75,22 @@ test("schema has cities, weeks, listings and seeds London", () => {
   assert.equal(listingColumns.clicks.type, "INTEGER");
   assert.equal(listingColumns.clicks.notnull, 1);
   assert.equal(listingColumns.clicks.dflt_value, "0");
+  const checkoutColumns = columnMap(db, "checkouts");
+  assert.deepEqual(Object.keys(checkoutColumns), [
+    "id",
+    "amount_usd",
+    "business",
+    "category",
+    "city",
+    "site_url",
+    "license_id",
+    "week_id",
+    "status",
+    "listing_id",
+    "created_at",
+  ]);
+  assert.equal(checkoutColumns.id.pk, 1);
+  assert.match(tableSql(db, "checkouts"), /status IN \('open', 'paid', 'cancelled'\)/);
   assert.match(
     tableSql(db, "listings"),
     /UNIQUE \(site_url, category, city, week_id\)/,

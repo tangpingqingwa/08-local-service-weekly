@@ -1,0 +1,363 @@
+import { randomBytes } from "node:crypto";
+import type { CategorySlug } from "../categories";
+import { getDb, type AppDb, type Listing, type TakedownReason } from "../db";
+import {
+  isPolarLive,
+  parseBidUsd,
+  PolarError,
+  type CheckoutRecord,
+  type CheckoutStart,
+  type CreateCheckoutInput,
+  type ListingDraft,
+  type PolarPort,
+} from "./port";
+
+export type FakePolarOptions = {
+  /** Default true: createCheckout returns paid and places the listing. */
+  autoSettle?: boolean;
+};
+
+type CheckoutRow = {
+  id: string;
+  amount_usd: number;
+  business: string;
+  category: CategorySlug;
+  city: string;
+  site_url: string;
+  license_id: string | null;
+  week_id: string;
+  status: CheckoutRecord["status"];
+  listing_id: string | null;
+  created_at: string;
+};
+
+type ListingRow = {
+  id: string;
+  business: string;
+  category: CategorySlug;
+  city: string;
+  site_url: string;
+  license_id: string | null;
+  bid_usd: number;
+  week_id: string;
+  created_at: string;
+  raised_at: string | null;
+  clicks: number;
+  hidden: number;
+  hidden_reason: TakedownReason | null;
+};
+
+let defaultPort: FakePolarPort | undefined;
+let testOverride: PolarPort | undefined;
+
+function newId(prefix: string): string {
+  return `${prefix}_${randomBytes(8).toString("hex")}`;
+}
+
+/** Monday date (YYYY-MM-DD) in Europe/London. Full week clock is PR 6. */
+export function currentWeekId(now: Date = new Date()): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Europe/London",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      weekday: "short",
+    })
+      .formatToParts(now)
+      .map((part) => [part.type, part.value]),
+  );
+  const weekday: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+  const y = Number(parts.year);
+  const m = Number(parts.month);
+  const d = Number(parts.day);
+  const dow = weekday[parts.weekday ?? "Mon"] ?? 1;
+  const daysFromMonday = dow === 0 ? 6 : dow - 1;
+  const monday = new Date(Date.UTC(y, m - 1, d - daysFromMonday));
+  return monday.toISOString().slice(0, 10);
+}
+
+export function ensureWeek(
+  db: AppDb,
+  weekId: string = currentWeekId(),
+): string {
+  const existing = db
+    .prepare<[string], { id: string }>("SELECT id FROM weeks WHERE id = ?")
+    .get(weekId);
+  if (existing) {
+    return weekId;
+  }
+  const opensAt = `${weekId}T00:00:00.000Z`;
+  const close = new Date(`${weekId}T00:00:00.000Z`);
+  close.setUTCDate(close.getUTCDate() + 7);
+  db.prepare(
+    "INSERT INTO weeks (id, timezone, opens_at, closes_at) VALUES (?, ?, ?, ?)",
+  ).run(weekId, "Europe/London", opensAt, close.toISOString());
+  return weekId;
+}
+
+export function placePaidListing(
+  db: AppDb,
+  draft: ListingDraft,
+  paidAt: string,
+): Listing {
+  const bidUsd = parseBidUsd(draft.bidUsd);
+  const weekId = draft.weekId ?? currentWeekId();
+  ensureWeek(db, weekId);
+  const id = newId("lst");
+  try {
+    db.prepare(
+      `INSERT INTO listings (
+         id, business, category, city, site_url, license_id, bid_usd, week_id,
+         created_at, raised_at, clicks, hidden, hidden_reason
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      id,
+      draft.business,
+      draft.category,
+      draft.city,
+      draft.siteUrl,
+      draft.licenseId,
+      bidUsd,
+      weekId,
+      paidAt,
+      null,
+      0,
+      0,
+      null,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (/UNIQUE/i.test(message)) {
+      throw new PolarError("already_listed", 409);
+    }
+    throw error;
+  }
+  return {
+    id,
+    business: draft.business,
+    category: draft.category,
+    city: draft.city,
+    siteUrl: draft.siteUrl,
+    licenseId: draft.licenseId,
+    bidUsd,
+    weekId,
+    createdAt: paidAt,
+    raisedAt: null,
+    clicks: 0,
+    hidden: false,
+    hiddenReason: null,
+  };
+}
+
+/** In-process Polar. Completing / auto-settling writes the listing; unpaid does not. */
+export class FakePolarPort implements PolarPort {
+  readonly kind = "fixture" as const;
+  private readonly autoSettle: boolean;
+  private seq = 0;
+
+  constructor(
+    private readonly db: AppDb = getDb(),
+    options: FakePolarOptions = {},
+  ) {
+    this.autoSettle = options.autoSettle !== false;
+  }
+
+  reset(): void {
+    this.db.exec("DELETE FROM checkouts");
+    this.seq = 0;
+  }
+
+  async createCheckout(input: CreateCheckoutInput): Promise<CheckoutStart> {
+    const amountUsd = parseBidUsd(input.amountUsd);
+    const weekId = input.listing.weekId ?? currentWeekId();
+    ensureWeek(this.db, weekId);
+    const listing: ListingDraft = {
+      ...input.listing,
+      bidUsd: amountUsd,
+      weekId,
+    };
+    const id = newId("chk");
+    this.db
+      .prepare(
+        `INSERT INTO checkouts (
+           id, amount_usd, business, category, city, site_url, license_id,
+           week_id, status, listing_id, created_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'open', NULL, ?)`,
+      )
+      .run(
+        id,
+        amountUsd,
+        listing.business,
+        listing.category,
+        listing.city,
+        listing.siteUrl,
+        listing.licenseId,
+        weekId,
+        this.nextIso(),
+      );
+    if (this.autoSettle) {
+      const paid = await this.settle(id);
+      return {
+        id,
+        status: "paid",
+        url: `/return?checkout=${encodeURIComponent(id)}`,
+        listingId: paid?.id,
+      };
+    }
+    return {
+      id,
+      status: "open",
+      url: `/return?checkout=${encodeURIComponent(id)}`,
+    };
+  }
+
+  async settle(id: string): Promise<Listing | null> {
+    const checkout = this.loadCheckout(id);
+    if (!checkout || checkout.status === "cancelled") {
+      return null;
+    }
+    if (checkout.status === "paid" && checkout.listingId) {
+      return this.loadListing(checkout.listingId);
+    }
+    const listing = placePaidListing(
+      this.db,
+      checkout.listing,
+      checkout.createdAt,
+    );
+    this.db
+      .prepare(
+        "UPDATE checkouts SET status = 'paid', listing_id = ? WHERE id = ?",
+      )
+      .run(listing.id, id);
+    return listing;
+  }
+
+  async abandon(id: string): Promise<void> {
+    const checkout = this.loadCheckout(id);
+    if (!checkout || checkout.status !== "open") {
+      return;
+    }
+    this.db
+      .prepare("UPDATE checkouts SET status = 'cancelled' WHERE id = ?")
+      .run(id);
+  }
+
+  getCheckout(id: string): CheckoutRecord | undefined {
+    const checkout = this.loadCheckout(id);
+    if (!checkout) {
+      return undefined;
+    }
+    return {
+      id: checkout.id,
+      amountUsd: checkout.amountUsd,
+      listing: { ...checkout.listing },
+      status: checkout.status,
+      listingId: checkout.listingId,
+    };
+  }
+
+  private loadCheckout(
+    id: string,
+  ): (CheckoutRecord & { createdAt: string }) | undefined {
+    const row = this.db
+      .prepare<[string], CheckoutRow>(
+        `SELECT id, amount_usd, business, category, city, site_url, license_id,
+                week_id, status, listing_id, created_at
+           FROM checkouts WHERE id = ?`,
+      )
+      .get(id);
+    if (!row) {
+      return undefined;
+    }
+    return {
+      id: row.id,
+      amountUsd: row.amount_usd,
+      listing: {
+        business: row.business,
+        category: row.category,
+        city: row.city,
+        siteUrl: row.site_url,
+        licenseId: row.license_id,
+        bidUsd: row.amount_usd,
+        weekId: row.week_id,
+      },
+      status: row.status,
+      listingId: row.listing_id ?? undefined,
+      createdAt: row.created_at,
+    };
+  }
+
+  private loadListing(id: string): Listing | null {
+    const row = this.db
+      .prepare<[string], ListingRow>(
+        `SELECT id, business, category, city, site_url, license_id, bid_usd,
+                week_id, created_at, raised_at, clicks, hidden, hidden_reason
+           FROM listings WHERE id = ?`,
+      )
+      .get(id);
+    return row ? listingFromRow(row) : null;
+  }
+
+  private nextIso(): string {
+    this.seq += 1;
+    return new Date(Date.now() + this.seq).toISOString();
+  }
+}
+
+function listingFromRow(row: ListingRow): Listing {
+  return {
+    id: row.id,
+    business: row.business,
+    category: row.category,
+    city: row.city,
+    siteUrl: row.site_url,
+    licenseId: row.license_id,
+    bidUsd: row.bid_usd,
+    weekId: row.week_id,
+    createdAt: row.created_at,
+    raisedAt: row.raised_at,
+    clicks: row.clicks,
+    hidden: row.hidden === 1,
+    hiddenReason: row.hidden_reason,
+  };
+}
+
+export function getFakePolarPort(db?: AppDb): FakePolarPort {
+  if (db) {
+    return new FakePolarPort(db);
+  }
+  if (!defaultPort) {
+    defaultPort = new FakePolarPort(getDb());
+  }
+  return defaultPort;
+}
+
+/** Fixture unless live is requested. Live Polar is PR 9 — fail closed. */
+export function getPolarPort(db?: AppDb): PolarPort {
+  if (testOverride) {
+    return testOverride;
+  }
+  if (isPolarLive()) {
+    throw new PolarError("polar_not_live", 503);
+  }
+  return getFakePolarPort(db);
+}
+
+export function setPolarPortForTests(port?: PolarPort): void {
+  testOverride = port;
+}
+
+export function resetPolarFixture(): void {
+  defaultPort?.reset();
+  defaultPort = undefined;
+  testOverride = undefined;
+}

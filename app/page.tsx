@@ -1,9 +1,11 @@
 import {
   DEFAULT_CITY_SLUG,
   listCityLanes,
+  listLastWeekChampions,
   resolveCity,
 } from "../src/board";
 import { CityHub } from "../src/ui/city-hub";
+import { currentWeekId } from "../src/week";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,5 +16,13 @@ export default function HomePage() {
     throw new Error("v1 default city London is missing from the catalog");
   }
 
-  return <CityHub city={city.value} lanes={listCityLanes(city.value.slug)} />;
+  const weekId = currentWeekId();
+  return (
+    <CityHub
+      city={city.value}
+      lanes={listCityLanes(city.value.slug)}
+      lastWeek={listLastWeekChampions(city.value.slug)}
+      weekId={weekId}
+    />
+  );
 }

@@ -6,6 +6,12 @@ import {
   findListingByIdentity,
 } from "../listings";
 import {
+  currentWeekId,
+  ensureWeek,
+  requireOpenWeek,
+  WeekError,
+} from "../week";
+import {
   isPolarLive,
   parseBidUsd,
   parseChargeUsd,
@@ -17,6 +23,8 @@ import {
   type ListingDraft,
   type PolarPort,
 } from "./port";
+
+export { currentWeekId, ensureWeek } from "../week";
 
 export type FakePolarOptions = {
   /** Default true: createCheckout returns paid and places the listing. */
@@ -62,54 +70,15 @@ function newId(prefix: string): string {
   return `${prefix}_${randomBytes(8).toString("hex")}`;
 }
 
-/** Monday date (YYYY-MM-DD) in Europe/London. Full week clock is PR 6. */
-export function currentWeekId(now: Date = new Date()): string {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: "Europe/London",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      weekday: "short",
-    })
-      .formatToParts(now)
-      .map((part) => [part.type, part.value]),
-  );
-  const weekday: Record<string, number> = {
-    Sun: 0,
-    Mon: 1,
-    Tue: 2,
-    Wed: 3,
-    Thu: 4,
-    Fri: 5,
-    Sat: 6,
-  };
-  const y = Number(parts.year);
-  const m = Number(parts.month);
-  const d = Number(parts.day);
-  const dow = weekday[parts.weekday ?? "Mon"] ?? 1;
-  const daysFromMonday = dow === 0 ? 6 : dow - 1;
-  const monday = new Date(Date.UTC(y, m - 1, d - daysFromMonday));
-  return monday.toISOString().slice(0, 10);
-}
-
-export function ensureWeek(
-  db: AppDb,
-  weekId: string = currentWeekId(),
-): string {
-  const existing = db
-    .prepare<[string], { id: string }>("SELECT id FROM weeks WHERE id = ?")
-    .get(weekId);
-  if (existing) {
-    return weekId;
+function openWeekId(id: string): string {
+  try {
+    return requireOpenWeek(id);
+  } catch (error) {
+    if (error instanceof WeekError) {
+      throw new PolarError(error.code, error.httpStatus, error.message);
+    }
+    throw error;
   }
-  const opensAt = `${weekId}T00:00:00.000Z`;
-  const close = new Date(`${weekId}T00:00:00.000Z`);
-  close.setUTCDate(close.getUTCDate() + 7);
-  db.prepare(
-    "INSERT INTO weeks (id, timezone, opens_at, closes_at) VALUES (?, ?, ?, ?)",
-  ).run(weekId, "Europe/London", opensAt, close.toISOString());
-  return weekId;
 }
 
 export function placePaidListing(
@@ -118,7 +87,7 @@ export function placePaidListing(
   paidAt: string,
 ): Listing {
   const bidUsd = parseBidUsd(draft.bidUsd);
-  const weekId = draft.weekId ?? currentWeekId();
+  const weekId = openWeekId(draft.weekId ?? currentWeekId());
   ensureWeek(db, weekId);
   const id = newId("lst");
   try {
@@ -170,7 +139,9 @@ function settlePaidRaise(
   db: AppDb,
   checkout: CheckoutRecord & { createdAt: string },
 ): Listing {
-  const weekId = checkout.listing.weekId;
+  const weekId = checkout.listing.weekId
+    ? openWeekId(checkout.listing.weekId)
+    : undefined;
   if (!weekId) {
     throw new PolarError("invalid_listing", 400, "Missing weekId");
   }
@@ -220,7 +191,7 @@ export class FakePolarPort implements PolarPort {
       intent === "raise"
         ? parseChargeUsd(input.amountUsd)
         : parseBidUsd(input.amountUsd);
-    const weekId = input.listing.weekId ?? currentWeekId();
+    const weekId = openWeekId(input.listing.weekId ?? currentWeekId());
     ensureWeek(this.db, weekId);
     const targetBidUsd =
       intent === "raise" ? parseBidUsd(input.listing.bidUsd) : amountUsd;

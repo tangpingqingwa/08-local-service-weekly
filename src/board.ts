@@ -5,6 +5,7 @@ import {
   type Listing,
   type TakedownReason,
 } from "./db";
+import { currentWeekId, previousWeekId } from "./week";
 
 export { DEFAULT_CITY_SLUG, MAX_BID_USD, MIN_BID_USD } from "./constants";
 export { resolveCategory } from "./categories";
@@ -57,34 +58,66 @@ export function rankLane(listings: readonly Listing[]): RankedListing[] {
     }));
 }
 
-/** Visible listings in one city × category. Clicks stay at the stored integer. */
+/**
+ * Visible listings in one (city, category, weekId) lane.
+ * Ranker stays keyed by city; weeks never mix. Clicks stay at the stored integer.
+ */
 export function listLane(
   city: string,
   category: CategorySlug,
   db: AppDb = getDb(),
+  week: string = currentWeekId(),
 ): RankedListing[] {
   const rows = db
-    .prepare<[string, string], ListingRow>(
+    .prepare<[string, string, string], ListingRow>(
       `SELECT id, business, category, city, site_url, license_id, bid_usd,
               week_id, created_at, raised_at, clicks, hidden, hidden_reason
          FROM listings
-        WHERE city = ? AND category = ? AND hidden = 0
+        WHERE city = ? AND category = ? AND week_id = ? AND hidden = 0
         ORDER BY bid_usd DESC, created_at ASC`,
     )
-    .all(city, category);
+    .all(city, category, week);
   return rankLane(rows.map(listingFromRow));
 }
 
 export function listCityLanes(
   city: string,
   db: AppDb = getDb(),
+  week: string = currentWeekId(),
 ): Record<CategorySlug, RankedListing[]> {
   return Object.fromEntries(
     CATEGORIES.map((category) => [
       category.slug,
-      listLane(city, category.slug, db),
+      listLane(city, category.slug, db, week),
     ]),
   ) as Record<CategorySlug, RankedListing[]>;
+}
+
+/** Last week's #1 in this city × category, if anyone paid. Not current rank. */
+export function lastWeekNumberOne(
+  city: string,
+  category: CategorySlug,
+  db: AppDb = getDb(),
+  now: Date = new Date(),
+): RankedListing | undefined {
+  const lastWeek = previousWeekId(currentWeekId(now));
+  return listLane(city, category, db, lastWeek)[0];
+}
+
+export function listLastWeekChampions(
+  city: string,
+  db: AppDb = getDb(),
+  now: Date = new Date(),
+): Partial<Record<CategorySlug, RankedListing>> {
+  const lastWeek = previousWeekId(currentWeekId(now));
+  const out: Partial<Record<CategorySlug, RankedListing>> = {};
+  for (const category of CATEGORIES) {
+    const champion = listLane(city, category.slug, db, lastWeek)[0];
+    if (champion) {
+      out[category.slug] = champion;
+    }
+  }
+  return out;
 }
 
 function listingFromRow(row: ListingRow): Listing {

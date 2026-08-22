@@ -8,6 +8,8 @@ type LaneBoardProps = {
   city: City;
   category: Category;
   listings: readonly RankedListing[];
+  lastWeek?: RankedListing;
+  weekId?: string;
   showForm?: boolean;
 };
 
@@ -15,6 +17,8 @@ export function LaneBoard({
   city,
   category,
   listings,
+  lastWeek,
+  weekId,
   showForm = false,
 }: LaneBoardProps) {
   return (
@@ -23,6 +27,7 @@ export function LaneBoard({
       data-lane=""
       data-city={city.slug}
       data-category={category.slug}
+      data-week={weekId}
     >
       <header className="lane-header">
         <h2>
@@ -45,6 +50,14 @@ export function LaneBoard({
           ))}
         </ol>
       )}
+      {lastWeek ? (
+        <aside className="last-week" data-last-week="">
+          <p>
+            Last week #1: <strong>{lastWeek.business}</strong> at $
+            {lastWeek.bidUsd}. Not this week&apos;s #1 unless they pay again.
+          </p>
+        </aside>
+      ) : null}
       {showForm ? (
         <OutbidForm
           city={city.slug}

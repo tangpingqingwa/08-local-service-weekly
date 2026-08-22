@@ -3,6 +3,7 @@ import { resolveCity } from "../cities";
 import { MAX_BID_USD, MIN_BID_USD } from "../constants";
 import type { AppDb, Listing } from "../db";
 import { canonicalizeSiteUrl, UrlError } from "../urls";
+import { currentWeekId } from "../week";
 
 export type PolarEnv = Record<string, string | undefined>;
 
@@ -135,6 +136,7 @@ export function parseListingDraft(
   const siteUrl = readSiteUrl(input.siteUrl ?? input.site);
   const licenseId = readOptionalText(input.licenseId);
   const bidUsd = parseBidUsd(input.amount ?? input.amountUsd ?? input.bidUsd);
+  const weekId = readOptionalText(input.weekId) ?? currentWeekId();
   return {
     business,
     category: categoryLookup.value.slug,
@@ -142,6 +144,7 @@ export function parseListingDraft(
     siteUrl,
     licenseId,
     bidUsd,
+    weekId,
   };
 }
 

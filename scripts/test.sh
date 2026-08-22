@@ -129,16 +129,14 @@ grep -q 'bid_too_low' src/polar/port.ts || fail "port.ts must emit bid_too_low"
 grep -q 'bid_not_integer' src/polar/port.ts || fail "port.ts must emit bid_not_integer"
 grep -q 'data-return' app/return/page.tsx || fail "return page must expose paid/cancelled/unknown"
 grep -q '/api/checkout' src/ui/outbid-form.tsx || fail "Outbid form must POST to /api/checkout"
-if [[ -f src/polar/live.ts ]]; then
-  fail "live Polar belongs in PR 9, not this unit"
-fi
 grep -q 'bid_too_low' tests/checkout.test.ts || fail "checkout tests must cover bid_too_low"
 grep -q 'bid_not_integer' tests/checkout.test.ts || fail "checkout tests must cover bid_not_integer"
 if grep -nE 'fetch\(|polar\.sh|api\.polar' src/polar/fake.ts src/polar/port.ts >/dev/null; then
   fail "fixture/port must not call Polar over the network"
 fi
-if grep -RInE 'https?://([^/]*\.)?polar\.sh' app src tests >/dev/null 2>&1; then
-  fail "app/src/tests must not hard-code polar.sh HTTP"
+if grep -RInE 'https?://([^/]*\.)?polar\.sh' app src tests \
+  | grep -v 'src/polar/live.ts:' >/dev/null; then
+  fail "app/src/tests must not hard-code polar.sh HTTP (live.ts excepted)"
 fi
 
 echo "== raise-bid difference =="
@@ -214,9 +212,6 @@ grep -q 'license_required' tests/takedown.test.ts || fail "takedown tests must c
 grep -q 'hideListing' tests/takedown.test.ts || fail "takedown tests must hide #1"
 grep -q 'not verified' tests/takedown.test.ts || fail "takedown tests must not invent license verification"
 grep -q 'invent' tests/takedown.test.ts || fail "takedown tests must refuse invented replacement #1"
-if [[ -f src/polar/live.ts ]]; then
-  fail "live Polar belongs in PR 9, not this unit"
-fi
 echo "== public click counts =="
 for f in app/go/\[id\]/route.ts src/clicks.ts tests/clicks.test.ts; do
   [[ -f "$f" ]] || fail "missing $f"
@@ -231,8 +226,50 @@ grep -q 'incrementPublicClick' app/go/\[id\]/route.ts || fail "go route must inc
 grep -q 'utm_source' tests/clicks.test.ts || fail "click tests must strip utm_source"
 grep -q '302' tests/clicks.test.ts || fail "click tests must assert 302"
 grep -q 'listing_not_found' tests/clicks.test.ts || fail "click tests must cover missing listings"
-if [[ -f src/polar/live.ts || -f scripts/live-smoke.sh ]]; then
-  fail "live Polar / live-smoke belong in PR 9, not this unit"
+echo "== live Polar gate + live-smoke =="
+for f in src/polar/live.ts scripts/live-smoke.sh docs/live-smoke.md tests/live-smoke.test.ts; do
+  [[ -f "$f" ]] || fail "missing $f"
+  [[ -s "$f" ]] || fail "empty $f"
+done
+[[ -x scripts/live-smoke.sh ]] || fail "scripts/live-smoke.sh must be executable"
+grep -q 'export class LivePolarPort' src/polar/live.ts \
+  || fail "live.ts must export LivePolarPort"
+grep -q 'BLOCKED-SECRET: POLAR_ACCESS_TOKEN' src/polar/live.ts \
+  || fail "live.ts must fail closed without POLAR_ACCESS_TOKEN"
+grep -q 'POLAR_LIVE' src/polar/live.ts || fail "live.ts must gate on POLAR_LIVE"
+grep -q 'POLAR_FIXTURE_ONLY' src/polar/live.ts \
+  || fail "live.ts must honor POLAR_FIXTURE_ONLY"
+grep -q 'getPolarPort' src/polar/fake.ts || fail "fake.ts must select the Polar port"
+grep -q 'LivePolarPort' src/polar/fake.ts \
+  || fail "getPolarPort must select LivePolarPort when live"
+grep -q 'BLOCKED-SECRET: POLAR_ACCESS_TOKEN' scripts/live-smoke.sh \
+  || fail "live-smoke.sh must name BLOCKED-SECRET: POLAR_ACCESS_TOKEN"
+grep -q 'POLAR_LIVE' scripts/live-smoke.sh \
+  || fail "live-smoke.sh must gate live Polar on POLAR_LIVE"
+grep -q 'live-smoke refuses CI=true' scripts/live-smoke.sh \
+  || fail "live-smoke.sh must refuse CI=true"
+grep -q 'live-smoke must not run in GitHub Actions' scripts/live-smoke.sh \
+  || fail "live-smoke.sh must refuse GITHUB_ACTIONS"
+grep -q 'data-empty-lane' scripts/live-smoke.sh \
+  || fail "live-smoke.sh must keep an empty London lane honest"
+grep -q 'PASS-ERROR' docs/live-smoke.md || fail "docs/live-smoke.md missing PASS-ERROR"
+grep -q 'BLOCKED-SECRET' docs/live-smoke.md || fail "docs/live-smoke.md missing BLOCKED-SECRET"
+grep -q 'London' docs/live-smoke.md || fail "docs/live-smoke.md must name London"
+if grep -Eq '^\s*(bash )?(\./)?scripts/live-smoke\.sh' scripts/test.sh; then
+  fail "test.sh must not invoke live-smoke.sh"
+fi
+if grep -q 'live-smoke.sh' .github/workflows/ci.yml; then
+  fail "live-smoke.sh must not be called from Actions"
+fi
+if grep -Eqi 'POLAR_LIVE=1|POLAR_ACCESS_TOKEN=' .github/workflows/ci.yml; then
+  fail "CI must not set live Polar flags or secrets"
+fi
+grep -q 'BLOCKED-SECRET' tests/live-smoke.test.ts \
+  || fail "live-smoke tests must cover BLOCKED-SECRET"
+grep -q 'POLAR_FIXTURE_ONLY' tests/live-smoke.test.ts \
+  || fail "live-smoke tests must cover POLAR_FIXTURE_ONLY wins"
+if grep -nE 'fetch\(|polar\.sh|api\.polar' tests/live-smoke.test.ts >/dev/null; then
+  fail "live-smoke tests must stay offline (no Polar HTTP)"
 fi
 grep -q 'charged \$5' tests/raise.test.ts \
   || grep -q 'chargeUsd, 5' tests/raise.test.ts \

@@ -88,6 +88,8 @@ test("schema has cities, weeks, listings and seeds London", () => {
     "status",
     "listing_id",
     "created_at",
+    "intent",
+    "target_bid_usd",
   ]);
   assert.equal(checkoutColumns.id.pk, 1);
   assert.match(tableSql(db, "checkouts"), /status IN \('open', 'paid', 'cancelled'\)/);

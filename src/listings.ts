@@ -8,6 +8,7 @@ import {
   type PolarPort,
 } from "./polar/port";
 import { canonicalizeSiteUrl, UrlError } from "./urls";
+import { currentWeekId, requireOpenWeek, WeekError } from "./week";
 
 function dbFromPort(port: PolarPort, fallback: AppDb): AppDb {
   if (typeof port.database === "function") {
@@ -192,9 +193,14 @@ export async function raiseListing(
   db?: AppDb,
 ): Promise<RaiseResult> {
   const store = db ?? dbFromPort(port, getDb());
-  const weekId = draft.weekId;
-  if (!weekId) {
-    throw new PolarError("invalid_listing", 400, "Missing weekId");
+  let weekId = draft.weekId ?? currentWeekId();
+  try {
+    weekId = requireOpenWeek(weekId);
+  } catch (error) {
+    if (error instanceof WeekError) {
+      throw new PolarError(error.code, error.httpStatus, error.message);
+    }
+    throw error;
   }
   const existing = findListingByIdentity(store, {
     siteUrl: draft.siteUrl,

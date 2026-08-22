@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { raiseListing } from "../../../src/listings";
-import { currentWeekId, getPolarPort } from "../../../src/polar/fake";
+import { getPolarPort } from "../../../src/polar/fake";
 import { parseListingDraft, PolarError } from "../../../src/polar/port";
+import { currentWeekId } from "../../../src/week";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

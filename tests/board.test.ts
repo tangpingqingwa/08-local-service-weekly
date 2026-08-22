@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 (globalThis as { React?: typeof React }).React = React;
 import {
   DEFAULT_CITY_SLUG,
+  lastWeekNumberOne,
   listCityLanes,
   listLane,
   rankLane,
@@ -17,6 +18,7 @@ import { CATEGORIES, CATEGORY_SLUGS, getCategory } from "../src/categories";
 import { getCity } from "../src/cities";
 import type { Listing } from "../src/db";
 import { openDatabase } from "../src/db";
+import { currentWeekId, ensureWeek, previousWeekId } from "../src/week";
 import { CityHub } from "../src/ui/city-hub";
 import { LaneBoard } from "../src/ui/lane-board";
 import { ListingCard } from "../src/ui/listing-card";
@@ -122,6 +124,17 @@ test("listLane on a fresh db is empty and clicks stay at the stored 0", () => {
     siteUrl: "https://example.com",
     bidUsd: 20,
     clicks: 0,
+    weekId: currentWeekId(),
+  });
+  insertListing(db, {
+    id: "lst_last",
+    business: "Last Week Van",
+    category: "movers",
+    city: "london",
+    siteUrl: "https://last.example",
+    bidUsd: 99,
+    clicks: 0,
+    weekId: previousWeekId(currentWeekId()),
   });
   const [row] = listLane("london", "movers", db);
   assert.ok(row);
@@ -129,7 +142,12 @@ test("listLane on a fresh db is empty and clicks stay at the stored 0", () => {
   assert.equal(row.bidUsd, 20);
   assert.equal(row.clicks, 0);
   assert.equal(row.siteHost, "example.com");
+  assert.equal(row.business, "North London Movers");
+  assert.equal(row.weekId, currentWeekId());
+  assert.notEqual(row.business, "Last Week Van");
   assert.deepEqual(listLane("london", "dentists", db), []);
+  assert.equal(lastWeekNumberOne("london", "movers", db)?.business, "Last Week Van");
+  assert.equal(listLane("london", "movers", db, previousWeekId(currentWeekId()))[0]?.rank, 1);
 });
 
 test("unknown-city 404 chrome prints city_unknown", () => {
@@ -319,14 +337,8 @@ function ranked(overrides: Partial<RankedListing> = {}): RankedListing {
 }
 
 function seedWeek(db: import("better-sqlite3").Database): void {
-  db.prepare(
-    "INSERT INTO weeks (id, timezone, opens_at, closes_at) VALUES (?, ?, ?, ?)",
-  ).run(
-    "2026-08-17",
-    "Europe/London",
-    "2026-08-16T23:00:00.000Z",
-    "2026-08-23T23:00:00.000Z",
-  );
+  ensureWeek(db, currentWeekId());
+  ensureWeek(db, previousWeekId(currentWeekId()));
 }
 
 function insertListing(
@@ -339,8 +351,11 @@ function insertListing(
     siteUrl: string;
     bidUsd: number;
     clicks: number;
+    weekId?: string;
   },
 ): void {
+  const week = row.weekId ?? currentWeekId();
+  ensureWeek(db, week);
   db.prepare(
     `INSERT INTO listings (
        id, business, category, city, site_url, license_id, bid_usd, week_id,
@@ -354,7 +369,7 @@ function insertListing(
     row.siteUrl,
     null,
     row.bidUsd,
-    "2026-08-17",
+    week,
     "2026-08-17T00:00:00.000Z",
     null,
     row.clicks,

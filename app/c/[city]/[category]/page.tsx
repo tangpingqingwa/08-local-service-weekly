@@ -1,6 +1,12 @@
-import { listLane, resolveCategory, resolveCity } from "../../../../src/board";
+import {
+  lastWeekNumberOne,
+  listLane,
+  resolveCategory,
+  resolveCity,
+} from "../../../../src/board";
 import { LaneBoard } from "../../../../src/ui/lane-board";
 import { NotFoundCode } from "../../../../src/ui/not-found-code";
+import { currentWeekId } from "../../../../src/week";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,9 +26,11 @@ export default async function LanePage({ params }: LanePageProps) {
     return <NotFoundCode code="category_unknown" />;
   }
 
+  const weekId = currentWeekId();
   const listings = listLane(city.value.slug, category.value.slug);
+  const lastWeek = lastWeekNumberOne(city.value.slug, category.value.slug);
   return (
-    <main className="board" data-board="" data-city={city.value.slug}>
+    <main className="board" data-board="" data-city={city.value.slug} data-week={weekId}>
       <header className="board-header">
         <p className="eyebrow">Local Service Weekly</p>
         <h1>
@@ -34,6 +42,8 @@ export default async function LanePage({ params }: LanePageProps) {
         city={city.value}
         category={category.value}
         listings={listings}
+        lastWeek={lastWeek}
+        weekId={weekId}
         showForm
       />
     </main>

@@ -183,11 +183,28 @@ grep -q 'url_shortener' tests/urls.test.ts || fail "url tests must cover url_sho
 if grep -RInE '★|⭐|top rated|review count' app/about app/rules src/urls.ts >/dev/null 2>&1; then
   fail "about/rules/urls must not render stars or review counts"
 fi
-if [[ -f src/week.ts || -f tests/week.test.ts ]]; then
-  fail "week clock belongs in PR 6, not this unit"
+echo "== weekly window + London v1 lane =="
+for f in src/week.ts tests/week.test.ts; do
+  [[ -f "$f" ]] || fail "missing $f"
+  [[ -s "$f" ]] || fail "empty $f"
+done
+grep -q 'export function weekId' src/week.ts || fail "week.ts must export weekId"
+grep -q 'Europe/London' src/week.ts || fail "week.ts must use Europe/London"
+grep -q 'week_closed' src/week.ts || fail "week.ts must reject closed weeks"
+grep -q 'week_id = ?' src/board.ts || fail "board must filter lanes by weekId"
+grep -q 'lastWeekNumberOne' src/board.ts || fail "board must expose last-week archive, not current #1"
+grep -q 'Monday 00:00' tests/week.test.ts || fail "week tests must pin Monday 00:00 London rollover"
+grep -q 'week_closed' tests/week.test.ts || fail "week tests must cover week_closed"
+grep -q 'Last Week Van' tests/week.test.ts || fail "week tests must keep last week off current #1"
+grep -q 'manchester' tests/week.test.ts || fail "week tests must keep ranker keyed by city"
+if [[ -f src/takedown.ts ]]; then
+  fail "takedown belongs in PR 7, not this unit"
 fi
 if [[ -f src/polar/live.ts ]]; then
   fail "live Polar belongs in PR 9, not this unit"
+fi
+if [[ -f app/go/\[id\]/route.ts || -f src/clicks.ts ]]; then
+  fail "public clicks belong in PR 8, not this unit"
 fi
 grep -q 'charged \$5' tests/raise.test.ts \
   || grep -q 'chargeUsd, 5' tests/raise.test.ts \
@@ -261,6 +278,7 @@ if [[ -f package.json ]]; then
   home_code="$(curl -sS -o "${home_body}" -w '%{http_code}' "http://127.0.0.1:${port}/")"
   [[ "${home_code}" == "200" ]] || fail "GET / expected 200 got ${home_code}"
   grep -q 'data-city="london"' "${home_body}" || fail "GET / must default to London"
+  grep -q 'data-week="' "${home_body}" || fail "GET / must stamp the open weekId"
   grep -q 'data-empty-lane="true"' "${home_body}" || fail "GET / empty London lane must be empty"
   grep -q 'Outbid' "${home_body}" || fail "GET / must show Outbid form chrome"
   if grep -qiE '★|⭐|top rated|review count' "${home_body}"; then
@@ -466,13 +484,68 @@ if [[ -f package.json ]]; then
     fail "rejected chat/NSFW/shortener URLs must not list"
   fi
 
+  echo "== weekly window HTTP =="
+  open_week="$(npx tsx -e 'import { currentWeekId } from "./src/week.ts"; process.stdout.write(currentWeekId())')"
+  last_week="$(npx tsx -e 'import { currentWeekId, previousWeekId } from "./src/week.ts"; process.stdout.write(previousWeekId(currentWeekId()))')"
+  grep -q "data-week=\"${open_week}\"" "${movers_hygiene}" \
+    || fail "lane board must stamp open weekId ${open_week}"
+
+  closed_week_body="$(mktemp)"
+  closed_week_code="$(curl -sS -o "${closed_week_body}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d "{\"business\":\"Stale Van\",\"category\":\"movers\",\"city\":\"london\",\"siteUrl\":\"https://stale.example\",\"amount\":20,\"weekId\":\"${last_week}\"}" \
+    "http://127.0.0.1:${port}/api/checkout")"
+  [[ "${closed_week_code}" == "409" ]] \
+    || fail "closed week checkout expected 409 got ${closed_week_code}: $(cat "${closed_week_body}")"
+  grep -q 'week_closed' "${closed_week_body}" || fail "closed week must return week_closed"
+
+  DATABASE_PATH="${db_file}" npx tsx -e '
+    import { openDatabase } from "./src/db.ts";
+    import { currentWeekId, ensureWeek, previousWeekId } from "./src/week.ts";
+    const db = openDatabase(process.env.DATABASE_PATH);
+    const last = previousWeekId(currentWeekId());
+    ensureWeek(db, last);
+    db.prepare(
+      `INSERT INTO listings (
+         id, business, category, city, site_url, license_id, bid_usd, week_id,
+         created_at, raised_at, clicks, hidden, hidden_reason
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "lst_last_week",
+      "Last Week Van",
+      "movers",
+      "london",
+      "https://last.example",
+      null,
+      99,
+      last,
+      "2026-08-10T00:00:00.000Z",
+      null,
+      0,
+      0,
+      null,
+    );
+    db.close();
+  '
+
+  movers_week="$(mktemp)"
+  curl -sS -o "${movers_week}" "http://127.0.0.1:${port}/c/london/movers"
+  grep -q 'data-empty-lane="true"' "${movers_week}" && fail "open week with paid listings must not be empty"
+  grep -q 'data-last-week' "${movers_week}" || fail "board may show last week as archive copy"
+  grep -q 'Last Week Van' "${movers_week}" || fail "last week #1 may appear as archive copy"
+  occupant_week_rank="$(python3 -c 'import re,sys; html=open(sys.argv[1]).read(); m=re.search(r"data-rank=\"(\d)\"[\s\S]{0,400}Last Week Van", html); print(m.group(1) if m else "")' "${movers_week}")"
+  [[ -z "${occupant_week_rank}" ]] || fail "last week must not be current #1 (rank=${occupant_week_rank})"
+  current_one="$(python3 -c 'import re,sys; html=open(sys.argv[1]).read(); m=re.search(r"data-rank=\"1\"[\s\S]{0,400}<h3 class=\"business\">([^<]+)", html); print(m.group(1) if m else "")' "${movers_week}")"
+  [[ "${current_one}" != "Last Week Van" ]] || fail "last week occupant must not be this week #1"
+  grep -q 'North London Movers' "${movers_week}" || fail "current-week occupant must remain listed"
+
   rm -f "${home_body}" "${city_body}" "${lane_body}" "${unknown_cat}" \
     "${paid_body}" "${movers_paid}" "${low_body}" "${frac_body}" \
     "${return_unknown}" "${form_headers}" "${form_body}" "${return_paid}" \
     "${movers_two}" "${raise_body}" "${movers_raised}" "${rival_body}" \
     "${movers_rival}" "${same_raise}" "${about_body}" "${rules_body}" \
     "${tracked_body}" "${movers_tracked}" "${chat_body}" "${nsfw_body}" \
-    "${short_body}" "${movers_hygiene}"
+    "${short_body}" "${movers_hygiene}" "${closed_week_body}" "${movers_week}"
 fi
 
 echo "OK: buildable and testable"

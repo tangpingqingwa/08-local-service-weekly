@@ -7,11 +7,13 @@ import { OutbidForm } from "./outbid-form";
 type CityHubProps = {
   city: City;
   lanes: Readonly<Record<CategorySlug, readonly RankedListing[]>>;
+  lastWeek?: Readonly<Partial<Record<CategorySlug, RankedListing>>>;
+  weekId?: string;
 };
 
-export function CityHub({ city, lanes }: CityHubProps) {
+export function CityHub({ city, lanes, lastWeek, weekId }: CityHubProps) {
   return (
-    <main className="board" data-board="" data-city={city.slug}>
+    <main className="board" data-board="" data-city={city.slug} data-week={weekId}>
       <header className="board-header">
         <p className="eyebrow">Local Service Weekly</p>
         <h1>{city.display}</h1>
@@ -37,6 +39,8 @@ export function CityHub({ city, lanes }: CityHubProps) {
           city={city}
           category={category}
           listings={lanes[category.slug]}
+          lastWeek={lastWeek?.[category.slug]}
+          weekId={weekId}
         />
       ))}
       <OutbidForm city={city.slug} lockCity />

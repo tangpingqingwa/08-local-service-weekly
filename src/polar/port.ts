@@ -2,6 +2,7 @@ import { resolveCategory, type CategorySlug } from "../categories";
 import { resolveCity } from "../cities";
 import { MAX_BID_USD, MIN_BID_USD } from "../constants";
 import type { AppDb, Listing } from "../db";
+import { canonicalizeSiteUrl, UrlError } from "../urls";
 
 export type PolarEnv = Record<string, string | undefined>;
 
@@ -166,14 +167,13 @@ function readBusiness(raw: unknown): string {
 function readSiteUrl(raw: unknown): string {
   const text = readRequired(raw, "siteUrl");
   try {
-    const url = new URL(text);
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
-      throw new Error("not http(s)");
+    return canonicalizeSiteUrl(text);
+  } catch (error) {
+    if (error instanceof UrlError) {
+      throw new PolarError(error.code, error.httpStatus, error.message);
     }
-  } catch {
-    throw new PolarError("invalid_listing", 400, "Site URL must be http(s)");
+    throw error;
   }
-  return text;
 }
 
 function readOptionalText(raw: unknown): string | null {

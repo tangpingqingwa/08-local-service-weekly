@@ -1,0 +1,283 @@
+import assert from "node:assert/strict";
+import { after, afterEach, test } from "node:test";
+import React, { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import AboutPage from "../app/about/page";
+import RulesPage from "../app/rules/page";
+import { listLane } from "../src/board";
+import { openDatabase } from "../src/db";
+import { findListingByIdentity, listingIdentity } from "../src/listings";
+import {
+  FakePolarPort,
+  currentWeekId,
+  resetPolarFixture,
+  setPolarPortForTests,
+} from "../src/polar/fake";
+import { PolarError, parseListingDraft } from "../src/polar/port";
+import {
+  canonicalizeSiteUrl,
+  isTrackingQueryKey,
+  UrlError,
+} from "../src/urls";
+
+(globalThis as { React?: typeof React }).React = React;
+
+process.env.DATABASE_PATH = ":memory:";
+
+afterEach(() => {
+  resetPolarFixture();
+});
+
+function assertUrlError(raw: string, code: string): void {
+  assert.throws(
+    () => canonicalizeSiteUrl(raw),
+    (err: unknown) => {
+      assert.ok(err instanceof UrlError);
+      assert.equal(err.code, code);
+      assert.equal(err.httpStatus, 400);
+      return true;
+    },
+  );
+}
+
+test("strips tracking query keys, fragment, and lowercases host", () => {
+  assert.equal(
+    canonicalizeSiteUrl("https://North.Example/van?utm_source=x&utm_campaign=ad#frag"),
+    "https://north.example/van",
+  );
+  assert.equal(
+    canonicalizeSiteUrl(
+      "https://north.example/van?gclid=1&fbclid=2&ref=tweet&ref_id=9&affiliate=x&via=ad&mc_cid=1&mc_eid=2&keep=yes",
+    ),
+    "https://north.example/van?keep=yes",
+  );
+  assert.equal(
+    canonicalizeSiteUrl("https://NORTH.EXAMPLE:443/van/"),
+    "https://north.example/van",
+  );
+  assert.equal(
+    canonicalizeSiteUrl("http://north.example/van?utm_source=x"),
+    "https://north.example/van",
+  );
+  assert.equal(isTrackingQueryKey("utm_source"), true);
+  assert.equal(isTrackingQueryKey("gclid"), true);
+  assert.equal(isTrackingQueryKey("keep"), false);
+});
+
+test("trailing slash is ignored for identity", () => {
+  assert.equal(
+    canonicalizeSiteUrl("https://north.example/van/"),
+    canonicalizeSiteUrl("https://north.example/van"),
+  );
+  assert.deepEqual(
+    listingIdentity({
+      siteUrl: "https://NORTH.EXAMPLE/van/?utm_source=x",
+      category: "movers",
+      city: "london",
+      weekId: "2026-08-17",
+    }),
+    {
+      siteUrl: "https://north.example/van",
+      category: "movers",
+      city: "london",
+      weekId: "2026-08-17",
+    },
+  );
+});
+
+test("chat and invite hosts are 400 chat_link", () => {
+  for (const raw of [
+    "https://t.me/joinchat/abc",
+    "https://telegram.me/joinchat/xyz",
+    "https://wa.me/15551234567",
+    "https://chat.whatsapp.com/invite",
+    "https://discord.gg/abc123",
+    "https://discord.com/invite/abc123",
+    "https://m.me/page",
+    "https://signal.me/#p/+15551234567",
+  ]) {
+    assertUrlError(raw, "chat_link");
+  }
+});
+
+test("NSFW hosts and path keywords are 400 nsfw", () => {
+  for (const raw of [
+    "https://onlyfans.com/someone",
+    "https://www.pornhub.com/view_video.php?viewkey=1",
+    "https://fansly.com/profile",
+    "https://clinic.example/porn/gallery",
+    "https://clinic.example/xxx",
+  ]) {
+    assertUrlError(raw, "nsfw");
+  }
+});
+
+test("unresolved shorteners are 400 url_shortener", () => {
+  assertUrlError("https://bit.ly/abc", "url_shortener");
+  assertUrlError("https://t.co/x", "url_shortener");
+  assertUrlError("https://tinyurl.com/abc", "url_shortener");
+});
+
+test("non-http(s) schemes are rejected", () => {
+  assertUrlError("javascript:alert(1)", "invalid_listing");
+  assertUrlError("data:text/html,hi", "invalid_listing");
+  assertUrlError("not a url", "invalid_listing");
+});
+
+test("parseListingDraft stores the stripped URL and rejects chat / NSFW / shortener", () => {
+  const draft = parseListingDraft({
+    business: "North London Movers",
+    category: "movers",
+    city: "london",
+    siteUrl: "https://north.example/van?utm_source=x&fbclid=1#top",
+    amount: 20,
+  });
+  assert.equal(draft.siteUrl, "https://north.example/van");
+  assert.doesNotMatch(draft.siteUrl, /utm_/);
+  assert.doesNotMatch(draft.siteUrl, /fbclid/);
+
+  assert.throws(
+    () =>
+      parseListingDraft({
+        business: "Chat Van",
+        category: "movers",
+        city: "london",
+        siteUrl: "https://t.me/movers",
+        amount: 20,
+      }),
+    (err: unknown) => {
+      assert.ok(err instanceof PolarError);
+      assert.equal(err.code, "chat_link");
+      assert.equal(err.httpStatus, 400);
+      return true;
+    },
+  );
+  assert.throws(
+    () =>
+      parseListingDraft({
+        business: "Adult Clinic",
+        category: "dentists",
+        city: "london",
+        siteUrl: "https://onlyfans.com/clinic",
+        licenseId: "GDC-1",
+        amount: 20,
+      }),
+    (err: unknown) => {
+      assert.ok(err instanceof PolarError);
+      assert.equal(err.code, "nsfw");
+      return true;
+    },
+  );
+  assert.throws(
+    () =>
+      parseListingDraft({
+        business: "Short Van",
+        category: "movers",
+        city: "london",
+        siteUrl: "https://bit.ly/van",
+        amount: 20,
+      }),
+    (err: unknown) => {
+      assert.ok(err instanceof PolarError);
+      assert.equal(err.code, "url_shortener");
+      return true;
+    },
+  );
+});
+
+test("paid checkout stores the stripped URL; chat / NSFW / shortener never list", async () => {
+  const db = openDatabase(":memory:");
+  after(() => db.close());
+  const polar = new FakePolarPort(db);
+  setPolarPortForTests(polar);
+  const { POST } = await import("../app/api/checkout/route");
+
+  const ok = await POST(
+    new Request("http://127.0.0.1/api/checkout", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        business: "North London Movers",
+        category: "movers",
+        city: "london",
+        siteUrl: "https://north.example/van?utm_source=x&gclid=1",
+        amount: 20,
+      }),
+    }),
+  );
+  assert.equal(ok.status, 200);
+  const stored = findListingByIdentity(db, {
+    siteUrl: "https://NORTH.EXAMPLE/van/",
+    category: "movers",
+    city: "london",
+    weekId: currentWeekId(),
+  });
+  assert.ok(stored);
+  assert.equal(stored.siteUrl, "https://north.example/van");
+  assert.doesNotMatch(stored.siteUrl, /utm_/);
+  assert.doesNotMatch(stored.siteUrl, /gclid/);
+
+  for (const [siteUrl, code] of [
+    ["https://t.me/joinchat/abc", "chat_link"],
+    ["https://onlyfans.com/x", "nsfw"],
+    ["https://bit.ly/abc", "url_shortener"],
+  ] as const) {
+    const blocked = await POST(
+      new Request("http://127.0.0.1/api/checkout", {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          business: "Blocked Co",
+          category: "movers",
+          city: "london",
+          siteUrl,
+          amount: 20,
+        }),
+      }),
+    );
+    assert.equal(blocked.status, 400);
+    assert.deepEqual(await blocked.json(), { error: code });
+  }
+
+  const ranked = listLane("london", "movers", db);
+  assert.equal(ranked.length, 1);
+  assert.equal(ranked[0]?.business, "North London Movers");
+  assert.doesNotMatch(ranked[0]?.siteUrl ?? "", /utm_|t\.me|onlyfans|bit\.ly/);
+});
+
+test("About page states the outbid.lol local-service-weekly product", () => {
+  const html = renderToStaticMarkup(createElement(AboutPage));
+  assert.match(html, /data-page="about"/);
+  assert.match(html, /<h1>About<\/h1>/);
+  assert.match(html, /Rank is the bid/);
+  assert.match(html, /outbid\.lol/);
+  assert.match(html, /local-service-weekly/);
+  assert.match(html, /global English/i);
+  assert.match(html, /London/);
+  assert.match(html, /no ads/i);
+  assert.match(html, /no stars/);
+  assert.match(html, /href="\/rules"/);
+  assert.doesNotMatch(html, /★|⭐|review count/i);
+});
+
+test("Rules page states min $5, rank=bid, older wins ties, raise pays difference", () => {
+  const html = renderToStaticMarkup(createElement(RulesPage));
+  assert.match(html, /data-page="rules"/);
+  assert.match(html, /<h1>Rules<\/h1>/);
+  assert.match(html, /Rank is the bid/);
+  assert.match(html, /min \$5/);
+  assert.match(html, /older/);
+  assert.match(html, /difference/);
+  assert.match(html, /London/);
+  assert.match(html, /chat_link/);
+  assert.match(html, /nsfw/);
+  assert.match(html, /url_shortener/);
+  assert.match(html, /utm_/);
+  assert.doesNotMatch(html, /★|⭐|review count/i);
+});

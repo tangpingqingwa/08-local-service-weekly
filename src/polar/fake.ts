@@ -12,6 +12,7 @@ import {
   requireOpenWeek,
   WeekError,
 } from "../week";
+import { LivePolarPort } from "./live";
 import {
   isPolarLive,
   parseBidUsd,
@@ -369,13 +370,13 @@ export function getFakePolarPort(db?: AppDb): FakePolarPort {
   return defaultPort;
 }
 
-/** Fixture unless live is requested. Live Polar is PR 9 — fail closed. */
+/** Fixture unless POLAR_LIVE=1. POLAR_FIXTURE_ONLY=1 always wins. */
 export function getPolarPort(db?: AppDb): PolarPort {
   if (testOverride) {
     return testOverride;
   }
   if (isPolarLive()) {
-    throw new PolarError("polar_not_live", 503);
+    return new LivePolarPort({ db: db ?? getDb() });
   }
   return getFakePolarPort(db);
 }

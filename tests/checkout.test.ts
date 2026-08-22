@@ -109,23 +109,22 @@ test("POLAR_FIXTURE_ONLY=1 wins; unset / 0 stay fixture", () => {
   }
 });
 
-test("live checkout without live Polar is polar_not_live 503", () => {
+test("live checkout without Polar secret is BLOCKED-SECRET", () => {
   const previousLive = process.env.POLAR_LIVE;
   const previousFixture = process.env.POLAR_FIXTURE_ONLY;
+  const previousToken = process.env.POLAR_ACCESS_TOKEN;
   process.env.POLAR_LIVE = "1";
   delete process.env.POLAR_FIXTURE_ONLY;
+  delete process.env.POLAR_ACCESS_TOKEN;
   try {
-    assert.throws(() => getPolarPort(), (err: unknown) => {
-      assert.ok(err instanceof PolarError);
-      assert.equal(err.code, "polar_not_live");
-      assert.equal(err.httpStatus, 503);
-      return true;
-    });
+    assert.throws(() => getPolarPort(), /BLOCKED-SECRET: POLAR_ACCESS_TOKEN/);
   } finally {
     if (previousLive === undefined) delete process.env.POLAR_LIVE;
     else process.env.POLAR_LIVE = previousLive;
     if (previousFixture === undefined) delete process.env.POLAR_FIXTURE_ONLY;
     else process.env.POLAR_FIXTURE_ONLY = previousFixture;
+    if (previousToken === undefined) delete process.env.POLAR_ACCESS_TOKEN;
+    else process.env.POLAR_ACCESS_TOKEN = previousToken;
   }
 });
 

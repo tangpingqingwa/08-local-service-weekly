@@ -2,9 +2,15 @@ import { randomBytes } from "node:crypto";
 import type { CategorySlug } from "../categories";
 import { getDb, type AppDb, type Listing, type TakedownReason } from "../db";
 import {
+  applyRaise,
+  findListingByIdentity,
+} from "../listings";
+import {
   isPolarLive,
   parseBidUsd,
+  parseChargeUsd,
   PolarError,
+  type CheckoutIntent,
   type CheckoutRecord,
   type CheckoutStart,
   type CreateCheckoutInput,
@@ -29,6 +35,8 @@ type CheckoutRow = {
   status: CheckoutRecord["status"];
   listing_id: string | null;
   created_at: string;
+  intent: CheckoutIntent;
+  target_bid_usd: number | null;
 };
 
 type ListingRow = {
@@ -158,6 +166,32 @@ export function placePaidListing(
   };
 }
 
+function settlePaidRaise(
+  db: AppDb,
+  checkout: CheckoutRecord & { createdAt: string },
+): Listing {
+  const weekId = checkout.listing.weekId;
+  if (!weekId) {
+    throw new PolarError("invalid_listing", 400, "Missing weekId");
+  }
+  const existing = findListingByIdentity(db, {
+    siteUrl: checkout.listing.siteUrl,
+    category: checkout.listing.category,
+    city: checkout.listing.city,
+    weekId,
+  });
+  if (!existing) {
+    throw new PolarError("listing_not_found", 404);
+  }
+  return applyRaise(db, existing, {
+    newBidUsd: checkout.listing.bidUsd,
+    chargeUsd: checkout.amountUsd,
+    business: checkout.listing.business,
+    licenseId: checkout.listing.licenseId,
+    raisedAt: checkout.createdAt,
+  });
+}
+
 /** In-process Polar. Completing / auto-settling writes the listing; unpaid does not. */
 export class FakePolarPort implements PolarPort {
   readonly kind = "fixture" as const;
@@ -171,18 +205,28 @@ export class FakePolarPort implements PolarPort {
     this.autoSettle = options.autoSettle !== false;
   }
 
+  database(): AppDb {
+    return this.db;
+  }
+
   reset(): void {
     this.db.exec("DELETE FROM checkouts");
     this.seq = 0;
   }
 
   async createCheckout(input: CreateCheckoutInput): Promise<CheckoutStart> {
-    const amountUsd = parseBidUsd(input.amountUsd);
+    const intent: CheckoutIntent = input.intent ?? "place";
+    const amountUsd =
+      intent === "raise"
+        ? parseChargeUsd(input.amountUsd)
+        : parseBidUsd(input.amountUsd);
     const weekId = input.listing.weekId ?? currentWeekId();
     ensureWeek(this.db, weekId);
+    const targetBidUsd =
+      intent === "raise" ? parseBidUsd(input.listing.bidUsd) : amountUsd;
     const listing: ListingDraft = {
       ...input.listing,
-      bidUsd: amountUsd,
+      bidUsd: targetBidUsd,
       weekId,
     };
     const id = newId("chk");
@@ -190,8 +234,8 @@ export class FakePolarPort implements PolarPort {
       .prepare(
         `INSERT INTO checkouts (
            id, amount_usd, business, category, city, site_url, license_id,
-           week_id, status, listing_id, created_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'open', NULL, ?)`,
+           week_id, status, listing_id, created_at, intent, target_bid_usd
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'open', NULL, ?, ?, ?)`,
       )
       .run(
         id,
@@ -203,6 +247,8 @@ export class FakePolarPort implements PolarPort {
         listing.licenseId,
         weekId,
         this.nextIso(),
+        intent,
+        targetBidUsd,
       );
     if (this.autoSettle) {
       const paid = await this.settle(id);
@@ -228,11 +274,10 @@ export class FakePolarPort implements PolarPort {
     if (checkout.status === "paid" && checkout.listingId) {
       return this.loadListing(checkout.listingId);
     }
-    const listing = placePaidListing(
-      this.db,
-      checkout.listing,
-      checkout.createdAt,
-    );
+    const listing =
+      checkout.intent === "raise"
+        ? settlePaidRaise(this.db, checkout)
+        : placePaidListing(this.db, checkout.listing, checkout.createdAt);
     this.db
       .prepare(
         "UPDATE checkouts SET status = 'paid', listing_id = ? WHERE id = ?",
@@ -262,6 +307,7 @@ export class FakePolarPort implements PolarPort {
       listing: { ...checkout.listing },
       status: checkout.status,
       listingId: checkout.listingId,
+      intent: checkout.intent,
     };
   }
 
@@ -271,7 +317,7 @@ export class FakePolarPort implements PolarPort {
     const row = this.db
       .prepare<[string], CheckoutRow>(
         `SELECT id, amount_usd, business, category, city, site_url, license_id,
-                week_id, status, listing_id, created_at
+                week_id, status, listing_id, created_at, intent, target_bid_usd
            FROM checkouts WHERE id = ?`,
       )
       .get(id);
@@ -287,11 +333,12 @@ export class FakePolarPort implements PolarPort {
         city: row.city,
         siteUrl: row.site_url,
         licenseId: row.license_id,
-        bidUsd: row.amount_usd,
+        bidUsd: row.target_bid_usd ?? row.amount_usd,
         weekId: row.week_id,
       },
       status: row.status,
       listingId: row.listing_id ?? undefined,
+      intent: row.intent,
       createdAt: row.created_at,
     };
   }

@@ -132,9 +132,6 @@ grep -q '/api/checkout' src/ui/outbid-form.tsx || fail "Outbid form must POST to
 if [[ -f src/polar/live.ts ]]; then
   fail "live Polar belongs in PR 9, not this unit"
 fi
-if [[ -d app/api/raise ]]; then
-  fail "raise-bid belongs in PR 4, not this unit"
-fi
 grep -q 'bid_too_low' tests/checkout.test.ts || fail "checkout tests must cover bid_too_low"
 grep -q 'bid_not_integer' tests/checkout.test.ts || fail "checkout tests must cover bid_not_integer"
 if grep -nE 'fetch\(|polar\.sh|api\.polar' src/polar/fake.ts src/polar/port.ts >/dev/null; then
@@ -143,6 +140,36 @@ fi
 if grep -RInE 'https?://([^/]*\.)?polar\.sh' app src tests >/dev/null 2>&1; then
   fail "app/src/tests must not hard-code polar.sh HTTP"
 fi
+
+echo "== raise-bid difference =="
+for f in app/api/raise/route.ts src/listings.ts tests/raise.test.ts; do
+  [[ -f "$f" ]] || fail "missing $f"
+  [[ -s "$f" ]] || fail "empty $f"
+done
+grep -q 'quoteRaise' src/listings.ts || fail "listings.ts must quote a raise"
+grep -q 'applyRaise' src/listings.ts || fail "listings.ts must apply a raise"
+grep -q 'created_at' src/listings.ts || fail "raise must keep createdAt"
+grep -q 'chargeUsd' src/listings.ts || fail "raise must charge the difference"
+grep -q 'listing_hidden' src/listings.ts || fail "hidden listings cannot raise"
+grep -q 'intent' src/polar/port.ts || fail "raise checkout must carry intent"
+grep -q 'POST' app/api/raise/route.ts || fail "app/api/raise missing POST"
+if [[ -d app/about || -d app/rules ]]; then
+  fail "about/rules belong in PR 5, not this unit"
+fi
+if [[ -f src/urls.ts || -f tests/urls.test.ts ]]; then
+  fail "URL hygiene belongs in PR 5, not this unit"
+fi
+if [[ -f src/week.ts || -f tests/week.test.ts ]]; then
+  fail "week clock belongs in PR 6, not this unit"
+fi
+if [[ -f src/polar/live.ts ]]; then
+  fail "live Polar belongs in PR 9, not this unit"
+fi
+grep -q 'charged \$5' tests/raise.test.ts \
+  || grep -q 'chargeUsd, 5' tests/raise.test.ts \
+  || fail "raise tests must assert difference-only charge"
+grep -q 'createdAt' tests/raise.test.ts || fail "raise tests must keep createdAt"
+grep -q 'Rival' tests/raise.test.ts || fail "raise tests must cover rival difference"
 
 if [[ -f package.json ]]; then
   echo "== install =="
@@ -304,10 +331,55 @@ if [[ -f package.json ]]; then
   grep -q 'South London Movers' "${movers_two}" || fail "\$15 underbid must still list"
   grep -q 'data-rank="2"' "${movers_two}" || fail "\$15 must list below \$20"
 
+  echo "== fixture raise HTTP =="
+  raise_body="$(mktemp)"
+  raise_code="$(curl -sS -o "${raise_body}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d '{"business":"North London Movers","category":"movers","city":"london","siteUrl":"https://north.example","amount":25}' \
+    "http://127.0.0.1:${port}/api/raise")"
+  [[ "${raise_code}" == "200" ]] || fail "POST /api/raise \$25 expected 200 got ${raise_code}: $(cat "${raise_body}")"
+  grep -q '"status":"paid"' "${raise_body}" || fail "fixture raise must return paid"
+  grep -q '"chargedUsd":5' "${raise_body}" || fail "raise \$20→\$25 must charge \$5"
+  grep -q '"bidUsd":25' "${raise_body}" || fail "raise must list at \$25"
+
+  movers_raised="$(mktemp)"
+  curl -sS -o "${movers_raised}" "http://127.0.0.1:${port}/c/london/movers"
+  grep -q 'North London Movers' "${movers_raised}" || fail "raised listing must stay on the board"
+  grep -q '\$25' "${movers_raised}" || fail "raised listing must show \$25"
+  grep -q 'data-rank="1"' "${movers_raised}" || fail "raised \$25 must stay #1"
+  grep -q 'South London Movers' "${movers_raised}" || fail "\$15 underbid must still list after raise"
+
+  rival_body="$(mktemp)"
+  rival_code="$(curl -sS -o "${rival_body}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d '{"business":"Rival Van","category":"movers","city":"london","siteUrl":"https://rival.example","amount":5}' \
+    "http://127.0.0.1:${port}/api/checkout")"
+  [[ "${rival_code}" == "200" ]] || fail "rival \$5 checkout expected 200 got ${rival_code}: $(cat "${rival_body}")"
+  movers_rival="$(mktemp)"
+  curl -sS -o "${movers_rival}" "http://127.0.0.1:${port}/c/london/movers"
+  grep -q 'Rival Van' "${movers_rival}" || fail "rival \$5 must still list"
+  grep -q '\$25' "${movers_rival}" || fail "occupant must remain at \$25 after rival difference"
+  if ! grep -q 'North London Movers' "${movers_rival}"; then
+    fail "occupant must remain listed after rival difference"
+  fi
+  occupant_rank="$(python3 -c 'import re,sys; html=open(sys.argv[1]).read(); m=re.search(r"data-rank=\"(\d)\"[\s\S]{0,400}North London Movers", html); print(m.group(1) if m else "")' "${movers_rival}")"
+  [[ "${occupant_rank}" == "1" ]] || fail "rival paying the difference must not take #1 (occupant rank=${occupant_rank})"
+  rival_rank="$(python3 -c 'import re,sys; html=open(sys.argv[1]).read(); m=re.search(r"data-rank=\"(\d)\"[\s\S]{0,400}Rival Van", html); print(m.group(1) if m else "")' "${movers_rival}")"
+  [[ "${rival_rank}" != "1" ]] || fail "rival \$5 must not be rank 1"
+
+  same_raise="$(mktemp)"
+  same_raise_code="$(curl -sS -o "${same_raise}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d '{"business":"North London Movers","category":"movers","city":"london","siteUrl":"https://north.example","amount":25}' \
+    "http://127.0.0.1:${port}/api/raise")"
+  [[ "${same_raise_code}" == "400" ]] || fail "same-bid raise expected 400 got ${same_raise_code}"
+  grep -q 'bid_too_low' "${same_raise}" || fail "same-bid raise must return bid_too_low"
+
   rm -f "${home_body}" "${city_body}" "${lane_body}" "${unknown_cat}" \
     "${paid_body}" "${movers_paid}" "${low_body}" "${frac_body}" \
     "${return_unknown}" "${form_headers}" "${form_body}" "${return_paid}" \
-    "${movers_two}"
+    "${movers_two}" "${raise_body}" "${movers_raised}" "${rival_body}" \
+    "${movers_rival}" "${same_raise}"
 fi
 
 echo "OK: buildable and testable"

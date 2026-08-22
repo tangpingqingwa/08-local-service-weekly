@@ -1,7 +1,7 @@
 import { resolveCategory, type CategorySlug } from "../categories";
 import { resolveCity } from "../cities";
 import { MAX_BID_USD, MIN_BID_USD } from "../constants";
-import type { Listing } from "../db";
+import type { AppDb, Listing } from "../db";
 
 export type PolarEnv = Record<string, string | undefined>;
 
@@ -23,11 +23,16 @@ export type CheckoutRecord = {
   listing: ListingDraft;
   status: CheckoutStatus;
   listingId?: string;
+  intent: CheckoutIntent;
 };
+
+export type CheckoutIntent = "place" | "raise";
 
 export type CreateCheckoutInput = {
   amountUsd: number;
   listing: ListingDraft;
+  /** Raise checkouts charge the difference only (may be $1–$4). */
+  intent?: CheckoutIntent;
 };
 
 export type CheckoutStart = {
@@ -44,6 +49,8 @@ export type PolarPort = {
   settle(id: string): Promise<Listing | null>;
   getCheckout(id: string): CheckoutRecord | undefined;
   abandon(id: string): Promise<void>;
+  /** Fixture adapters share the in-process SQLite used to settle. */
+  database?(): AppDb;
 };
 
 export type ReturnState = "paid" | "cancelled" | "unknown";
@@ -72,6 +79,15 @@ export function polarFixtureOnly(env: PolarEnv = process.env): boolean {
 }
 
 export function parseBidUsd(raw: unknown): number {
+  return parseUsdAmount(raw, MIN_BID_USD);
+}
+
+/** Polar charge for a raise: whole USD, $1…$999999 (the difference). */
+export function parseChargeUsd(raw: unknown): number {
+  return parseUsdAmount(raw, 1);
+}
+
+function parseUsdAmount(raw: unknown, minUsd: number): number {
   if (typeof raw === "boolean") {
     throw new PolarError("bid_not_integer", 400);
   }
@@ -79,7 +95,7 @@ export function parseBidUsd(raw: unknown): number {
     if (!Number.isInteger(raw)) {
       throw new PolarError("bid_not_integer", 400);
     }
-    return assertBidRange(raw);
+    return assertUsdRange(raw, minUsd);
   }
   if (typeof raw !== "string" || raw.trim() === "") {
     throw new PolarError("bid_not_integer", 400);
@@ -88,11 +104,11 @@ export function parseBidUsd(raw: unknown): number {
   if (!/^[0-9]+$/.test(trimmed)) {
     throw new PolarError("bid_not_integer", 400);
   }
-  return assertBidRange(Number(trimmed));
+  return assertUsdRange(Number(trimmed), minUsd);
 }
 
-function assertBidRange(value: number): number {
-  if (value < MIN_BID_USD) {
+function assertUsdRange(value: number, minUsd: number): number {
+  if (value < minUsd) {
     throw new PolarError("bid_too_low", 400);
   }
   if (value > MAX_BID_USD) {

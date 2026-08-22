@@ -153,11 +153,35 @@ grep -q 'chargeUsd' src/listings.ts || fail "raise must charge the difference"
 grep -q 'listing_hidden' src/listings.ts || fail "hidden listings cannot raise"
 grep -q 'intent' src/polar/port.ts || fail "raise checkout must carry intent"
 grep -q 'POST' app/api/raise/route.ts || fail "app/api/raise missing POST"
-if [[ -d app/about || -d app/rules ]]; then
-  fail "about/rules belong in PR 5, not this unit"
-fi
-if [[ -f src/urls.ts || -f tests/urls.test.ts ]]; then
-  fail "URL hygiene belongs in PR 5, not this unit"
+echo "== about, rules, and URL hygiene =="
+for f in app/about/page.tsx app/rules/page.tsx src/urls.ts tests/urls.test.ts; do
+  [[ -f "$f" ]] || fail "missing $f"
+  [[ -s "$f" ]] || fail "empty $f"
+done
+grep -q 'canonicalizeSiteUrl' src/urls.ts || fail "urls.ts must export canonicalizeSiteUrl"
+grep -q 'chat_link' src/urls.ts || fail "urls.ts must reject chat_link"
+grep -q 'nsfw' src/urls.ts || fail "urls.ts must reject nsfw"
+grep -q 'url_shortener' src/urls.ts || fail "urls.ts must reject url_shortener"
+grep -q 'utm_' src/urls.ts || fail "urls.ts must strip utm_ tracking keys"
+grep -q 'canonicalizeSiteUrl' src/polar/port.ts || fail "checkout must canonicalize site URLs"
+grep -q 'canonicalizeSiteUrl' src/listings.ts || fail "listing identity must use canonical URLs"
+grep -q 'href="/about"' app/layout.tsx || fail "nav must link to /about"
+grep -q 'href="/rules"' app/layout.tsx || fail "nav must link to /rules"
+grep -q 'Rank is the bid' app/about/page.tsx || fail "about must state rank is the bid"
+grep -q 'outbid.lol' app/about/page.tsx || fail "about must name outbid.lol"
+grep -q 'local-service-weekly' app/about/page.tsx || fail "about must name the vertical"
+grep -q 'London' app/about/page.tsx || fail "about must name London v1"
+grep -q 'global English' app/about/page.tsx || fail "about must state global English"
+grep -q 'min $5' app/rules/page.tsx || fail "rules must state min \$5"
+grep -q 'Rank is the bid' app/rules/page.tsx || fail "rules must state rank is the bid"
+grep -q 'older' app/rules/page.tsx || fail "rules must state older wins ties"
+grep -q 'difference' app/rules/page.tsx || fail "rules must state raise pays the difference"
+grep -q 'utm_source' tests/urls.test.ts || fail "url tests must strip utm_source"
+grep -q 'chat_link' tests/urls.test.ts || fail "url tests must cover chat_link"
+grep -q 'nsfw' tests/urls.test.ts || fail "url tests must cover nsfw"
+grep -q 'url_shortener' tests/urls.test.ts || fail "url tests must cover url_shortener"
+if grep -RInE '★|⭐|top rated|review count' app/about app/rules src/urls.ts >/dev/null 2>&1; then
+  fail "about/rules/urls must not render stars or review counts"
 fi
 if [[ -f src/week.ts || -f tests/week.test.ts ]]; then
   fail "week clock belongs in PR 6, not this unit"
@@ -375,11 +399,80 @@ if [[ -f package.json ]]; then
   [[ "${same_raise_code}" == "400" ]] || fail "same-bid raise expected 400 got ${same_raise_code}"
   grep -q 'bid_too_low' "${same_raise}" || fail "same-bid raise must return bid_too_low"
 
+  echo "== about + rules HTTP =="
+  about_body="$(mktemp)"
+  about_code="$(curl -sS -o "${about_body}" -w '%{http_code}' "http://127.0.0.1:${port}/about")"
+  [[ "${about_code}" == "200" ]] || fail "GET /about expected 200 got ${about_code}"
+  grep -q 'data-page="about"' "${about_body}" || fail "GET /about must render about"
+  grep -q 'Rank is the bid' "${about_body}" || fail "GET /about must state rank is the bid"
+  grep -q 'outbid.lol' "${about_body}" || fail "GET /about must name outbid.lol"
+  grep -q 'London' "${about_body}" || fail "GET /about must name London"
+  grep -qi 'global English' "${about_body}" || fail "GET /about must state global English"
+  if grep -qiE '★|⭐|top rated|review count' "${about_body}"; then
+    fail "GET /about must not show stars or review counts"
+  fi
+
+  rules_body="$(mktemp)"
+  rules_code="$(curl -sS -o "${rules_body}" -w '%{http_code}' "http://127.0.0.1:${port}/rules")"
+  [[ "${rules_code}" == "200" ]] || fail "GET /rules expected 200 got ${rules_code}"
+  grep -q 'data-page="rules"' "${rules_body}" || fail "GET /rules must render rules"
+  grep -q 'min $5' "${rules_body}" || fail "GET /rules must state min \$5"
+  grep -q 'Rank is the bid' "${rules_body}" || fail "GET /rules must state rank is the bid"
+  grep -q 'older' "${rules_body}" || fail "GET /rules must state older wins ties"
+  grep -q 'difference' "${rules_body}" || fail "GET /rules must state raise pays the difference"
+
+  echo "== URL hygiene HTTP =="
+  tracked_body="$(mktemp)"
+  tracked_code="$(curl -sS -o "${tracked_body}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d '{"business":"Tracked Van","category":"movers","city":"london","siteUrl":"https://tracked.example/van?utm_source=x&gclid=1","amount":12}' \
+    "http://127.0.0.1:${port}/api/checkout")"
+  [[ "${tracked_code}" == "200" ]] || fail "tracked URL checkout expected 200 got ${tracked_code}: $(cat "${tracked_body}")"
+  movers_tracked="$(mktemp)"
+  curl -sS -o "${movers_tracked}" "http://127.0.0.1:${port}/c/london/movers"
+  grep -q 'Tracked Van' "${movers_tracked}" || fail "tracked listing must appear after pay"
+  grep -q 'tracked.example' "${movers_tracked}" || fail "cleaned host must appear on the board"
+  if grep -q 'utm_source' "${movers_tracked}"; then
+    fail "board must not show utm_source after store"
+  fi
+
+  chat_body="$(mktemp)"
+  chat_code="$(curl -sS -o "${chat_body}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d '{"business":"Chat Van","category":"movers","city":"london","siteUrl":"https://t.me/joinchat/abc","amount":12}' \
+    "http://127.0.0.1:${port}/api/checkout")"
+  [[ "${chat_code}" == "400" ]] || fail "telegram checkout expected 400 got ${chat_code}"
+  grep -q 'chat_link' "${chat_body}" || fail "telegram must return chat_link"
+
+  nsfw_body="$(mktemp)"
+  nsfw_code="$(curl -sS -o "${nsfw_body}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d '{"business":"Adult Clinic","category":"movers","city":"london","siteUrl":"https://onlyfans.com/x","amount":12}' \
+    "http://127.0.0.1:${port}/api/checkout")"
+  [[ "${nsfw_code}" == "400" ]] || fail "NSFW checkout expected 400 got ${nsfw_code}"
+  grep -q 'nsfw' "${nsfw_body}" || fail "adult host must return nsfw"
+
+  short_body="$(mktemp)"
+  short_code="$(curl -sS -o "${short_body}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d '{"business":"Short Van","category":"movers","city":"london","siteUrl":"https://bit.ly/abc","amount":12}' \
+    "http://127.0.0.1:${port}/api/checkout")"
+  [[ "${short_code}" == "400" ]] || fail "shortener checkout expected 400 got ${short_code}"
+  grep -q 'url_shortener' "${short_body}" || fail "shortener must return url_shortener"
+
+  movers_hygiene="$(mktemp)"
+  curl -sS -o "${movers_hygiene}" "http://127.0.0.1:${port}/c/london/movers"
+  if grep -qiE 'Chat Van|Adult Clinic|Short Van|t.me|onlyfans|bit.ly' "${movers_hygiene}"; then
+    fail "rejected chat/NSFW/shortener URLs must not list"
+  fi
+
   rm -f "${home_body}" "${city_body}" "${lane_body}" "${unknown_cat}" \
     "${paid_body}" "${movers_paid}" "${low_body}" "${frac_body}" \
     "${return_unknown}" "${form_headers}" "${form_body}" "${return_paid}" \
     "${movers_two}" "${raise_body}" "${movers_raised}" "${rival_body}" \
-    "${movers_rival}" "${same_raise}"
+    "${movers_rival}" "${same_raise}" "${about_body}" "${rules_body}" \
+    "${tracked_body}" "${movers_tracked}" "${chat_body}" "${nsfw_body}" \
+    "${short_body}" "${movers_hygiene}"
 fi
 
 echo "OK: buildable and testable"

@@ -17,6 +17,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             Local Service Weekly
           </a>
           <p className="tagline">Rank is the bid. London, this week.</p>
+          <nav className="site-nav" aria-label="Site">
+            <a href="/about">About</a>
+            <a href="/rules">Rules</a>
+          </nav>
         </header>
         {children}
       </body>

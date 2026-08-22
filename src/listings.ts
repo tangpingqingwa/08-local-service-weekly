@@ -7,6 +7,7 @@ import {
   type ListingDraft,
   type PolarPort,
 } from "./polar/port";
+import { canonicalizeSiteUrl, UrlError } from "./urls";
 
 function dbFromPort(port: PolarPort, fallback: AppDb): AppDb {
   if (typeof port.database === "function") {
@@ -55,14 +56,21 @@ type ListingRow = {
 const LISTING_COLUMNS = `id, business, category, city, site_url, license_id, bid_usd,
         week_id, created_at, raised_at, clicks, hidden, hidden_reason`;
 
-/** Identity key used for raise-bid (full URL canonicalize is PR 5). */
+/** Identity key: canonical site URL + category + city + weekId. */
 export function listingIdentity(input: ListingIdentity): ListingIdentity {
-  return {
-    siteUrl: input.siteUrl,
-    category: input.category,
-    city: input.city,
-    weekId: input.weekId,
-  };
+  try {
+    return {
+      siteUrl: canonicalizeSiteUrl(input.siteUrl),
+      category: input.category,
+      city: input.city,
+      weekId: input.weekId,
+    };
+  } catch (error) {
+    if (error instanceof UrlError) {
+      throw new PolarError(error.code, error.httpStatus, error.message);
+    }
+    throw error;
+  }
 }
 
 export function listingFromRow(row: ListingRow): Listing {

@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
-import { GET } from "../app/healthz/route";
 import { CITIES, PUBLIC_CITY_SLUGS, getCity } from "../src/cities";
 import { openDatabase } from "../src/db";
 
+process.env.DATABASE_PATH = ":memory:";
+
 test("GET /healthz returns 200 { ok: true }", async () => {
+  const { GET } = await import("../app/healthz/route");
   const response = GET();
 
   assert.equal(response.status, 200);
@@ -72,10 +74,13 @@ test("schema has cities, weeks, listings and seeds London", () => {
   assert.equal(listingColumns.bid_usd.type, "INTEGER");
   assert.equal(listingColumns.clicks.type, "INTEGER");
   assert.equal(listingColumns.clicks.notnull, 1);
+  assert.equal(listingColumns.clicks.dflt_value, "0");
   assert.match(
     tableSql(db, "listings"),
     /UNIQUE \(site_url, category, city, week_id\)/,
   );
+  assert.match(tableSql(db, "listings"), /FOREIGN KEY \(city\) REFERENCES cities/);
+  assert.doesNotMatch(tableSql(db, "listings"), /star|rating|review/i);
 
   const london = db
     .prepare<[], { slug: string; display: string; public: number }>(
@@ -135,12 +140,36 @@ test("schema has cities, weeks, listings and seeds London", () => {
       null,
     );
   });
+
+  assert.throws(() => {
+    db.prepare(
+      `INSERT INTO listings (
+         id, business, category, city, site_url, license_id, bid_usd, week_id,
+         created_at, raised_at, clicks, hidden, hidden_reason
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "lst_unknown_city",
+      "Future City Movers",
+      "movers",
+      "manchester",
+      "https://example.com/mcr",
+      null,
+      20,
+      "2026-08-17",
+      "2026-08-17T00:00:00.000Z",
+      null,
+      0,
+      0,
+      null,
+    );
+  });
 });
 
 type ColumnInfo = {
   name: string;
   type: string;
   notnull: number;
+  dflt_value: string | null;
   pk: number;
 };
 

@@ -55,7 +55,11 @@ export type Week = {
   closesAt: string;
 };
 
-export function openDatabase(path: string): AppDb {
+export function defaultDatabasePath(): string {
+  return process.env.DATABASE_PATH ?? join(process.cwd(), "data", "app.sqlite");
+}
+
+export function openDatabase(path: string = defaultDatabasePath()): AppDb {
   if (path !== ":memory:") {
     mkdirSync(dirname(path), { recursive: true });
   }
@@ -112,4 +116,17 @@ export function seedCities(db: AppDb): void {
       public: city.public ? 1 : 0,
     });
   }
+}
+
+let cached: AppDb | undefined;
+let cachedPath: string | undefined;
+
+export function getDb(): AppDb {
+  const dbPath = defaultDatabasePath();
+  if (!cached || cachedPath !== dbPath) {
+    cached?.close();
+    cached = openDatabase(dbPath);
+    cachedPath = dbPath;
+  }
+  return cached;
 }

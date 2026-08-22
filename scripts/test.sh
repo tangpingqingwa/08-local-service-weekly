@@ -217,8 +217,22 @@ grep -q 'invent' tests/takedown.test.ts || fail "takedown tests must refuse inve
 if [[ -f src/polar/live.ts ]]; then
   fail "live Polar belongs in PR 9, not this unit"
 fi
-if [[ -f app/go/\[id\]/route.ts || -f src/clicks.ts ]]; then
-  fail "public clicks belong in PR 8, not this unit"
+echo "== public click counts =="
+for f in app/go/\[id\]/route.ts src/clicks.ts tests/clicks.test.ts; do
+  [[ -f "$f" ]] || fail "missing $f"
+  [[ -s "$f" ]] || fail "empty $f"
+done
+grep -q 'incrementPublicClick' src/clicks.ts || fail "clicks.ts must increment then redirect"
+grep -q 'listing_not_found' src/clicks.ts || fail "clicks.ts must 404 unknown listings"
+grep -q 'canonicalizeSiteUrl' src/clicks.ts || fail "click destination must be cleaned"
+grep -q 'GET' app/go/\[id\]/route.ts || fail "app/go/[id] missing GET"
+grep -q '302' app/go/\[id\]/route.ts || fail "app/go/[id] must 302"
+grep -q 'incrementPublicClick' app/go/\[id\]/route.ts || fail "go route must increment clicks"
+grep -q 'utm_source' tests/clicks.test.ts || fail "click tests must strip utm_source"
+grep -q '302' tests/clicks.test.ts || fail "click tests must assert 302"
+grep -q 'listing_not_found' tests/clicks.test.ts || fail "click tests must cover missing listings"
+if [[ -f src/polar/live.ts || -f scripts/live-smoke.sh ]]; then
+  fail "live Polar / live-smoke belong in PR 9, not this unit"
 fi
 grep -q 'charged \$5' tests/raise.test.ts \
   || grep -q 'chargeUsd, 5' tests/raise.test.ts \
@@ -641,6 +655,49 @@ if [[ -f package.json ]]; then
     || fail "raise on hidden listing expected 409 got ${hidden_raise_code}: $(cat "${hidden_raise}")"
   grep -q 'listing_hidden' "${hidden_raise}" || fail "hidden listing cannot raise"
 
+  echo "== public click HTTP =="
+  click_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("listingId") or "")' "${tracked_body}")"
+  [[ -n "${click_id}" ]] || fail "tracked checkout must return listingId for /go/:id"
+
+  click_headers="$(mktemp)"
+  click_body="$(mktemp)"
+  click_code="$(curl -sS -D "${click_headers}" -o "${click_body}" -w '%{http_code}' \
+    "http://127.0.0.1:${port}/go/${click_id}?utm_source=injected")"
+  [[ "${click_code}" == "302" ]] \
+    || fail "GET /go/:id expected 302 got ${click_code}: $(cat "${click_body}")"
+  click_location="$(awk 'BEGIN{IGNORECASE=1} /^location:/{sub("\r",""); print $2; exit}' "${click_headers}")"
+  [[ "${click_location}" == "https://tracked.example/van" ]] \
+    || fail "click must 302 to cleaned URL got ${click_location}"
+  if echo "${click_location}" | grep -Eqi 'utm_|gclid|fbclid|\?'; then
+    fail "click destination must have no tracking query: ${click_location}"
+  fi
+
+  movers_clicked="$(mktemp)"
+  curl -sS -o "${movers_clicked}" "http://127.0.0.1:${port}/c/london/movers"
+  grep -q 'Tracked Van' "${movers_clicked}" || fail "clicked listing must stay on the board"
+  grep -q '1 click' "${movers_clicked}" || fail "public click count must increment to 1"
+
+  click_again_headers="$(mktemp)"
+  click_again_body="$(mktemp)"
+  click_again_code="$(curl -sS -D "${click_again_headers}" -o "${click_again_body}" -w '%{http_code}' \
+    "http://127.0.0.1:${port}/go/${click_id}")"
+  [[ "${click_again_code}" == "302" ]] \
+    || fail "second GET /go/:id expected 302 got ${click_again_code}"
+  click_again_location="$(awk 'BEGIN{IGNORECASE=1} /^location:/{sub("\r",""); print $2; exit}' "${click_again_headers}")"
+  [[ "${click_again_location}" == "https://tracked.example/van" ]] \
+    || fail "second click must 302 to cleaned URL got ${click_again_location}"
+
+  movers_clicked_two="$(mktemp)"
+  curl -sS -o "${movers_clicked_two}" "http://127.0.0.1:${port}/c/london/movers"
+  grep -q '2 clicks' "${movers_clicked_two}" || fail "public click count must increment to 2"
+
+  missing_click="$(mktemp)"
+  missing_click_code="$(curl -sS -o "${missing_click}" -w '%{http_code}' \
+    "http://127.0.0.1:${port}/go/does-not-exist")"
+  [[ "${missing_click_code}" == "404" ]] \
+    || fail "GET /go/missing expected 404 got ${missing_click_code}"
+  grep -q 'listing_not_found' "${missing_click}" || fail "missing listing click must be listing_not_found"
+
   rm -f "${home_body}" "${city_body}" "${lane_body}" "${unknown_cat}" \
     "${paid_body}" "${movers_paid}" "${low_body}" "${frac_body}" \
     "${return_unknown}" "${form_headers}" "${form_body}" "${return_paid}" \
@@ -650,7 +707,9 @@ if [[ -f package.json ]]; then
     "${short_body}" "${movers_hygiene}" "${closed_week_body}" "${movers_week}" \
     "${dentist_missing}" "${lawyer_missing}" "${dentist_paid}" "${dentist_board}" \
     "${dentist_two}" "${takedown_denied}" "${takedown_ok}" "${dentists_after}" \
-    "${hidden_raise}"
+    "${hidden_raise}" "${click_headers}" "${click_body}" "${movers_clicked}" \
+    "${click_again_headers}" "${click_again_body}" "${movers_clicked_two}" \
+    "${missing_click}"
 fi
 
 echo "OK: buildable and testable"

@@ -1,0 +1,250 @@
+:root {
+  --bg: #f4efe8;
+  --fg: #1c1917;
+  --muted: #78716c;
+  --card: #fffcf8;
+  --line: #e7ddd2;
+  --primary: #e24a16;
+  --primary-fg: #fffaf6;
+  --max: 52rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "DM Sans", "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+a:hover {
+  color: var(--primary);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.site-header,
+.board,
+.error-page {
+  width: 100%;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 1.25rem 1rem 0;
+}
+
+.site-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.5rem;
+}
+
+.logo {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  text-decoration: none;
+}
+
+.tagline,
+.eyebrow,
+.claim-note,
+.field-hint,
+.empty-lane,
+.error-status {
+  color: var(--muted);
+}
+
+.board {
+  padding-bottom: 3rem;
+}
+
+.board-header h1,
+.lane-header h2,
+.error-page h1 {
+  margin: 0.2rem 0 0.5rem;
+}
+
+.category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+
+.category-tabs a {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  text-decoration: none;
+  background: var(--card);
+}
+
+.lane {
+  margin: 1.5rem 0 2rem;
+}
+
+.empty-lane {
+  margin: 0.75rem 0;
+}
+
+.leaderboard {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.9rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  padding: 0.9rem 1rem;
+}
+
+.rank {
+  font-weight: 700;
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+}
+
+.business {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.bid {
+  margin: 0;
+  font-weight: 700;
+}
+
+.meta {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.claim {
+  margin-top: 1.5rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 1rem;
+}
+
+.claim h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 0.5rem;
+}
+
+.amount-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.amount-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  font-weight: 700;
+}
+
+.amount-field input,
+.fields input,
+.fields select {
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  background: #fff;
+}
+
+.amount-field input {
+  width: 5.5rem;
+}
+
+.step,
+.outbid {
+  border: 0;
+  border-radius: 0.5rem;
+  background: var(--primary);
+  color: var(--primary-fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.step {
+  width: 2rem;
+  height: 2rem;
+}
+
+.outbid {
+  padding: 0.55rem 1.1rem;
+}
+
+.fields {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.fields label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+}
+
+.bid-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.stub-note,
+.error-page p {
+  margin-top: 0.75rem;
+}
+
+.error-page {
+  padding-bottom: 3rem;
+}
+
+.error-status {
+  margin: 0;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}

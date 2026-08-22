@@ -197,9 +197,23 @@ grep -q 'Monday 00:00' tests/week.test.ts || fail "week tests must pin Monday 00
 grep -q 'week_closed' tests/week.test.ts || fail "week tests must cover week_closed"
 grep -q 'Last Week Van' tests/week.test.ts || fail "week tests must keep last week off current #1"
 grep -q 'manchester' tests/week.test.ts || fail "week tests must keep ranker keyed by city"
-if [[ -f src/takedown.ts ]]; then
-  fail "takedown belongs in PR 7, not this unit"
-fi
+echo "== license and complaint takedown =="
+for f in src/takedown.ts tests/takedown.test.ts src/migrations/006_takedowns.sql \
+  app/api/takedown/route.ts; do
+  [[ -f "$f" ]] || fail "missing $f"
+  [[ -s "$f" ]] || fail "empty $f"
+done
+grep -q 'license_required' src/takedown.ts || fail "takedown.ts must emit license_required"
+grep -q 'requireClaimedLicense' src/takedown.ts || fail "takedown.ts must guard claimed licenses"
+grep -q 'hideListing' src/takedown.ts || fail "takedown.ts must hide listings"
+grep -q 'operatorHideListing' src/takedown.ts || fail "takedown.ts must expose operator hide"
+grep -q 'CREATE TABLE takedowns' src/migrations/006_takedowns.sql || fail "takedowns migration missing"
+grep -q 'requireClaimedLicense' src/polar/port.ts || fail "checkout draft must require license"
+grep -q 'requireClaimedLicense' src/listings.ts || fail "raise must keep license guard"
+grep -q 'license_required' tests/takedown.test.ts || fail "takedown tests must cover license_required"
+grep -q 'hideListing' tests/takedown.test.ts || fail "takedown tests must hide #1"
+grep -q 'not verified' tests/takedown.test.ts || fail "takedown tests must not invent license verification"
+grep -q 'invent' tests/takedown.test.ts || fail "takedown tests must refuse invented replacement #1"
 if [[ -f src/polar/live.ts ]]; then
   fail "live Polar belongs in PR 9, not this unit"
 fi
@@ -256,6 +270,7 @@ if [[ -f package.json ]]; then
 
   export DATABASE_PATH="${db_file}"
   export NEXT_TELEMETRY_DISABLED=1
+  export OPERATOR_SECRET="operator-test-secret"
   npx next build
   PORT="${port}" npx next start --port "${port}" --hostname 127.0.0.1 \
     >"${log_file}" 2>&1 &
@@ -539,13 +554,103 @@ if [[ -f package.json ]]; then
   [[ "${current_one}" != "Last Week Van" ]] || fail "last week occupant must not be this week #1"
   grep -q 'North London Movers' "${movers_week}" || fail "current-week occupant must remain listed"
 
+  echo "== license + takedown HTTP =="
+  dentist_missing="$(mktemp)"
+  dentist_missing_code="$(curl -sS -o "${dentist_missing}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d '{"business":"Soho Smile","category":"dentists","city":"london","siteUrl":"https://soho.example","amount":20}' \
+    "http://127.0.0.1:${port}/api/checkout")"
+  [[ "${dentist_missing_code}" == "400" ]] \
+    || fail "dentist without license expected 400 got ${dentist_missing_code}: $(cat "${dentist_missing}")"
+  grep -q 'license_required' "${dentist_missing}" || fail "dentist without license must return license_required"
+
+  lawyer_missing="$(mktemp)"
+  lawyer_missing_code="$(curl -sS -o "${lawyer_missing}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d '{"business":"Thames Counsel","category":"immigration_lawyers","city":"london","siteUrl":"https://thames.example","amount":20}' \
+    "http://127.0.0.1:${port}/api/checkout")"
+  [[ "${lawyer_missing_code}" == "400" ]] \
+    || fail "immigration lawyer without license expected 400 got ${lawyer_missing_code}"
+  grep -q 'license_required' "${lawyer_missing}" || fail "immigration lawyer without license must return license_required"
+
+  dentist_paid="$(mktemp)"
+  dentist_paid_code="$(curl -sS -o "${dentist_paid}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d '{"business":"Soho Smile","category":"dentists","city":"london","siteUrl":"https://soho.example","licenseId":"GDC-12345","amount":20}' \
+    "http://127.0.0.1:${port}/api/checkout")"
+  [[ "${dentist_paid_code}" == "200" ]] \
+    || fail "dentist with claimed license expected 200 got ${dentist_paid_code}: $(cat "${dentist_paid}")"
+  dentist_board="$(mktemp)"
+  curl -sS -o "${dentist_board}" "http://127.0.0.1:${port}/c/london/dentists"
+  grep -q 'Soho Smile' "${dentist_board}" || fail "claimed-license dentist must list"
+  grep -q 'GDC-12345' "${dentist_board}" || fail "board must show claimed license id"
+  grep -q 'not verified' "${dentist_board}" || fail "board must say claimed license is not verified"
+  if grep -qiE 'license verified|verified license' "${dentist_board}"; then
+    fail "board must not invent license verification"
+  fi
+
+  dentist_two="$(mktemp)"
+  dentist_two_code="$(curl -sS -o "${dentist_two}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d '{"business":"East Smile","category":"dentists","city":"london","siteUrl":"https://eastsmile.example","licenseId":"GDC-99999","amount":15}' \
+    "http://127.0.0.1:${port}/api/checkout")"
+  [[ "${dentist_two_code}" == "200" ]] \
+    || fail "second dentist expected 200 got ${dentist_two_code}: $(cat "${dentist_two}")"
+
+  listing_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("listingId") or "")' "${dentist_paid}")"
+  [[ -n "${listing_id}" ]] || fail "paid dentist checkout must return listingId"
+
+  takedown_denied="$(mktemp)"
+  takedown_denied_code="$(curl -sS -o "${takedown_denied}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d "{\"listingId\":\"${listing_id}\",\"reason\":\"unlicensed\"}" \
+    "http://127.0.0.1:${port}/api/takedown")"
+  [[ "${takedown_denied_code}" == "401" ]] \
+    || fail "takedown without secret expected 401 got ${takedown_denied_code}"
+  grep -q 'operator_unauthorized' "${takedown_denied}" || fail "takedown without secret must be operator_unauthorized"
+
+  takedown_ok="$(mktemp)"
+  takedown_ok_code="$(curl -sS -o "${takedown_ok}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -H 'x-operator-secret: operator-test-secret' \
+    -d "{\"listingId\":\"${listing_id}\",\"reason\":\"unlicensed\"}" \
+    "http://127.0.0.1:${port}/api/takedown")"
+  [[ "${takedown_ok_code}" == "200" ]] \
+    || fail "operator takedown expected 200 got ${takedown_ok_code}: $(cat "${takedown_ok}")"
+  grep -q '"hidden":true' "${takedown_ok}" || fail "takedown must hide the listing"
+
+  dentists_after="$(mktemp)"
+  curl -sS -o "${dentists_after}" "http://127.0.0.1:${port}/c/london/dentists"
+  if grep -q 'Soho Smile' "${dentists_after}"; then
+    fail "taken-down #1 must drop off the public board"
+  fi
+  grep -q 'East Smile' "${dentists_after}" || fail "next visible bid must remain listed"
+  next_rank="$(python3 -c 'import re,sys; html=open(sys.argv[1]).read(); m=re.search(r"data-rank=\"(\d)\"[\s\S]{0,400}East Smile", html); print(m.group(1) if m else "")' "${dentists_after}")"
+  [[ "${next_rank}" == "1" ]] || fail "next visible bid must be #1 after takedown (rank=${next_rank})"
+  if grep -qiE 'invented|placeholder clinic|example dentist' "${dentists_after}"; then
+    fail "takedown must not invent a replacement listing"
+  fi
+  unset OPERATOR_SECRET
+
+  hidden_raise="$(mktemp)"
+  hidden_raise_code="$(curl -sS -o "${hidden_raise}" -w '%{http_code}' \
+    -H 'accept: application/json' -H 'content-type: application/json' \
+    -d '{"business":"Soho Smile","category":"dentists","city":"london","siteUrl":"https://soho.example","licenseId":"GDC-12345","amount":25}' \
+    "http://127.0.0.1:${port}/api/raise")"
+  [[ "${hidden_raise_code}" == "409" ]] \
+    || fail "raise on hidden listing expected 409 got ${hidden_raise_code}: $(cat "${hidden_raise}")"
+  grep -q 'listing_hidden' "${hidden_raise}" || fail "hidden listing cannot raise"
+
   rm -f "${home_body}" "${city_body}" "${lane_body}" "${unknown_cat}" \
     "${paid_body}" "${movers_paid}" "${low_body}" "${frac_body}" \
     "${return_unknown}" "${form_headers}" "${form_body}" "${return_paid}" \
     "${movers_two}" "${raise_body}" "${movers_raised}" "${rival_body}" \
     "${movers_rival}" "${same_raise}" "${about_body}" "${rules_body}" \
     "${tracked_body}" "${movers_tracked}" "${chat_body}" "${nsfw_body}" \
-    "${short_body}" "${movers_hygiene}" "${closed_week_body}" "${movers_week}"
+    "${short_body}" "${movers_hygiene}" "${closed_week_body}" "${movers_week}" \
+    "${dentist_missing}" "${lawyer_missing}" "${dentist_paid}" "${dentist_board}" \
+    "${dentist_two}" "${takedown_denied}" "${takedown_ok}" "${dentists_after}" \
+    "${hidden_raise}"
 fi
 
 echo "OK: buildable and testable"

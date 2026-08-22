@@ -133,11 +133,23 @@ export default function RulesPage() {
         by us.
       </p>
 
-      <h2>Licenses</h2>
+      <h2>Licenses and takedown</h2>
       <p>
         Dentists and immigration lawyers must submit a claimed{" "}
-        <code>licenseId</code>. The site does <strong>not</strong> assert the
-        license is valid. It is a claimed string, not a verification.
+        <code>licenseId</code> (2–64 visible characters). Missing →{" "}
+        <code>400 license_required</code>. The site does <strong>not</strong>{" "}
+        assert the license is valid. It is a claimed string, not a
+        verification. v1 does not call a government license API.
+      </p>
+      <p>
+        An operator can hide a listing for <code>unlicensed</code>,{" "}
+        <code>impersonation</code>, a written <code>complaint</code> that names
+        the listing + city + category, <code>nsfw</code>,{" "}
+        <code>chat_link</code>, or <code>other</code>. Hidden listings drop off
+        the public board and
+        vacate rank. The bid is <strong>not</strong> auto-refunded. A hidden
+        listing cannot raise until unhidden. A taken-down #1 is not replaced
+        with an invented business.
       </p>
 
       <p>

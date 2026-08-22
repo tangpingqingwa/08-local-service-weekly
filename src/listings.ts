@@ -7,6 +7,7 @@ import {
   type ListingDraft,
   type PolarPort,
 } from "./polar/port";
+import { requireClaimedLicense, TakedownError } from "./takedown";
 import { canonicalizeSiteUrl, UrlError } from "./urls";
 import { currentWeekId, requireOpenWeek, WeekError } from "./week";
 
@@ -160,8 +161,19 @@ export function applyRaise(
     throw new PolarError("bid_too_low", 400);
   }
   const business = input.business?.trim() || existing.business;
-  const licenseId =
-    input.licenseId === undefined ? existing.licenseId : input.licenseId;
+  const nextLicense =
+    input.licenseId === undefined || input.licenseId === null
+      ? existing.licenseId
+      : input.licenseId;
+  let licenseId: string | null;
+  try {
+    licenseId = requireClaimedLicense(existing.category, nextLicense);
+  } catch (error) {
+    if (error instanceof TakedownError) {
+      throw new PolarError(error.code, error.httpStatus, error.message);
+    }
+    throw error;
+  }
   db.prepare(
     `UPDATE listings
         SET business = ?,

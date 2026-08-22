@@ -2,6 +2,7 @@ import { resolveCategory, type CategorySlug } from "../categories";
 import { resolveCity } from "../cities";
 import { MAX_BID_USD, MIN_BID_USD } from "../constants";
 import type { AppDb, Listing } from "../db";
+import { requireClaimedLicense, TakedownError } from "../takedown";
 import { canonicalizeSiteUrl, UrlError } from "../urls";
 import { currentWeekId } from "../week";
 
@@ -121,6 +122,7 @@ function assertUsdRange(value: number, minUsd: number): number {
 
 export function parseListingDraft(
   input: Record<string, unknown>,
+  options: { requireLicense?: boolean } = {},
 ): ListingDraft {
   const business = readBusiness(input.business);
   const cityLookup = resolveCity(readRequired(input.city, "city"));
@@ -134,7 +136,18 @@ export function parseListingDraft(
     throw new PolarError(categoryLookup.code, categoryLookup.status);
   }
   const siteUrl = readSiteUrl(input.siteUrl ?? input.site);
-  const licenseId = readOptionalText(input.licenseId);
+  const rawLicense = readOptionalText(input.licenseId);
+  let licenseId = rawLicense;
+  if (options.requireLicense !== false) {
+    try {
+      licenseId = requireClaimedLicense(categoryLookup.value.slug, rawLicense);
+    } catch (error) {
+      if (error instanceof TakedownError) {
+        throw new PolarError(error.code, error.httpStatus, error.message);
+      }
+      throw error;
+    }
+  }
   const bidUsd = parseBidUsd(input.amount ?? input.amountUsd ?? input.bidUsd);
   const weekId = readOptionalText(input.weekId) ?? currentWeekId();
   return {

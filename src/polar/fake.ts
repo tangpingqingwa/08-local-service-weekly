@@ -5,6 +5,7 @@ import {
   applyRaise,
   findListingByIdentity,
 } from "../listings";
+import { requireClaimedLicense, TakedownError } from "../takedown";
 import {
   currentWeekId,
   ensureWeek,
@@ -89,6 +90,15 @@ export function placePaidListing(
   const bidUsd = parseBidUsd(draft.bidUsd);
   const weekId = openWeekId(draft.weekId ?? currentWeekId());
   ensureWeek(db, weekId);
+  let licenseId: string | null;
+  try {
+    licenseId = requireClaimedLicense(draft.category, draft.licenseId);
+  } catch (error) {
+    if (error instanceof TakedownError) {
+      throw new PolarError(error.code, error.httpStatus, error.message);
+    }
+    throw error;
+  }
   const id = newId("lst");
   try {
     db.prepare(
@@ -102,7 +112,7 @@ export function placePaidListing(
       draft.category,
       draft.city,
       draft.siteUrl,
-      draft.licenseId,
+      licenseId,
       bidUsd,
       weekId,
       paidAt,
@@ -124,7 +134,7 @@ export function placePaidListing(
     category: draft.category,
     city: draft.city,
     siteUrl: draft.siteUrl,
-    licenseId: draft.licenseId,
+    licenseId,
     bidUsd,
     weekId,
     createdAt: paidAt,

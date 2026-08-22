@@ -1,11 +1,10 @@
 import { getDb } from "../../src/db";
 
+/** GET /healthz — process + SQLite probe. */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export const HEALTHZ_PATH = "/healthz" as const;
-
-export type HealthzOk = {
+type HealthzOk = {
   ok: true;
 };
 

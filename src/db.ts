@@ -2,6 +2,7 @@ import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { CategorySlug } from "./categories";
 import { CITIES } from "./cities";
 
 export type AppDb = import("better-sqlite3").Database;
@@ -14,12 +15,7 @@ const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), "migrations
 
 type MigrationRow = { id: string };
 
-/** SPEC §4 */
-export type CategorySlug =
-  | "movers"
-  | "dentists"
-  | "immigration_lawyers"
-  | "tutors";
+export type { CategorySlug };
 
 /** SPEC §10 */
 export type TakedownReason =

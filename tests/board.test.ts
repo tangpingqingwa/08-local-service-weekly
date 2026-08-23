@@ -187,7 +187,7 @@ test("empty London hub is empty: four lanes, Outbid, no invented cards or stars"
   assert.match(html, /<h1 class="edition-city">London<\/h1>/);
   assert.match(html, /Rank is the bid/);
   assert.match(html, /data-claim-pick/);
-  assert.match(html, /Outbid/);
+  assert.match(html, /Outbid my movers column/);
   assert.match(html, /Claim #1 for/);
   assert.match(html, /Pick one column/);
   assert.match(html, /aria-label="Classified columns"/);
@@ -206,6 +206,7 @@ test("empty London hub is empty: four lanes, Outbid, no invented cards or stars"
   assert.doesNotMatch(html, /class="fields want-ad-fields"/);
   for (const category of CATEGORY_SLUGS) {
     assert.match(html, new RegExp(`data-category="${category}"`));
+    assert.match(html, new RegExp(`data-claim-job="${category}"`));
     assert.match(
       html,
       new RegExp(`href="/c/london/${category}#claim"`),
@@ -286,7 +287,11 @@ test("hub claim picks one column and does not print the want-ad field grid", () 
   assert.match(html, /Claim #1 for/);
   assert.match(html, /\$5/);
   assert.match(html, /Pick one column/);
-  assert.match(html, /Outbid Movers/);
+  assert.match(html, /Outbid my movers column/);
+  assert.match(html, /Outbid my dentists column/);
+  assert.match(html, /Outbid my immigration lawyers column/);
+  assert.match(html, /Outbid my tutors column/);
+  assert.match(html, /data-claim-job="movers"/);
   assert.match(html, /href="\/c\/london\/movers#claim"/);
   assert.match(html, /href="\/c\/london\/dentists#claim"/);
   assert.match(html, /href="\/c\/london\/immigration_lawyers#claim"/);
@@ -295,6 +300,7 @@ test("hub claim picks one column and does not print the want-ad field grid", () 
   assert.doesNotMatch(html, /name="business"/);
   assert.doesNotMatch(html, /name="siteUrl"/);
   assert.doesNotMatch(html, /name="amount"/);
+  assert.doesNotMatch(html, /Outbid Movers|Outbid Dentists|Outbid Tutors/);
   assert.doesNotMatch(html, /★|⭐|map/i);
 });
 
@@ -335,7 +341,8 @@ test("GET / default page is the London hub", async () => {
   assert.match(html, /<h1 class="edition-city">London<\/h1>/);
   assert.match(html, /data-empty-lane="true"/);
   assert.match(html, /data-claim-pick/);
-  assert.match(html, /Outbid/);
+  assert.match(html, /Outbid my movers column/);
+  assert.match(html, /data-claim-job="movers"/);
   assert.ok(html.indexOf('data-empty-lane="true"') < html.indexOf("data-claim-pick"));
   assert.doesNotMatch(html, /name="business"/);
   assert.doesNotMatch(html, /★|⭐|review count/i);

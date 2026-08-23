@@ -217,6 +217,9 @@ test("empty London hub is empty: four lanes, Outbid, no invented cards or stars"
   assert.doesNotMatch(html, /data-listing-card/);
   assert.doesNotMatch(html, /Call this #1/);
   assert.doesNotMatch(html, /data-call-this-one/);
+  assert.doesNotMatch(html, /Call #2/);
+  assert.doesNotMatch(html, /data-call-later/);
+  assert.doesNotMatch(html, /data-call-ad="later"/);
   assert.doesNotMatch(html, /★|⭐|&star;|rated\s+\d|review count|top rated/i);
   assert.doesNotMatch(html, /North London Movers|placeholder provider/i);
   assert.doesNotMatch(html, /top rated in London|google map|★/i);
@@ -238,6 +241,7 @@ test("lane board empty state has no cards", () => {
   assert.match(html, /This lane is empty/);
   assert.match(html, />Outbid</);
   assert.doesNotMatch(html, /data-listing-card/);
+  assert.doesNotMatch(html, /Call this #1|Call #2|data-call-later|data-call-ad/);
 });
 
 test("rank card shows $bid, public clicks placeholder 0, and host", () => {
@@ -292,7 +296,7 @@ test("rank card shows $bid, public clicks placeholder 0, and host", () => {
   assert.doesNotMatch(dentist, /verified license|license verified/i);
 });
 
-test("occupied #1 stamps Call this #1; later ranks stay a quiet host hop", () => {
+test("occupied later ranks stamp Call #N ahead of $bid, not another Call this #1", () => {
   const later = renderToStaticMarkup(
     createElement(ListingCard, {
       listing: ranked({
@@ -305,12 +309,38 @@ test("occupied #1 stamps Call this #1; later ranks stay a quiet host hop", () =>
     }),
   );
   assert.match(later, /data-rank="2"/);
+  assert.match(later, /data-call-ad="later"/);
+  assert.match(later, /data-call-later=""/);
+  assert.match(later, /Call #2/);
   assert.match(later, /href="\/go\/lst_south"/);
   assert.match(later, /south.example/);
   assert.match(later, /\$15/);
+  const callAt = later.indexOf("Call #2");
+  const bidAt = later.indexOf("$15");
+  assert.ok(callAt >= 0 && bidAt > callAt);
   assert.doesNotMatch(later, /Call this #1/);
-  assert.doesNotMatch(later, /data-call-ad/);
   assert.doesNotMatch(later, /data-call-this-one/);
+  assert.doesNotMatch(later, /data-call-ad="lead"/);
+
+  const third = renderToStaticMarkup(
+    createElement(ListingCard, {
+      listing: ranked({
+        id: "lst_rival",
+        rank: 3,
+        business: "Rival Van",
+        bidUsd: 5,
+        siteHost: "rival.example",
+      }),
+    }),
+  );
+  assert.match(third, /data-rank="3"/);
+  assert.match(third, /Call #3/);
+  assert.match(third, /data-call-later=""/);
+  assert.match(third, /href="\/go\/lst_rival"/);
+  const thirdCall = third.indexOf("Call #3");
+  const thirdBid = third.indexOf("$5");
+  assert.ok(thirdCall >= 0 && thirdBid > thirdCall);
+  assert.doesNotMatch(third, /Call this #1|Call #2|data-call-this-one/);
 });
 
 test("occupied hub makes calling the paid #1 the neighbor move", () => {
@@ -357,6 +387,55 @@ test("occupied hub makes calling the paid #1 the neighbor move", () => {
   assert.ok(outbidAt > claimAt);
   assert.doesNotMatch(html, /★|⭐|review count|google map|map pin/i);
   assert.doesNotMatch(html, /name="business"/);
+  assert.doesNotMatch(html, /Call #2/);
+  assert.doesNotMatch(html, /data-call-later/);
+});
+
+test("occupied hub later ranks stamp Call #N; empty lanes stay honest", () => {
+  const london = getCity("london");
+  assert.ok(london);
+  const weekId = currentWeekId();
+  const html = renderToStaticMarkup(
+    createElement(CityHub, {
+      city: london,
+      weekId,
+      lanes: {
+        movers: [
+          ranked({
+            id: "lst_movers",
+            business: "North London Movers",
+            bidUsd: 20,
+            siteHost: "north.example",
+          }),
+          ranked({
+            id: "lst_south",
+            rank: 2,
+            business: "South London Movers",
+            bidUsd: 15,
+            siteHost: "south.example",
+          }),
+        ],
+        dentists: [],
+        immigration_lawyers: [],
+        tutors: [],
+      },
+    }),
+  );
+  assert.match(html, /data-call-ad="lead"/);
+  assert.match(html, /Call this #1/);
+  assert.match(html, /data-call-ad="later"/);
+  assert.match(html, /data-call-later=""/);
+  assert.match(html, /Call #2/);
+  assert.match(html, /href="\/go\/lst_south"/);
+  assert.match(html, /South London Movers/);
+  const laterStart = html.indexOf('data-rank="2"');
+  const laterCall = html.indexOf("Call #2", laterStart);
+  const laterBid = html.indexOf("$15", laterStart);
+  assert.ok(laterStart >= 0 && laterCall > laterStart && laterBid > laterCall);
+  assert.equal(html.slice(laterStart, laterStart + 900).includes("Call this #1"), false);
+  const emptyLanes = html.match(/data-empty-lane="true"/g) ?? [];
+  assert.equal(emptyLanes.length, 3);
+  assert.doesNotMatch(html, /★|⭐|review count|google map|map pin/i);
 });
 
 test("hub claim picks one column and does not print the want-ad field grid", () => {

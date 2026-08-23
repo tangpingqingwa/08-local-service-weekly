@@ -145,6 +145,14 @@ grep -q 'data-call-ad' src/ui/listing-card.tsx \
   || fail "paid #1 ad must stamp data-call-ad"
 grep -q 'Call this #1' tests/board.test.ts \
   || fail "board tests must cover Call this #1"
+grep -q 'Call #' src/ui/listing-card.tsx \
+  || fail "later ranks must offer Call #N"
+grep -q 'data-call-later' src/ui/listing-card.tsx \
+  || fail "later-rank call hop must stamp data-call-later"
+grep -q 'data-call-ad": "later"' src/ui/listing-card.tsx \
+  || fail "later-rank ad must stamp data-call-ad=later"
+grep -q 'Call #2' tests/board.test.ts \
+  || fail "board tests must cover later-rank Call #N"
 grep -q 'local classified' tests/board.test.ts \
   || fail "board tests must cover the classified edition"
 if grep -RInE '★|⭐|top rated|review count|top rated in London' app src >/dev/null 2>&1; then
@@ -430,6 +438,9 @@ if [[ -f package.json ]]; then
   if grep -q 'Call this #1' "${home_body}"; then
     fail "empty GET / must not invent Call this #1"
   fi
+  if grep -qE 'Call #[0-9]|data-call-later|data-call-ad="later"' "${home_body}"; then
+    fail "empty GET / must not invent a later-rank call"
+  fi
   if grep -qiE '★|⭐|top rated|review count|top rated in London' "${home_body}"; then
     fail "GET / must not show stars or review counts"
   fi
@@ -446,6 +457,9 @@ if [[ -f package.json ]]; then
   lane_code="$(curl -sS -o "${lane_body}" -w '%{http_code}' "http://127.0.0.1:${port}/c/london/movers")"
   [[ "${lane_code}" == "200" ]] || fail "GET /c/london/movers expected 200 got ${lane_code}"
   grep -q 'data-empty-lane="true"' "${lane_body}" || fail "empty movers lane must be empty"
+  if grep -qE 'Call #[0-9]|data-call-later|data-call-ad="later"' "${lane_body}"; then
+    fail "empty movers lane must not invent a later-rank call"
+  fi
   grep -q 'Outbid' "${lane_body}" || fail "lane board must show Outbid form chrome"
   grep -q 'data-classified=""' "${lane_body}" || fail "lane page must stay inside the classified edition"
   grep -q 'edition-city' "${lane_body}" || fail "lane page must keep the city edition masthead"
@@ -481,6 +495,9 @@ if [[ -f package.json ]]; then
   if grep -q 'data-empty-lane="true"' "${movers_paid}"; then
     fail "paid lane must not stay empty"
   fi
+  if grep -qE 'Call #[0-9]|data-call-later|data-call-ad="later"' "${movers_paid}"; then
+    fail "lone paid #1 must not invent a later-rank call"
+  fi
 
   occupied_home="$(mktemp)"
   occupied_home_code="$(curl -sS -o "${occupied_home}" -w '%{http_code}' "http://127.0.0.1:${port}/")"
@@ -494,6 +511,9 @@ if [[ -f package.json ]]; then
   home_claim_after="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-pick"))' "${occupied_home}")"
   [[ "${home_call_at}" -ge 0 && "${home_claim_after}" -gt "${home_call_at}" ]] \
     || fail "GET / paid column must show Call this #1 before the Outbid claim"
+  if grep -qE 'Call #[0-9]|data-call-later|data-call-ad="later"' "${occupied_home}"; then
+    fail "GET / with only paid #1 must not invent a later-rank call"
+  fi
   if grep -qiE '★|⭐|top rated|review count|google map|map pin' "${occupied_home}"; then
     fail "GET / occupied must not invent stars or maps"
   fi
@@ -547,13 +567,40 @@ if [[ -f package.json ]]; then
   curl -sS -o "${movers_two}" "http://127.0.0.1:${port}/c/london/movers"
   grep -q 'South London Movers' "${movers_two}" || fail "\$15 underbid must still list"
   grep -q 'data-rank="2"' "${movers_two}" || fail "\$15 must list below \$20"
-  later_has_call="$(python3 -c '
+  grep -q 'Call #2' "${movers_two}" || fail "rank 2 must offer Call #2"
+  grep -q 'data-call-later' "${movers_two}" || fail "rank 2 must stamp data-call-later"
+  grep -q 'data-call-ad="later"' "${movers_two}" || fail "rank 2 must stamp data-call-ad=later"
+  later_has_lead="$(python3 -c '
 import re, sys
 html = open(sys.argv[1]).read()
-m = re.search(r"data-rank=\"2\"[\s\S]{0,800}South London Movers[\s\S]{0,800}</article>", html)
+m = re.search(r"data-rank=\"2\"[\s\S]{0,900}South London Movers[\s\S]{0,900}</article>", html)
 print("yes" if m and ("Call this #1" in m.group(0) or "data-call-this-one" in m.group(0)) else "no")
 ' "${movers_two}")"
-  [[ "${later_has_call}" == "no" ]] || fail "rank 2 must stay a quiet host hop, not Call this #1"
+  [[ "${later_has_lead}" == "no" ]] || fail "rank 2 must not invent Call this #1"
+  later_call_at="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"data-rank=\"2\"[\s\S]{0,900}South London Movers[\s\S]{0,900}</article>", html)
+chunk = m.group(0) if m else ""
+print(chunk.find("Call #2"), chunk.find("$15"), sep=" ")
+' "${movers_two}")"
+  later_call_pos="${later_call_at%% *}"
+  later_bid_pos="${later_call_at##* }"
+  [[ "${later_call_pos}" -ge 0 && "${later_bid_pos}" -gt "${later_call_pos}" ]] \
+    || fail "rank 2 must show Call #2 before \$bid"
+
+  occupied_later_home="$(mktemp)"
+  occupied_later_home_code="$(curl -sS -o "${occupied_later_home}" -w '%{http_code}' "http://127.0.0.1:${port}/")"
+  [[ "${occupied_later_home_code}" == "200" ]] \
+    || fail "GET / after two movers expected 200 got ${occupied_later_home_code}"
+  grep -q 'Call this #1' "${occupied_later_home}" || fail "GET / must keep Call this #1 on #1"
+  grep -q 'Call #2' "${occupied_later_home}" || fail "GET / paid movers column must offer Call #2"
+  grep -q 'data-call-later' "${occupied_later_home}" || fail "GET / rank 2 must stamp data-call-later"
+  empty_after_two="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-empty-lane=\"true\""))' "${occupied_later_home}")"
+  [[ "${empty_after_two}" == "3" ]] || fail "GET / after two movers must keep three honest empty lanes (got ${empty_after_two})"
+  if grep -qiE '★|⭐|top rated|review count|google map|map pin' "${occupied_later_home}"; then
+    fail "GET / later-rank occupied must not invent stars or maps"
+  fi
 
   echo "== fixture raise HTTP =="
   raise_body="$(mktemp)"
@@ -590,6 +637,8 @@ print("yes" if m and ("Call this #1" in m.group(0) or "data-call-this-one" in m.
   [[ "${occupant_rank}" == "1" ]] || fail "rival paying the difference must not take #1 (occupant rank=${occupant_rank})"
   rival_rank="$(python3 -c 'import re,sys; html=open(sys.argv[1]).read(); m=re.search(r"data-rank=\"(\d)\"[\s\S]{0,400}Rival Van", html); print(m.group(1) if m else "")' "${movers_rival}")"
   [[ "${rival_rank}" != "1" ]] || fail "rival \$5 must not be rank 1"
+  grep -q 'Call #3' "${movers_rival}" || fail "rival \$5 at later rank must offer Call #3"
+  grep -q 'data-call-later' "${movers_rival}" || fail "rival later rank must stamp data-call-later"
 
   same_raise="$(mktemp)"
   same_raise_code="$(curl -sS -o "${same_raise}" -w '%{http_code}' \
@@ -854,7 +903,7 @@ print("yes" if m and ("Call this #1" in m.group(0) or "data-call-this-one" in m.
   rm -f "${home_body}" "${city_body}" "${lane_body}" "${unknown_cat}" \
     "${paid_body}" "${movers_paid}" "${occupied_home}" "${low_body}" "${frac_body}" \
     "${return_unknown}" "${form_headers}" "${form_body}" "${return_paid}" \
-    "${movers_two}" "${raise_body}" "${movers_raised}" "${rival_body}" \
+    "${movers_two}" "${occupied_later_home}" "${raise_body}" "${movers_raised}" "${rival_body}" \
     "${movers_rival}" "${same_raise}" "${about_body}" "${rules_body}" \
     "${tracked_body}" "${movers_tracked}" "${chat_body}" "${nsfw_body}" \
     "${short_body}" "${movers_hygiene}" "${closed_week_body}" "${movers_week}" \

@@ -14,6 +14,7 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
   const city = getCity(listing.city)?.display ?? listing.city;
   const category = getCategory(listing.category)?.display ?? listing.category;
   const lead = listing.rank === 1;
+  const later = listing.rank > 1;
 
   return (
     <article
@@ -23,6 +24,7 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
       data-rank={listing.rank}
       data-listing-id={listing.id}
       {...(lead ? { "data-call-ad": "lead" } : {})}
+      {...(later ? { "data-call-ad": "later" } : {})}
     >
       <span className="rank">#{listing.rank}</span>
       <div className="card-body">
@@ -38,9 +40,14 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
               Call this #1
             </a>
           ) : (
-            <p className="bid" data-bid="">
-              {formatUsd(listing.bidUsd)}
-            </p>
+            <a
+              className="host call-later"
+              href={`/go/${listing.id}`}
+              data-call-later=""
+              aria-label={`Call #${listing.rank} at ${listing.siteHost}`}
+            >
+              Call #{listing.rank}
+            </a>
           )}
         </div>
         <p className="meta">
@@ -49,21 +56,13 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
           <span data-city="">{city}</span>
         </p>
         <p className="meta">
-          {lead ? (
-            <>
-              <span className="bid" data-bid="">
-                {formatUsd(listing.bidUsd)}
-              </span>
-              <span aria-hidden="true"> · </span>
-              <span className="host" data-host="">
-                {listing.siteHost}
-              </span>
-            </>
-          ) : (
-            <a className="host" href={`/go/${listing.id}`} data-host="">
-              {listing.siteHost}
-            </a>
-          )}
+          <span className="bid" data-bid="">
+            {formatUsd(listing.bidUsd)}
+          </span>
+          <span aria-hidden="true"> · </span>
+          <span className="host" data-host="">
+            {listing.siteHost}
+          </span>
           <span aria-hidden="true"> · </span>
           <span className="clicks" data-clicks="">
             {formatClicks(listing.clicks)}

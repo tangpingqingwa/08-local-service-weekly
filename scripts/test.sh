@@ -173,18 +173,33 @@ grep -q 'after Call this #1' src/ui/lane-board.tsx \
   || fail "claim-after-call hop must sit after Call this #1"
 grep -q 'data-claim-after-call-one' src/ui/lane-board.tsx \
   || fail "occupied claim hop must concentrate after Call this #1"
+grep -q 'data-claim-after-call-two' src/ui/lane-board.tsx \
+  || fail "occupied claim hop must concentrate after Call this #1 is re-concentrated"
 grep -q 'Outbid my' src/ui/lane-board.tsx \
   || fail "occupied lane hop must name Outbid my {job} column"
 grep -q 'claim-after-call' app/globals.css \
   || fail "classified CSS must style the claim-after-call hop"
 grep -q 'claim-after-call-one' app/globals.css \
   || fail "classified CSS must concentrate the claim hop after Call this #1"
+grep -q 'claim-after-call-two' app/globals.css \
+  || fail "classified CSS must concentrate the claim hop after Call this #1 is re-concentrated"
 grep -q 'data-claim-after-call' tests/board.test.ts \
   || fail "board tests must cover claiming after Call #N"
 grep -q 'after Call this #1' tests/board.test.ts \
   || fail "board tests must keep the claim hop after Call this #1"
 grep -q 'concentrates Outbid my column after Call this #1' tests/board.test.ts \
   || fail "board tests must cover concentrating Outbid my column after Call this #1"
+grep -q 'concentrates Outbid my column after Call this #1 is re-concentrated' tests/board.test.ts \
+  || fail "board tests must cover concentrating Outbid my column after Call this #1 is re-concentrated"
+if grep -q 'claim-after-call-two' src/ui/listing-card.tsx; then
+  fail "listing cards must not stamp claim-after-call-two"
+fi
+if grep -q 'claim-after-call-two' src/ui/claim-column.tsx; then
+  fail "hub pick hops must not stamp claim-after-call-two"
+fi
+if grep -n 'data-call-after-claim' src/ui/lane-board.tsx | grep -q 'claim-after-call-two'; then
+  fail "later-rank Call hop must not stamp claim-after-call-two"
+fi
 grep -q 'data-call-after-claim' src/ui/lane-board.tsx \
   || fail "occupied later ranks must offer a call-after-claim hop"
 grep -q 'after the claim hop' src/ui/lane-board.tsx \
@@ -490,6 +505,9 @@ if [[ -f package.json ]]; then
   if grep -qE 'data-claim-after-call|after Call #|after Call this #1' "${home_body}"; then
     fail "empty GET / must not invent a claim-after-call hop"
   fi
+  if grep -qE 'data-claim-after-call-two|claim-after-call-two' "${home_body}"; then
+    fail "empty GET / must not invent a claim-after-call-two hop"
+  fi
   if grep -qE 'data-call-after-claim=""|after the claim hop' "${home_body}"; then
     fail "empty GET / must not invent a call-after-claim hop"
   fi
@@ -517,6 +535,9 @@ if [[ -f package.json ]]; then
   fi
   if grep -qE 'data-claim-after-call|after Call #|after Call this #1' "${lane_body}"; then
     fail "empty movers lane must not invent a claim-after-call hop"
+  fi
+  if grep -qE 'data-claim-after-call-two|claim-after-call-two' "${lane_body}"; then
+    fail "empty movers lane must not invent a claim-after-call-two hop"
   fi
   if grep -qE 'data-call-after-claim=""|after the claim hop' "${lane_body}"; then
     fail "empty movers lane must not invent a call-after-claim hop"
@@ -583,6 +604,10 @@ print(chunk.count("data-call-this-one"), chunk.count("data-call-after-claim-one"
     || fail "lone paid #1 must offer Outbid my column after Call this #1"
   grep -q 'data-claim-after-call-one' "${movers_paid}" \
     || fail "lone paid #1 must concentrate the claim hop after Call this #1"
+  grep -q 'data-claim-after-call-two' "${movers_paid}" \
+    || fail "lone paid #1 must concentrate the claim hop after Call this #1 is re-concentrated"
+  grep -q 'class="outbid claim-after-call claim-after-call-one claim-after-call-two"' "${movers_paid}" \
+    || fail "lone paid #1 must keep Outbid my column on one claim hop"
   grep -q 'Outbid my movers column' "${movers_paid}" \
     || fail "lone paid #1 hop must name Outbid my movers column"
   grep -q 'after Call this #1' "${movers_paid}" \
@@ -590,9 +615,12 @@ print(chunk.count("data-call-this-one"), chunk.count("data-call-after-claim-one"
   grep -q 'href="/c/london/movers#claim"' "${movers_paid}" \
     || fail "lone paid #1 hop must land on the lane claim form"
   paid_claim_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-after-call-one"))' "${movers_paid}")"
+  paid_claim_two="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-after-call-two"))' "${movers_paid}")"
   paid_form_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-bid-form"))' "${movers_paid}")"
   [[ "${call_at}" -ge 0 && "${paid_claim_at}" -gt "${call_at}" ]] \
     || fail "lone paid #1 claim hop must follow Call this #1"
+  [[ "${paid_claim_two}" -ge 0 && $((paid_claim_two - paid_claim_at)) -lt 80 && $((paid_claim_at - paid_claim_two)) -lt 80 ]] \
+    || fail "lone paid #1 must keep claim-after-call-two on the same hop"
   [[ "${paid_form_at}" -lt 0 || "${paid_form_at}" -gt "${paid_claim_at}" ]] \
     || fail "lone paid #1 DNA form must stay after the claim hop"
   if grep -qE 'after Call #' "${movers_paid}"; then
@@ -625,15 +653,29 @@ print(chunk.count("data-call-this-one"), chunk.count("data-call-after-claim-one"
     || fail "GET / paid movers column must offer claim after Call this #1"
   grep -q 'data-claim-after-call-one' "${occupied_home}" \
     || fail "GET / paid #1 must concentrate the claim hop after Call this #1"
+  grep -q 'data-claim-after-call-two' "${occupied_home}" \
+    || fail "GET / paid #1 must concentrate the claim hop after Call this #1 is re-concentrated"
+  grep -q 'class="outbid claim-after-call claim-after-call-one claim-after-call-two"' "${occupied_home}" \
+    || fail "GET / paid #1 must keep Outbid my column on one claim hop"
   grep -q 'Outbid my movers column' "${occupied_home}" \
     || fail "GET / paid hop must name Outbid my movers column"
   grep -q 'after Call this #1' "${occupied_home}" \
     || fail "GET / paid hop must sit after Call this #1"
   home_claim_one="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-after-call-one"))' "${occupied_home}")"
+  home_claim_two="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-after-call-two"))' "${occupied_home}")"
   [[ "${home_call_at}" -ge 0 && "${home_claim_one}" -gt "${home_call_at}" ]] \
     || fail "GET / paid column must show Call this #1 before the claim hop"
+  [[ "${home_claim_two}" -ge 0 && $((home_claim_two - home_claim_one)) -lt 80 && $((home_claim_one - home_claim_two)) -lt 80 ]] \
+    || fail "GET / paid #1 must keep claim-after-call-two on the same hop"
   [[ "${home_claim_after}" -gt "${home_claim_one}" ]] \
     || fail "GET / named hub hops must stay after the occupied-lane claim hop"
+  empty_claim_two="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+print("yes" if re.search(r"data-empty-lane=\"true\"[\s\S]{0,800}claim-after-call-two", html) else "no")
+' "${occupied_home}")"
+  [[ "${empty_claim_two}" == "no" ]] \
+    || fail "GET / empty lanes must not pick up claim-after-call-two"
   if grep -qE 'after Call #' "${occupied_home}"; then
     fail "GET / with only paid #1 must not invent a later-rank claim-after-call hop"
   fi
@@ -718,6 +760,10 @@ print(chunk.find("Call #2"), chunk.find("$15"), sep=" ")
     || fail "occupied movers lane must offer claim after Call this #1"
   grep -q 'data-claim-after-call-one' "${movers_two}" \
     || fail "occupied movers hop must concentrate after Call this #1"
+  grep -q 'data-claim-after-call-two' "${movers_two}" \
+    || fail "occupied movers hop must concentrate after Call this #1 is re-concentrated"
+  grep -q 'class="outbid claim-after-call claim-after-call-one claim-after-call-two"' "${movers_two}" \
+    || fail "occupied movers hop must keep Outbid my column on one claim hop"
   grep -q 'Outbid my movers column' "${movers_two}" \
     || fail "occupied movers hop must name Outbid my movers column"
   grep -q 'after Call this #1' "${movers_two}" \
@@ -725,6 +771,7 @@ print(chunk.find("Call #2"), chunk.find("$15"), sep=" ")
   grep -q 'href="/c/london/movers#claim"' "${movers_two}" \
     || fail "occupied movers hop must land on the lane claim form"
   later_claim_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-after-call"))' "${movers_two}")"
+  later_claim_two="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-after-call-two"))' "${movers_two}")"
   later_call_one="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("Call this #1"))' "${movers_two}")"
   later_call_page="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("Call #2"))' "${movers_two}")"
   later_form_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-bid-form"))' "${movers_two}")"
@@ -732,6 +779,8 @@ print(chunk.find("Call #2"), chunk.find("$15"), sep=" ")
     || fail "occupied movers claim hop must follow Call this #1"
   [[ "${later_call_page}" -ge 0 && "${later_claim_at}" -gt "${later_call_page}" ]] \
     || fail "occupied movers claim hop must follow Call #2"
+  [[ "${later_claim_two}" -ge 0 && $((later_claim_two - later_claim_at)) -lt 80 && $((later_claim_at - later_claim_two)) -lt 80 ]] \
+    || fail "occupied movers hop must keep claim-after-call-two on the same hop"
   [[ "${later_form_at}" -lt 0 || "${later_form_at}" -gt "${later_claim_at}" ]] \
     || fail "occupied movers DNA form must stay after the claim hop"
   if grep -qE 'after Call #' "${movers_two}"; then
@@ -762,7 +811,7 @@ import re, sys
 html = open(sys.argv[1]).read()
 m = re.search(r"<article[^>]*data-rank=\"2\"[\s\S]*?</article>", html)
 chunk = m.group(0) if m else ""
-print("yes" if "data-call-after-claim-one" in chunk else "no")
+print("yes" if "data-call-after-claim-one" in chunk or "data-claim-after-call-two" in chunk else "no")
 ' "${movers_two}")"
   [[ "${later_rank_stamp}" == "no" ]] \
     || fail "rank 2 must not pick up the Call this #1 after-claim stamp"
@@ -804,6 +853,10 @@ print("yes" if "Call this #1" in chunk or "data-call-this-one" in chunk or "data
     || fail "GET / later-rank movers column must offer claim after Call this #1"
   grep -q 'data-claim-after-call-one' "${occupied_later_home}" \
     || fail "GET / later-rank movers hop must concentrate after Call this #1"
+  grep -q 'data-claim-after-call-two' "${occupied_later_home}" \
+    || fail "GET / later-rank movers hop must concentrate after Call this #1 is re-concentrated"
+  grep -q 'class="outbid claim-after-call claim-after-call-one claim-after-call-two"' "${occupied_later_home}" \
+    || fail "GET / later-rank movers must keep Outbid my column on one claim hop"
   grep -q 'after Call this #1' "${occupied_later_home}" \
     || fail "GET / later-rank movers hop must sit after Call this #1"
   if grep -qE 'after Call #' "${occupied_later_home}"; then
@@ -813,12 +866,15 @@ print("yes" if "Call this #1" in chunk or "data-call-this-one" in chunk or "data
   [[ "${empty_after_two}" == "3" ]] || fail "GET / after two movers must keep three honest empty lanes (got ${empty_after_two})"
   home_later_call="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("Call #2"))' "${occupied_later_home}")"
   home_later_claim="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-after-call"))' "${occupied_later_home}")"
+  home_later_claim_two="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-after-call-two"))' "${occupied_later_home}")"
   home_later_pick="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-pick"))' "${occupied_later_home}")"
   home_later_call_one="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("Call this #1"))' "${occupied_later_home}")"
   [[ "${home_later_call_one}" -ge 0 && "${home_later_claim}" -gt "${home_later_call_one}" ]] \
     || fail "GET / claim-after-call hop must follow Call this #1"
   [[ "${home_later_call}" -ge 0 && "${home_later_claim}" -gt "${home_later_call}" ]] \
     || fail "GET / claim-after-call hop must follow Call #2"
+  [[ "${home_later_claim_two}" -ge 0 && $((home_later_claim_two - home_later_claim)) -lt 80 && $((home_later_claim - home_later_claim_two)) -lt 80 ]] \
+    || fail "GET / later-rank movers must keep claim-after-call-two on the same hop"
   [[ "${home_later_pick}" -gt "${home_later_claim}" ]] \
     || fail "GET / named hub hops must stay after the occupied-lane claim hop"
   grep -q 'data-call-after-claim=""' "${occupied_later_home}" \

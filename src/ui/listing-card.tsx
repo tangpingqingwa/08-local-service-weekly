@@ -32,7 +32,7 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
           <h3 className="business">{listing.business}</h3>
           {lead ? (
             <a
-              className="host call-this-one"
+              className="outbid call-this-one"
               href={`/go/${listing.id}`}
               data-call-this-one=""
               aria-label={`Call this #1 at ${listing.siteHost}`}

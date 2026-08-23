@@ -7,7 +7,6 @@ import {
 import { ClassifiedEdition } from "../../../../src/ui/edition";
 import { LaneBoard } from "../../../../src/ui/lane-board";
 import { NotFoundCode } from "../../../../src/ui/not-found-code";
-import { OutbidForm } from "../../../../src/ui/outbid-form";
 import { currentWeekId } from "../../../../src/week";
 
 export const runtime = "nodejs";
@@ -32,18 +31,7 @@ export default async function LanePage({ params }: LanePageProps) {
   const listings = listLane(city.value.slug, category.value.slug);
   const lastWeek = lastWeekNumberOne(city.value.slug, category.value.slug);
   return (
-    <ClassifiedEdition
-      city={city.value}
-      weekId={weekId}
-      claim={
-        <OutbidForm
-          city={city.value.slug}
-          category={category.value.slug}
-          lockCity
-          lockCategory
-        />
-      }
-    >
+    <ClassifiedEdition city={city.value} weekId={weekId}>
       <div className="classified-columns classified-single" data-classified-columns="">
         <LaneBoard
           city={city.value}
@@ -51,6 +39,7 @@ export default async function LanePage({ params }: LanePageProps) {
           listings={listings}
           lastWeek={lastWeek}
           weekId={weekId}
+          showForm
         />
       </div>
     </ClassifiedEdition>

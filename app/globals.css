@@ -327,6 +327,18 @@ a:hover {
   font-size: 0.9rem;
 }
 
+.claim-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+  margin: 0.75rem 0 0;
+}
+
+.claim-columns .outbid {
+  text-decoration: none;
+}
+
 .amount-stepper {
   display: inline-flex;
   align-items: center;

@@ -2,9 +2,9 @@ import type { RankedListing } from "../board";
 import { CATEGORIES, type CategorySlug } from "../categories";
 import type { City } from "../cities";
 import { currentWeekId } from "../week";
+import { ClaimColumn } from "./claim-column";
 import { ClassifiedEdition } from "./edition";
 import { LaneBoard } from "./lane-board";
-import { OutbidForm } from "./outbid-form";
 
 type CityHubProps = {
   city: City;
@@ -19,7 +19,7 @@ export function CityHub({ city, lanes, lastWeek, weekId }: CityHubProps) {
     <ClassifiedEdition
       city={city}
       weekId={openWeek}
-      claim={<OutbidForm city={city.slug} lockCity />}
+      claim={<ClaimColumn city={city.slug} />}
     >
       <div className="classified-columns" data-classified-columns="">
         {CATEGORIES.map((category) => (

@@ -95,7 +95,7 @@ for f in app/page.tsx app/c/\[city\]/page.tsx app/c/\[city\]/\[category\]/page.t
   app/c/\[city\]/not-found.tsx app/c/\[city\]/\[category\]/not-found.tsx \
   src/board.ts src/categories.ts src/ui/city-hub.tsx src/ui/lane-board.tsx \
   src/ui/listing-card.tsx src/ui/outbid-form.tsx src/ui/not-found-code.tsx \
-  src/ui/edition.tsx tests/board.test.ts; do
+  src/ui/edition.tsx src/ui/claim-column.tsx tests/board.test.ts; do
   [[ -f "$f" ]] || fail "missing $f"
   [[ -s "$f" ]] || fail "empty $f"
 done
@@ -118,6 +118,10 @@ grep -q 'edition-city' src/ui/edition.tsx || fail "city must be the edition mast
 grep -q 'classified-columns' src/ui/city-hub.tsx \
   || fail "categories must render as classified columns"
 grep -q 'Claim #1 for' src/ui/outbid-form.tsx || fail "bid form must clone Claim #1"
+grep -q 'data-claim-pick' src/ui/claim-column.tsx \
+  || fail "hub claim must pick a column before the want-ad fields"
+grep -q 'ClaimColumn' src/ui/city-hub.tsx \
+  || fail "city hub must send first-time locals into one column"
 grep -q 'amount-field' src/ui/outbid-form.tsx || fail "bid form must keep the dashed amount"
 grep -q 'Decrease bid by one dollar' src/ui/outbid-form.tsx \
   || fail "bid form must expose a minus stepper"
@@ -394,6 +398,12 @@ if [[ -f package.json ]]; then
   grep -q 'data-empty-lane="true"' "${home_body}" || fail "GET / empty London lane must be empty"
   grep -q 'Outbid' "${home_body}" || fail "GET / must show Outbid form chrome"
   grep -q 'Claim #1' "${home_body}" || fail "GET / must keep Claim #1 in the edition header"
+  grep -q 'data-claim-pick' "${home_body}" || fail "GET / must pick a column before the want-ad fields"
+  grep -q 'href="/c/london/movers#claim"' "${home_body}" \
+    || fail "GET / claim must send a first-time local into one column"
+  if grep -q 'name="business"' "${home_body}"; then
+    fail "GET / must not print the tall want-ad field grid"
+  fi
   if grep -qiE '★|⭐|top rated|review count|top rated in London' "${home_body}"; then
     fail "GET / must not show stars or review counts"
   fi

@@ -1254,7 +1254,6 @@ test("occupied column concentrates Call this #1 after Outbid my column is re-con
   assert.match(empty, /data-empty-lane="true"/);
   assert.doesNotMatch(empty, /data-call-after-claim-two|call-after-claim-two/);
   assert.doesNotMatch(empty, /data-call-after-claim-one|call-after-claim-one/);
-  assert.doesNotMatch(empty, /data-call-after-claim-two|call-after-claim-two/);
   assert.doesNotMatch(empty, /data-call-this-one|Call this #1/);
   assert.doesNotMatch(empty, /data-claim-after-call-one|after Call this #1/);
   assert.doesNotMatch(empty, /data-claim-after-call-two|claim-after-call-two/);

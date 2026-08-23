@@ -40,13 +40,28 @@ export function LaneBoard({
           This lane is empty.
         </p>
       ) : (
-        <ol className="leaderboard" data-leaderboard="">
-          {listings.map((listing) => (
-            <li key={listing.id}>
-              <ListingCard listing={listing} />
-            </li>
-          ))}
-        </ol>
+        <>
+          <ol className="leaderboard" data-leaderboard="">
+            {listings.map((listing) => (
+              <li key={listing.id}>
+                <ListingCard listing={listing} />
+              </li>
+            ))}
+          </ol>
+          {listings.some((listing) => listing.rank > 1) ? (
+            <p className="claim-after-call-line">
+              <a
+                className="outbid claim-after-call"
+                href="#claim"
+                data-claim-after-call=""
+                data-claim-job={category.slug}
+              >
+                {`Outbid my ${category.display.toLowerCase()} column`}
+              </a>{" "}
+              {`after Call #${listings[listings.length - 1]?.rank}. Paying less than #1 still lists. Rank is the bid.`}
+            </p>
+          ) : null}
+        </>
       )}
       {lastWeek ? (
         <aside className="last-week" data-last-week="">

@@ -1,6 +1,6 @@
+import type { RankedListing } from "../board";
 import type { Category } from "../categories";
 import type { City } from "../cities";
-import type { RankedListing } from "../board";
 import { ListingCard } from "./listing-card";
 import { OutbidForm } from "./outbid-form";
 
@@ -23,7 +23,7 @@ export function LaneBoard({
 }: LaneBoardProps) {
   return (
     <section
-      className="lane"
+      className="lane classified-column"
       data-lane=""
       data-city={city.slug}
       data-category={category.slug}
@@ -31,11 +31,9 @@ export function LaneBoard({
     >
       <header className="lane-header">
         <h2>
-          <a href={`/c/${city.slug}/${category.slug}`}>
-            {city.display} / {category.display}
-          </a>
+          <a href={`/c/${city.slug}/${category.slug}`}>{category.display}</a>
         </h2>
-        <p>Rank is the bid. No stars.</p>
+        <p>Want ads. Rank is the bid.</p>
       </header>
       {listings.length === 0 ? (
         <p className="empty-lane" data-empty-lane="true">

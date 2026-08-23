@@ -168,6 +168,22 @@ export function zonedMidnight(
   return new Date(utcGuess + (target - shown));
 }
 
+const WEEK_LABEL = new Intl.DateTimeFormat("en-GB", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: WEEK_TIMEZONE,
+});
+
+/** Spoken folio for the Monday that opens `id`, e.g. `Mon 17 Aug 2026`. */
+export function formatWeekLabel(id: string): string {
+  const monday = parseWeekId(id);
+  return WEEK_LABEL.format(
+    zonedMidnight(WEEK_TIMEZONE, monday.year, monday.month, monday.day),
+  );
+}
+
 /** Monday ISO date of the week containing `now` in `timeZone`, e.g. `2026-08-17`. */
 export function weekId(
   now: Date = new Date(),

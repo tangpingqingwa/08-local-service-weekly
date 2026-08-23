@@ -4,8 +4,10 @@ import {
   resolveCategory,
   resolveCity,
 } from "../../../../src/board";
+import { ClassifiedEdition } from "../../../../src/ui/edition";
 import { LaneBoard } from "../../../../src/ui/lane-board";
 import { NotFoundCode } from "../../../../src/ui/not-found-code";
+import { OutbidForm } from "../../../../src/ui/outbid-form";
 import { currentWeekId } from "../../../../src/week";
 
 export const runtime = "nodejs";
@@ -30,22 +32,27 @@ export default async function LanePage({ params }: LanePageProps) {
   const listings = listLane(city.value.slug, category.value.slug);
   const lastWeek = lastWeekNumberOne(city.value.slug, category.value.slug);
   return (
-    <main className="board" data-board="" data-city={city.value.slug} data-week={weekId}>
-      <header className="board-header">
-        <p className="eyebrow">Local Service Weekly</p>
-        <h1>
-          <a href={`/c/${city.value.slug}`}>{city.value.display}</a>
-        </h1>
-        <p>Rank is the bid. Empty lane is empty.</p>
-      </header>
-      <LaneBoard
-        city={city.value}
-        category={category.value}
-        listings={listings}
-        lastWeek={lastWeek}
-        weekId={weekId}
-        showForm
-      />
-    </main>
+    <ClassifiedEdition
+      city={city.value}
+      weekId={weekId}
+      claim={
+        <OutbidForm
+          city={city.value.slug}
+          category={category.value.slug}
+          lockCity
+          lockCategory
+        />
+      }
+    >
+      <div className="classified-columns classified-single" data-classified-columns="">
+        <LaneBoard
+          city={city.value}
+          category={category.value}
+          listings={listings}
+          lastWeek={lastWeek}
+          weekId={weekId}
+        />
+      </div>
+    </ClassifiedEdition>
   );
 }

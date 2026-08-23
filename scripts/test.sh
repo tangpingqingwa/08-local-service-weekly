@@ -95,7 +95,7 @@ for f in app/page.tsx app/c/\[city\]/page.tsx app/c/\[city\]/\[category\]/page.t
   app/c/\[city\]/not-found.tsx app/c/\[city\]/\[category\]/not-found.tsx \
   src/board.ts src/categories.ts src/ui/city-hub.tsx src/ui/lane-board.tsx \
   src/ui/listing-card.tsx src/ui/outbid-form.tsx src/ui/not-found-code.tsx \
-  tests/board.test.ts; do
+  src/ui/edition.tsx tests/board.test.ts; do
   [[ -f "$f" ]] || fail "missing $f"
   [[ -s "$f" ]] || fail "empty $f"
 done
@@ -110,7 +110,28 @@ grep -q 'data-empty-lane' src/ui/lane-board.tsx \
   || fail "lane board must have an honest empty-lane state"
 grep -q 'data-clicks' src/ui/listing-card.tsx || fail "cards must show public clicks"
 grep -q 'data-bid' src/ui/listing-card.tsx || fail "cards must show \$bid"
-if grep -RInE '★|⭐|top rated|review count' app src >/dev/null 2>&1; then
+grep -q 'data-classified' src/ui/city-hub.tsx \
+  || grep -q 'ClassifiedEdition' src/ui/city-hub.tsx \
+  || fail "city hub must render the classified edition"
+grep -q 'data-classified' src/ui/edition.tsx || fail "edition must mark the classified paper"
+grep -q 'edition-city' src/ui/edition.tsx || fail "city must be the edition masthead"
+grep -q 'classified-columns' src/ui/city-hub.tsx \
+  || fail "categories must render as classified columns"
+grep -q 'Claim #1 for' src/ui/outbid-form.tsx || fail "bid form must clone Claim #1"
+grep -q 'amount-field' src/ui/outbid-form.tsx || fail "bid form must keep the dashed amount"
+grep -q 'Decrease bid by one dollar' src/ui/outbid-form.tsx \
+  || fail "bid form must expose a minus stepper"
+grep -q 'Increase bid by one dollar' src/ui/outbid-form.tsx \
+  || fail "bid form must expose a plus stepper"
+grep -q 'data-classified-ad' src/ui/listing-card.tsx \
+  || fail "listing card must read as a classified ad"
+grep -q 'Claimed license' src/ui/listing-card.tsx \
+  || fail "cards must show claimed license when present"
+grep -q 'href={`/go/${listing.id}`}' src/ui/listing-card.tsx \
+  || fail "ad host must click through /go/:id"
+grep -q 'local classified' tests/board.test.ts \
+  || fail "board tests must cover the classified edition"
+if grep -RInE '★|⭐|top rated|review count|top rated in London' app src >/dev/null 2>&1; then
   fail "board UI must not render stars or review counts"
 fi
 
@@ -366,9 +387,14 @@ if [[ -f package.json ]]; then
   [[ "${home_code}" == "200" ]] || fail "GET / expected 200 got ${home_code}"
   grep -q 'data-city="london"' "${home_body}" || fail "GET / must default to London"
   grep -q 'data-week="' "${home_body}" || fail "GET / must stamp the open weekId"
+  grep -q 'data-classified=""' "${home_body}" || fail "GET / must render the classified edition"
+  grep -q 'data-edition=""' "${home_body}" || fail "GET / must stamp the city edition header"
+  grep -q 'edition-city' "${home_body}" || fail "GET / city must be the edition masthead"
+  grep -q 'data-classified-columns=""' "${home_body}" || fail "GET / categories must be classified columns"
   grep -q 'data-empty-lane="true"' "${home_body}" || fail "GET / empty London lane must be empty"
   grep -q 'Outbid' "${home_body}" || fail "GET / must show Outbid form chrome"
-  if grep -qiE '★|⭐|top rated|review count' "${home_body}"; then
+  grep -q 'Claim #1' "${home_body}" || fail "GET / must keep Claim #1 in the edition header"
+  if grep -qiE '★|⭐|top rated|review count|top rated in London' "${home_body}"; then
     fail "GET / must not show stars or review counts"
   fi
 
@@ -385,6 +411,8 @@ if [[ -f package.json ]]; then
   [[ "${lane_code}" == "200" ]] || fail "GET /c/london/movers expected 200 got ${lane_code}"
   grep -q 'data-empty-lane="true"' "${lane_body}" || fail "empty movers lane must be empty"
   grep -q 'Outbid' "${lane_body}" || fail "lane board must show Outbid form chrome"
+  grep -q 'data-classified=""' "${lane_body}" || fail "lane page must stay inside the classified edition"
+  grep -q 'edition-city' "${lane_body}" || fail "lane page must keep the city edition masthead"
 
   unknown_cat="$(mktemp)"
   unknown_cat_code="$(curl -sS -o "${unknown_cat}" -w '%{http_code}' "http://127.0.0.1:${port}/c/london/plumbers")"

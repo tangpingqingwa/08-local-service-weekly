@@ -40,10 +40,7 @@ export function OutbidForm({
   const categoryOptions: readonly Category[] = CATEGORIES;
 
   const licenseHint = useMemo(
-    () =>
-      licenseNeeded
-        ? "Claimed license id (not verified)."
-        : null,
+    () => (licenseNeeded ? "Claimed license id (not verified)." : null),
     [licenseNeeded],
   );
 
@@ -99,7 +96,7 @@ export function OutbidForm({
           New spots start at ${MIN_BID_USD}. Paying less than #1 still lists at
           the rank that bid can take. Rank is the bid.
         </p>
-        <div className="fields">
+        <div className="fields want-ad-fields">
           <label>
             Business
             <input
@@ -107,6 +104,7 @@ export function OutbidForm({
               maxLength={80}
               required
               autoComplete="organization"
+              placeholder="Business name"
             />
           </label>
           {lockCity ? (
@@ -171,11 +169,11 @@ export function OutbidForm({
               <span className="field-hint">{licenseHint}</span>
             </label>
           ) : null}
-        </div>
-        <div className="bid-row">
-          <button type="submit" className="outbid">
-            Outbid
-          </button>
+          <div className="bid-row">
+            <button type="submit" className="outbid">
+              Outbid
+            </button>
+          </div>
         </div>
       </form>
     </section>

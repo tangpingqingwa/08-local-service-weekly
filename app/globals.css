@@ -367,6 +367,18 @@ a:hover {
   vertical-align: middle;
 }
 
+.card[data-call-ad="lead"] .card-top {
+  align-items: center;
+}
+
+.call-this-one {
+  display: inline-block;
+  text-decoration: none;
+  padding: 0.4rem 0.85rem;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
 .amount-stepper {
   display: inline-flex;
   align-items: center;

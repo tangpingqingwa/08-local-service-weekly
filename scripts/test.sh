@@ -141,10 +141,18 @@ grep -q 'Call this #1' src/ui/listing-card.tsx \
   || fail "paid #1 must offer Call this #1"
 grep -q 'data-call-this-one' src/ui/listing-card.tsx \
   || fail "paid #1 call hop must stamp data-call-this-one"
+grep -q 'outbid call-this-one' src/ui/listing-card.tsx \
+  || fail "paid #1 call hop must reuse Outbid button chrome"
 grep -q 'data-call-ad' src/ui/listing-card.tsx \
   || fail "paid #1 ad must stamp data-call-ad"
+grep -q 'call-this-one' app/globals.css \
+  || fail "classified CSS must style the concentrated Call this #1 hop"
 grep -q 'Call this #1' tests/board.test.ts \
   || fail "board tests must cover Call this #1"
+grep -q 'outbid call-this-one' tests/board.test.ts \
+  || fail "board tests must keep Call this #1 on Outbid chrome"
+grep -q 'concentrates Call this #1' tests/board.test.ts \
+  || fail "board tests must cover concentrating Call this #1 without another #1 hop"
 grep -q 'Call #' src/ui/listing-card.tsx \
   || fail "later ranks must offer Call #N"
 grep -q 'data-call-later' src/ui/listing-card.tsx \
@@ -524,8 +532,19 @@ if [[ -f package.json ]]; then
   grep -q '\$20' "${movers_paid}" || fail "paid listing must show \$20"
   grep -q 'Call this #1' "${movers_paid}" || fail "paid #1 must offer Call this #1"
   grep -q 'data-call-this-one' "${movers_paid}" || fail "paid #1 must stamp data-call-this-one"
+  grep -q 'class="outbid call-this-one"' "${movers_paid}" \
+    || fail "paid #1 must concentrate Call this #1 on Outbid chrome"
   grep -q 'data-call-ad="lead"' "${movers_paid}" || fail "paid #1 must stamp data-call-ad=lead"
   grep -q 'href="/go/' "${movers_paid}" || fail "Call this #1 must hop through /go/:id"
+  one_call_count="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"<article[^>]*data-rank=\"1\"[\s\S]*?</article>", html)
+chunk = m.group(0) if m else ""
+print(chunk.count("data-call-this-one"))
+' "${movers_paid}")"
+  [[ "${one_call_count}" == "1" ]] \
+    || fail "lone paid #1 must keep one Call this #1 hop (got ${one_call_count})"
   call_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("Call this #1"))' "${movers_paid}")"
   bid_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("$20"))' "${movers_paid}")"
   [[ "${call_at}" -ge 0 && "${bid_at}" -gt "${call_at}" ]] \
@@ -548,6 +567,8 @@ if [[ -f package.json ]]; then
   [[ "${occupied_home_code}" == "200" ]] || fail "GET / after pay expected 200 got ${occupied_home_code}"
   grep -q 'Call this #1' "${occupied_home}" || fail "GET / paid movers column must offer Call this #1"
   grep -q 'data-call-this-one' "${occupied_home}" || fail "GET / paid #1 must stamp data-call-this-one"
+  grep -q 'class="outbid call-this-one"' "${occupied_home}" \
+    || fail "GET / paid #1 must concentrate Call this #1 on Outbid chrome"
   grep -q 'North London Movers' "${occupied_home}" || fail "GET / must show the paid movers ad"
   empty_after_pay="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-empty-lane=\"true\""))' "${occupied_home}")"
   [[ "${empty_after_pay}" == "3" ]] || fail "GET / after one paid lane must keep three honest empty lanes (got ${empty_after_pay})"
@@ -676,6 +697,26 @@ print((m.group(1) or m.group(2)) if m else "")
   [[ "${occupied_later_home_code}" == "200" ]] \
     || fail "GET / after two movers expected 200 got ${occupied_later_home_code}"
   grep -q 'Call this #1' "${occupied_later_home}" || fail "GET / must keep Call this #1 on #1"
+  grep -q 'class="outbid call-this-one"' "${occupied_later_home}" \
+    || fail "GET / later-rank movers must keep Call this #1 on Outbid chrome"
+  later_one_call_count="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"<article[^>]*data-rank=\"1\"[\s\S]*?</article>", html)
+chunk = m.group(0) if m else ""
+print(chunk.count("data-call-this-one"))
+' "${occupied_later_home}")"
+  [[ "${later_one_call_count}" == "1" ]] \
+    || fail "GET / later-rank movers must not stack another Call this #1 (got ${later_one_call_count})"
+  later_rank_has_one="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"<article[^>]*data-rank=\"2\"[\s\S]*?</article>", html)
+chunk = m.group(0) if m else ""
+print("yes" if "Call this #1" in chunk or "data-call-this-one" in chunk else "no")
+' "${occupied_later_home}")"
+  [[ "${later_rank_has_one}" == "no" ]] \
+    || fail "GET / rank 2 must not invent Call this #1"
   grep -q 'Call #2' "${occupied_later_home}" || fail "GET / paid movers column must offer Call #2"
   grep -q 'data-call-later' "${occupied_later_home}" || fail "GET / rank 2 must stamp data-call-later"
   grep -q 'data-claim-after-call' "${occupied_later_home}" \

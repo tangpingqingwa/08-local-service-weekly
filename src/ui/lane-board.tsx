@@ -21,6 +21,8 @@ export function LaneBoard({
   weekId,
   showForm = false,
 }: LaneBoardProps) {
+  const lastCall = [...listings].reverse().find((listing) => listing.rank > 1);
+
   return (
     <section
       className="lane classified-column"
@@ -48,18 +50,31 @@ export function LaneBoard({
               </li>
             ))}
           </ol>
-          {listings.some((listing) => listing.rank > 1) ? (
-            <p className="claim-after-call-line">
-              <a
-                className="outbid claim-after-call"
-                href="#claim"
-                data-claim-after-call=""
-                data-claim-job={category.slug}
-              >
-                {`Outbid my ${category.display.toLowerCase()} column`}
-              </a>{" "}
-              {`after Call #${listings[listings.length - 1]?.rank}. Paying less than #1 still lists. Rank is the bid.`}
-            </p>
+          {lastCall ? (
+            <>
+              <p className="claim-after-call-line">
+                <a
+                  className="outbid claim-after-call"
+                  href="#claim"
+                  data-claim-after-call=""
+                  data-claim-job={category.slug}
+                >
+                  {`Outbid my ${category.display.toLowerCase()} column`}
+                </a>{" "}
+                {`after Call #${lastCall.rank}. Paying less than #1 still lists. Rank is the bid.`}
+              </p>
+              <p className="call-after-claim-line">
+                <a
+                  className="outbid call-after-claim"
+                  href={`/go/${lastCall.id}`}
+                  data-call-after-claim=""
+                  aria-label={`Call #${lastCall.rank} after the claim hop at ${lastCall.siteHost}`}
+                >
+                  {`Call #${lastCall.rank}`}
+                </a>{" "}
+                after the claim hop.
+              </p>
+            </>
           ) : null}
         </>
       )}

@@ -165,6 +165,20 @@ grep -q 'data-claim-after-call' tests/board.test.ts \
   || fail "board tests must cover claiming after Call #N"
 grep -q 'after Call #2' tests/board.test.ts \
   || fail "board tests must keep the claim hop after Call #2"
+grep -q 'data-call-after-claim' src/ui/lane-board.tsx \
+  || fail "occupied later ranks must offer a call-after-claim hop"
+grep -q 'after the claim hop' src/ui/lane-board.tsx \
+  || fail "call-after-claim hop must sit after the claim hop"
+grep -q 'href={`/go/${lastCall.id}`}' src/ui/lane-board.tsx \
+  || fail "call-after-claim hop must go through /go/:id"
+grep -q 'outbid call-after-claim' src/ui/lane-board.tsx \
+  || fail "call-after-claim hop must reuse Outbid button chrome"
+grep -q 'call-after-claim' app/globals.css \
+  || fail "classified CSS must style the call-after-claim hop"
+grep -q 'data-call-after-claim' tests/board.test.ts \
+  || fail "board tests must cover calling after the claim hop"
+grep -q 'after the claim hop' tests/board.test.ts \
+  || fail "board tests must keep Call after the claim hop"
 grep -q 'local classified' tests/board.test.ts \
   || fail "board tests must cover the classified edition"
 if grep -RInE '★|⭐|top rated|review count|top rated in London' app src >/dev/null 2>&1; then
@@ -456,6 +470,9 @@ if [[ -f package.json ]]; then
   if grep -qE 'data-claim-after-call|after Call #' "${home_body}"; then
     fail "empty GET / must not invent a claim-after-call hop"
   fi
+  if grep -qE 'data-call-after-claim|after the claim hop' "${home_body}"; then
+    fail "empty GET / must not invent a call-after-claim hop"
+  fi
   if grep -qiE '★|⭐|top rated|review count|top rated in London' "${home_body}"; then
     fail "GET / must not show stars or review counts"
   fi
@@ -477,6 +494,9 @@ if [[ -f package.json ]]; then
   fi
   if grep -qE 'data-claim-after-call|after Call #' "${lane_body}"; then
     fail "empty movers lane must not invent a claim-after-call hop"
+  fi
+  if grep -qE 'data-call-after-claim|after the claim hop' "${lane_body}"; then
+    fail "empty movers lane must not invent a call-after-claim hop"
   fi
   grep -q 'Outbid' "${lane_body}" || fail "lane board must show Outbid form chrome"
   grep -q 'data-classified=""' "${lane_body}" || fail "lane page must stay inside the classified edition"
@@ -519,6 +539,9 @@ if [[ -f package.json ]]; then
   if grep -qE 'data-claim-after-call|after Call #' "${movers_paid}"; then
     fail "lone paid #1 must not invent a claim-after-call hop"
   fi
+  if grep -qE 'data-call-after-claim|after the claim hop' "${movers_paid}"; then
+    fail "lone paid #1 must not invent a call-after-claim hop"
+  fi
 
   occupied_home="$(mktemp)"
   occupied_home_code="$(curl -sS -o "${occupied_home}" -w '%{http_code}' "http://127.0.0.1:${port}/")"
@@ -537,6 +560,9 @@ if [[ -f package.json ]]; then
   fi
   if grep -qE 'data-claim-after-call|after Call #' "${occupied_home}"; then
     fail "GET / with only paid #1 must not invent a claim-after-call hop"
+  fi
+  if grep -qE 'data-call-after-claim|after the claim hop' "${occupied_home}"; then
+    fail "GET / with only paid #1 must not invent a call-after-claim hop"
   fi
   if grep -qiE '★|⭐|top rated|review count|google map|map pin' "${occupied_home}"; then
     fail "GET / occupied must not invent stars or maps"
@@ -627,6 +653,23 @@ print(chunk.find("Call #2"), chunk.find("$15"), sep=" ")
     || fail "occupied movers claim hop must follow Call #2"
   [[ "${later_form_at}" -lt 0 || "${later_form_at}" -gt "${later_claim_at}" ]] \
     || fail "occupied movers DNA form must stay after the claim hop"
+  grep -q 'data-call-after-claim' "${movers_two}" \
+    || fail "occupied movers lane must offer Call after the claim hop"
+  grep -q 'after the claim hop' "${movers_two}" \
+    || fail "occupied movers Call hop must sit after the claim hop"
+  later_call_after="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-call-after-claim"))' "${movers_two}")"
+  [[ "${later_call_after}" -gt "${later_claim_at}" ]] \
+    || fail "occupied movers Call hop must follow the claim hop"
+  [[ "${later_form_at}" -lt 0 || "${later_form_at}" -gt "${later_call_after}" ]] \
+    || fail "occupied movers DNA form must stay after the call-after-claim hop"
+  later_call_href="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"data-call-after-claim=\"\"[^>]*href=\"(/go/[^\"]+)\"|href=\"(/go/[^\"]+)\"[^>]*data-call-after-claim", html)
+print((m.group(1) or m.group(2)) if m else "")
+' "${movers_two}")"
+  [[ "${later_call_href}" == /go/* ]] \
+    || fail "occupied movers call-after-claim hop must go through /go/:id got ${later_call_href}"
 
   occupied_later_home="$(mktemp)"
   occupied_later_home_code="$(curl -sS -o "${occupied_later_home}" -w '%{http_code}' "http://127.0.0.1:${port}/")"
@@ -648,6 +691,15 @@ print(chunk.find("Call #2"), chunk.find("$15"), sep=" ")
     || fail "GET / claim-after-call hop must follow Call #2"
   [[ "${home_later_pick}" -gt "${home_later_claim}" ]] \
     || fail "GET / named hub hops must stay after the occupied-lane claim hop"
+  grep -q 'data-call-after-claim' "${occupied_later_home}" \
+    || fail "GET / later-rank movers column must offer Call after the claim hop"
+  grep -q 'after the claim hop' "${occupied_later_home}" \
+    || fail "GET / later-rank movers Call hop must sit after the claim hop"
+  home_later_call_after="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-call-after-claim"))' "${occupied_later_home}")"
+  [[ "${home_later_call_after}" -gt "${home_later_claim}" ]] \
+    || fail "GET / call-after-claim hop must follow the claim hop"
+  [[ "${home_later_pick}" -gt "${home_later_call_after}" ]] \
+    || fail "GET / named hub hops must stay after the call-after-claim hop"
   if grep -qiE '★|⭐|top rated|review count|google map|map pin' "${occupied_later_home}"; then
     fail "GET / later-rank occupied must not invent stars or maps"
   fi

@@ -194,8 +194,12 @@ test("empty London hub is empty: four lanes, Outbid, no invented cards or stars"
   const editionEnd = html.indexOf("data-classified-columns");
   const claimAt = html.indexOf("data-claim-pick");
   const firstLane = html.indexOf("data-lane");
-  assert.ok(claimAt > -1 && editionEnd > claimAt);
-  assert.ok(firstLane > editionEnd);
+  const firstEmpty = html.indexOf('data-empty-lane="true"');
+  const firstOutbid = html.indexOf("Outbid");
+  assert.ok(editionEnd > -1 && firstLane > editionEnd);
+  assert.ok(claimAt > firstLane);
+  assert.ok(firstEmpty > -1 && firstEmpty < claimAt);
+  assert.ok(firstOutbid > firstEmpty);
   assert.ok(html.indexOf("data-bid-form") === -1 || html.indexOf("data-bid-form") > editionEnd);
   assert.doesNotMatch(html, /name="business"/);
   assert.doesNotMatch(html, /name="siteUrl"/);
@@ -332,6 +336,7 @@ test("GET / default page is the London hub", async () => {
   assert.match(html, /data-empty-lane="true"/);
   assert.match(html, /data-claim-pick/);
   assert.match(html, /Outbid/);
+  assert.ok(html.indexOf('data-empty-lane="true"') < html.indexOf("data-claim-pick"));
   assert.doesNotMatch(html, /name="business"/);
   assert.doesNotMatch(html, /★|⭐|review count/i);
 });

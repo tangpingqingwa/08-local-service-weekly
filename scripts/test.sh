@@ -397,8 +397,12 @@ if [[ -f package.json ]]; then
   grep -q 'data-classified-columns=""' "${home_body}" || fail "GET / categories must be classified columns"
   grep -q 'data-empty-lane="true"' "${home_body}" || fail "GET / empty London lane must be empty"
   grep -q 'Outbid' "${home_body}" || fail "GET / must show Outbid form chrome"
-  grep -q 'Claim #1' "${home_body}" || fail "GET / must keep Claim #1 in the edition header"
+  grep -q 'Claim #1' "${home_body}" || fail "GET / must keep Claim #1 after the classified columns"
   grep -q 'data-claim-pick' "${home_body}" || fail "GET / must pick a column before the want-ad fields"
+  home_empty_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-empty-lane"))' "${home_body}")"
+  home_claim_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-pick"))' "${home_body}")"
+  [[ "${home_empty_at}" -ge 0 && "${home_claim_at}" -gt "${home_empty_at}" ]] \
+    || fail "GET / must show empty columns before the Outbid claim"
   grep -q 'href="/c/london/movers#claim"' "${home_body}" \
     || fail "GET / claim must send a first-time local into one column"
   if grep -q 'name="business"' "${home_body}"; then

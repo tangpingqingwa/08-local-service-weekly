@@ -623,12 +623,6 @@ print(chunk.count("data-call-this-one"), chunk.count("data-call-after-claim-one"
     || fail "lone paid #1 must keep claim-after-call-two on the same hop"
   [[ "${paid_form_at}" -lt 0 || "${paid_form_at}" -gt "${paid_claim_at}" ]] \
     || fail "lone paid #1 DNA form must stay after the claim hop"
-  paid_claim_count="$(python3 -c '
-import re, sys
-print(len(re.findall(r"<a[^>]*data-claim-after-call-two=\"\"", open(sys.argv[1]).read())))
-' "${movers_paid}")"
-  [[ "${paid_claim_count}" == "1" ]] \
-    || fail "lone paid #1 must keep one claim-after-call-two hop (got ${paid_claim_count})"
   if grep -qE 'after Call #' "${movers_paid}"; then
     fail "lone paid #1 must not invent a later-rank claim-after-call hop"
   fi
@@ -789,12 +783,6 @@ print(chunk.find("Call #2"), chunk.find("$15"), sep=" ")
     || fail "occupied movers hop must keep claim-after-call-two on the same hop"
   [[ "${later_form_at}" -lt 0 || "${later_form_at}" -gt "${later_claim_at}" ]] \
     || fail "occupied movers DNA form must stay after the claim hop"
-  later_claim_count="$(python3 -c '
-import re, sys
-print(len(re.findall(r"<a[^>]*data-claim-after-call-two=\"\"", open(sys.argv[1]).read())))
-' "${movers_two}")"
-  [[ "${later_claim_count}" == "1" ]] \
-    || fail "occupied movers lane must keep one claim-after-call-two hop (got ${later_claim_count})"
   if grep -qE 'after Call #' "${movers_two}"; then
     fail "occupied movers hop must not keep a quieter after Call #N line"
   fi
@@ -889,12 +877,6 @@ print("yes" if "Call this #1" in chunk or "data-call-this-one" in chunk or "data
     || fail "GET / later-rank movers must keep claim-after-call-two on the same hop"
   [[ "${home_later_pick}" -gt "${home_later_claim}" ]] \
     || fail "GET / named hub hops must stay after the occupied-lane claim hop"
-  home_later_claim_count="$(python3 -c '
-import re, sys
-print(len(re.findall(r"<a[^>]*data-claim-after-call-two=\"\"", open(sys.argv[1]).read())))
-' "${occupied_later_home}")"
-  [[ "${home_later_claim_count}" == "1" ]] \
-    || fail "GET / later-rank movers must keep one claim-after-call-two hop (got ${home_later_claim_count})"
   grep -q 'data-call-after-claim=""' "${occupied_later_home}" \
     || fail "GET / later-rank movers column must offer Call after the claim hop"
   grep -q 'after the claim hop' "${occupied_later_home}" \

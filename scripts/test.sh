@@ -120,6 +120,10 @@ grep -q 'classified-columns' src/ui/city-hub.tsx \
 grep -q 'Claim #1 for' src/ui/outbid-form.tsx || fail "bid form must clone Claim #1"
 grep -q 'data-claim-pick' src/ui/claim-column.tsx \
   || fail "hub claim must pick a column before the want-ad fields"
+grep -q 'data-claim-job' src/ui/claim-column.tsx \
+  || fail "hub Outbid hops must name the column as a job the tradesperson owns"
+grep -q 'Outbid my' src/ui/claim-column.tsx \
+  || fail "hub hops must say Outbid my {job} column, not a generic Outbid {category}"
 grep -q 'ClaimColumn' src/ui/city-hub.tsx \
   || fail "city hub must send first-time locals into one column"
 grep -q 'amount-field' src/ui/outbid-form.tsx || fail "bid form must keep the dashed amount"
@@ -405,6 +409,13 @@ if [[ -f package.json ]]; then
     || fail "GET / must show empty columns before the Outbid claim"
   grep -q 'href="/c/london/movers#claim"' "${home_body}" \
     || fail "GET / claim must send a first-time local into one column"
+  grep -q 'Outbid my movers column' "${home_body}" \
+    || fail "GET / hop must name the movers column as a job a tradesperson owns"
+  grep -q 'data-claim-job="movers"' "${home_body}" \
+    || fail "GET / hop must stamp the movers job on the claim link"
+  if grep -q 'Outbid Movers' "${home_body}"; then
+    fail "GET / must not keep generic Outbid {category} hops"
+  fi
   if grep -q 'name="business"' "${home_body}"; then
     fail "GET / must not print the tall want-ad field grid"
   fi

@@ -26,8 +26,9 @@ export function ClaimColumn({ city }: { city: string }) {
             className="outbid"
             href={`/c/${city}/${item.slug}#claim`}
             data-claim-column={item.slug}
+            data-claim-job={item.slug}
           >
-            Outbid {item.display}
+            {`Outbid my ${item.display.toLowerCase()} column`}
           </a>
         ))}
       </nav>

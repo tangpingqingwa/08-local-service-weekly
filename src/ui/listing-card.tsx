@@ -13,6 +13,7 @@ export function formatClicks(clicks: number): string {
 export function ListingCard({ listing }: { listing: RankedListing }) {
   const city = getCity(listing.city)?.display ?? listing.city;
   const category = getCategory(listing.category)?.display ?? listing.category;
+  const lead = listing.rank === 1;
 
   return (
     <article
@@ -21,14 +22,26 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
       data-classified-ad=""
       data-rank={listing.rank}
       data-listing-id={listing.id}
+      {...(lead ? { "data-call-ad": "lead" } : {})}
     >
       <span className="rank">#{listing.rank}</span>
       <div className="card-body">
         <div className="card-top">
           <h3 className="business">{listing.business}</h3>
-          <p className="bid" data-bid="">
-            {formatUsd(listing.bidUsd)}
-          </p>
+          {lead ? (
+            <a
+              className="host call-this-one"
+              href={`/go/${listing.id}`}
+              data-call-this-one=""
+              aria-label={`Call this #1 at ${listing.siteHost}`}
+            >
+              Call this #1
+            </a>
+          ) : (
+            <p className="bid" data-bid="">
+              {formatUsd(listing.bidUsd)}
+            </p>
+          )}
         </div>
         <p className="meta">
           <span data-category="">{category}</span>
@@ -36,9 +49,21 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
           <span data-city="">{city}</span>
         </p>
         <p className="meta">
-          <a className="host" href={`/go/${listing.id}`} data-host="">
-            {listing.siteHost}
-          </a>
+          {lead ? (
+            <>
+              <span className="bid" data-bid="">
+                {formatUsd(listing.bidUsd)}
+              </span>
+              <span aria-hidden="true"> · </span>
+              <span className="host" data-host="">
+                {listing.siteHost}
+              </span>
+            </>
+          ) : (
+            <a className="host" href={`/go/${listing.id}`} data-host="">
+              {listing.siteHost}
+            </a>
+          )}
           <span aria-hidden="true"> · </span>
           <span className="clicks" data-clicks="">
             {formatClicks(listing.clicks)}

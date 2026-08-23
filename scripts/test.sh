@@ -137,6 +137,14 @@ grep -q 'Claimed license' src/ui/listing-card.tsx \
   || fail "cards must show claimed license when present"
 grep -q 'href={`/go/${listing.id}`}' src/ui/listing-card.tsx \
   || fail "ad host must click through /go/:id"
+grep -q 'Call this #1' src/ui/listing-card.tsx \
+  || fail "paid #1 must offer Call this #1"
+grep -q 'data-call-this-one' src/ui/listing-card.tsx \
+  || fail "paid #1 call hop must stamp data-call-this-one"
+grep -q 'data-call-ad' src/ui/listing-card.tsx \
+  || fail "paid #1 ad must stamp data-call-ad"
+grep -q 'Call this #1' tests/board.test.ts \
+  || fail "board tests must cover Call this #1"
 grep -q 'local classified' tests/board.test.ts \
   || fail "board tests must cover the classified edition"
 if grep -RInE '★|⭐|top rated|review count|top rated in London' app src >/dev/null 2>&1; then
@@ -419,6 +427,9 @@ if [[ -f package.json ]]; then
   if grep -q 'name="business"' "${home_body}"; then
     fail "GET / must not print the tall want-ad field grid"
   fi
+  if grep -q 'Call this #1' "${home_body}"; then
+    fail "empty GET / must not invent Call this #1"
+  fi
   if grep -qiE '★|⭐|top rated|review count|top rated in London' "${home_body}"; then
     fail "GET / must not show stars or review counts"
   fi
@@ -459,8 +470,32 @@ if [[ -f package.json ]]; then
   grep -q 'data-rank="1"' "${movers_paid}" || fail "paid $20 must list at rank 1"
   grep -q 'North London Movers' "${movers_paid}" || fail "paid listing must appear on the board"
   grep -q '\$20' "${movers_paid}" || fail "paid listing must show \$20"
+  grep -q 'Call this #1' "${movers_paid}" || fail "paid #1 must offer Call this #1"
+  grep -q 'data-call-this-one' "${movers_paid}" || fail "paid #1 must stamp data-call-this-one"
+  grep -q 'data-call-ad="lead"' "${movers_paid}" || fail "paid #1 must stamp data-call-ad=lead"
+  grep -q 'href="/go/' "${movers_paid}" || fail "Call this #1 must hop through /go/:id"
+  call_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("Call this #1"))' "${movers_paid}")"
+  bid_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("$20"))' "${movers_paid}")"
+  [[ "${call_at}" -ge 0 && "${bid_at}" -gt "${call_at}" ]] \
+    || fail "occupied movers ad must show Call this #1 before \$bid"
   if grep -q 'data-empty-lane="true"' "${movers_paid}"; then
     fail "paid lane must not stay empty"
+  fi
+
+  occupied_home="$(mktemp)"
+  occupied_home_code="$(curl -sS -o "${occupied_home}" -w '%{http_code}' "http://127.0.0.1:${port}/")"
+  [[ "${occupied_home_code}" == "200" ]] || fail "GET / after pay expected 200 got ${occupied_home_code}"
+  grep -q 'Call this #1' "${occupied_home}" || fail "GET / paid movers column must offer Call this #1"
+  grep -q 'data-call-this-one' "${occupied_home}" || fail "GET / paid #1 must stamp data-call-this-one"
+  grep -q 'North London Movers' "${occupied_home}" || fail "GET / must show the paid movers ad"
+  empty_after_pay="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-empty-lane=\"true\""))' "${occupied_home}")"
+  [[ "${empty_after_pay}" == "3" ]] || fail "GET / after one paid lane must keep three honest empty lanes (got ${empty_after_pay})"
+  home_call_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("Call this #1"))' "${occupied_home}")"
+  home_claim_after="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-pick"))' "${occupied_home}")"
+  [[ "${home_call_at}" -ge 0 && "${home_claim_after}" -gt "${home_call_at}" ]] \
+    || fail "GET / paid column must show Call this #1 before the Outbid claim"
+  if grep -qiE '★|⭐|top rated|review count|google map|map pin' "${occupied_home}"; then
+    fail "GET / occupied must not invent stars or maps"
   fi
 
   low_body="$(mktemp)"
@@ -512,6 +547,13 @@ if [[ -f package.json ]]; then
   curl -sS -o "${movers_two}" "http://127.0.0.1:${port}/c/london/movers"
   grep -q 'South London Movers' "${movers_two}" || fail "\$15 underbid must still list"
   grep -q 'data-rank="2"' "${movers_two}" || fail "\$15 must list below \$20"
+  later_has_call="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"data-rank=\"2\"[\s\S]{0,800}South London Movers[\s\S]{0,800}</article>", html)
+print("yes" if m and ("Call this #1" in m.group(0) or "data-call-this-one" in m.group(0)) else "no")
+' "${movers_two}")"
+  [[ "${later_has_call}" == "no" ]] || fail "rank 2 must stay a quiet host hop, not Call this #1"
 
   echo "== fixture raise HTTP =="
   raise_body="$(mktemp)"
@@ -810,7 +852,7 @@ if [[ -f package.json ]]; then
   grep -q 'listing_not_found' "${missing_click}" || fail "missing listing click must be listing_not_found"
 
   rm -f "${home_body}" "${city_body}" "${lane_body}" "${unknown_cat}" \
-    "${paid_body}" "${movers_paid}" "${low_body}" "${frac_body}" \
+    "${paid_body}" "${movers_paid}" "${occupied_home}" "${low_body}" "${frac_body}" \
     "${return_unknown}" "${form_headers}" "${form_body}" "${return_paid}" \
     "${movers_two}" "${raise_body}" "${movers_raised}" "${rival_body}" \
     "${movers_rival}" "${same_raise}" "${about_body}" "${rules_body}" \

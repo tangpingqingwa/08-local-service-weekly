@@ -360,6 +360,20 @@ a:hover {
   vertical-align: middle;
 }
 
+.claim-after-call-two {
+  display: inline-block;
+  text-decoration: none;
+  padding: 0.4rem 0.85rem;
+  vertical-align: middle;
+}
+
+.claim-after-call.claim-after-call-two,
+.claim-after-call[data-claim-after-call-two] {
+  padding: 0.7rem 1.35rem;
+  font-size: 1.12rem;
+  letter-spacing: 0.05em;
+}
+
 .call-after-claim-line {
   margin: 0.65rem 0 0;
   color: var(--muted);

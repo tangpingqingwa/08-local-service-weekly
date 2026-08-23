@@ -69,16 +69,21 @@ export class PolarError extends Error {
   }
 }
 
+function envText(env: PolarEnv, key: string): string | undefined {
+  const value = env[key]?.trim();
+  return value ? value : undefined;
+}
+
 /** Live Polar only when POLAR_LIVE=1. POLAR_FIXTURE_ONLY=1 always wins. */
 export function isPolarLive(env: PolarEnv = process.env): boolean {
-  if (env.POLAR_FIXTURE_ONLY === "1") {
+  if (envText(env, "POLAR_FIXTURE_ONLY") === "1") {
     return false;
   }
-  return env.POLAR_LIVE === "1";
+  return envText(env, "POLAR_LIVE") === "1";
 }
 
 export function polarFixtureOnly(env: PolarEnv = process.env): boolean {
-  return env.POLAR_FIXTURE_ONLY === "1";
+  return envText(env, "POLAR_FIXTURE_ONLY") === "1";
 }
 
 export function parseBidUsd(raw: unknown): number {

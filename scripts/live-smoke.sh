@@ -47,7 +47,9 @@ OP_POLAR_LIVE="${POLAR_LIVE:-}"
 OP_POLAR_ACCESS_TOKEN="${POLAR_ACCESS_TOKEN:-}"
 OP_POLAR_WEBHOOK_SECRET="${POLAR_WEBHOOK_SECRET:-}"
 OP_POLAR_PRODUCT_ID="${POLAR_PRODUCT_ID:-}"
+OP_POLAR_ORGANIZATION_ID="${POLAR_ORGANIZATION_ID:-${POLAR_ORG_ID:-}}"
 OP_POLAR_FIXTURE_ONLY="${POLAR_FIXTURE_ONLY:-}"
+OP_POLAR_API_BASE="${POLAR_API_BASE:-}"
 
 kill_tree() {
   local pid="${1:-}"
@@ -127,10 +129,14 @@ ensure_next_build() {
   if [[ -f "${root}/.next/BUILD_ID" ]]; then
     return 0
   fi
+  rebuild_next
+}
+
+rebuild_next() {
   echo "building Next.js app for live-smoke"
   (
     cd "$root"
-    unset POLAR_LIVE POLAR_ACCESS_TOKEN POLAR_WEBHOOK_SECRET POLAR_ORGANIZATION_ID POLAR_PRODUCT_ID || true
+    unset POLAR_LIVE POLAR_ACCESS_TOKEN POLAR_WEBHOOK_SECRET POLAR_ORGANIZATION_ID POLAR_PRODUCT_ID POLAR_API_BASE || true
     export POLAR_FIXTURE_ONLY=1
     export NEXT_TELEMETRY_DISABLED=1
     npx --no-install next build
@@ -145,15 +151,16 @@ start_smoke_server() {
   ensure_next_build
   (
     cd "$root"
-    unset POLAR_LIVE POLAR_ACCESS_TOKEN POLAR_WEBHOOK_SECRET POLAR_ORGANIZATION_ID POLAR_PRODUCT_ID POLAR_FIXTURE_ONLY || true
+    unset POLAR_LIVE POLAR_ACCESS_TOKEN POLAR_WEBHOOK_SECRET POLAR_ORGANIZATION_ID POLAR_PRODUCT_ID POLAR_FIXTURE_ONLY POLAR_API_BASE || true
     export POLAR_FIXTURE_ONLY=1
     export PORT="${port}"
     export DATABASE_PATH="${db_path}"
     export PUBLIC_BASE_URL="http://127.0.0.1:${port}"
     export OPERATOR_SECRET="${OPERATOR_SECRET:-live-smoke-operator}"
     export NEXT_TELEMETRY_DISABLED=1
+    # bash 3.2: do not `local` this name; export must reach next start.
     while [[ $# -gt 0 ]]; do
-      local assignment="$1"
+      assignment="$1"
       shift
       if [[ "${assignment}" == *= ]]; then
         unset "${assignment%=}" || true
@@ -161,6 +168,7 @@ start_smoke_server() {
         export "${assignment}"
       fi
     done
+    unset assignment
     exec npx --no-install next start --port "${port}" --hostname 127.0.0.1
   ) >"${log_path}" 2>&1 &
   echo $!
@@ -343,9 +351,14 @@ fi
 echo "base=${BASE}"
 echo "operator POLAR_LIVE=${OP_POLAR_LIVE:-<unset>}"
 if [[ -n "${OP_POLAR_ACCESS_TOKEN}" ]]; then
-  echo "operator POLAR_ACCESS_TOKEN=<set>"
+  echo "operator POLAR_ACCESS_TOKEN=<set len=${#OP_POLAR_ACCESS_TOKEN}>"
 else
   echo "operator POLAR_ACCESS_TOKEN=<unset>"
+fi
+if [[ -n "${OP_POLAR_API_BASE}" ]]; then
+  echo "operator POLAR_API_BASE=${OP_POLAR_API_BASE}"
+else
+  echo "operator POLAR_API_BASE=<unset; live process default is production>"
 fi
 
 # --- Health ---
@@ -452,12 +465,18 @@ if [[ "${OP_POLAR_LIVE}" == "1" ]]; then
     live_db="${WORKDIR}/live.sqlite"
     live_log="${WORKDIR}/polar-live.log"
     live_base="http://127.0.0.1:${live_port}"
-    LIVE_PID="$(start_smoke_server "$live_port" "$live_db" "$live_log" \
-      "POLAR_LIVE=1" \
-      "POLAR_ACCESS_TOKEN=${OP_POLAR_ACCESS_TOKEN}" \
-      "POLAR_WEBHOOK_SECRET=${OP_POLAR_WEBHOOK_SECRET:-}" \
-      "POLAR_PRODUCT_ID=${OP_POLAR_PRODUCT_ID:-}" \
-      "POLAR_FIXTURE_ONLY=")"
+    live_env=(
+      "POLAR_LIVE=1"
+      "POLAR_ACCESS_TOKEN=${OP_POLAR_ACCESS_TOKEN}"
+      "POLAR_WEBHOOK_SECRET=${OP_POLAR_WEBHOOK_SECRET:-}"
+      "POLAR_PRODUCT_ID=${OP_POLAR_PRODUCT_ID:-}"
+      "POLAR_ORGANIZATION_ID=${OP_POLAR_ORGANIZATION_ID:-}"
+      "POLAR_FIXTURE_ONLY="
+    )
+    if [[ -n "${OP_POLAR_API_BASE}" ]]; then
+      live_env+=("POLAR_API_BASE=${OP_POLAR_API_BASE}")
+    fi
+    LIVE_PID="$(start_smoke_server "$live_port" "$live_db" "$live_log" "${live_env[@]}")"
     if ! wait_health "$live_base"; then
       if grep -q 'BLOCKED-SECRET: POLAR_ACCESS_TOKEN' "${live_log}"; then
         echo "BLOCKED-SECRET: POLAR_ACCESS_TOKEN"
@@ -473,16 +492,31 @@ if [[ "${OP_POLAR_LIVE}" == "1" ]]; then
         "$live_body" "$live_hdrs" || true)"
       live_url="$(json_field "$live_body" "url" || true)"
       live_err="$(json_field "$live_body" "error" || true)"
+      live_status="$(json_field "$live_body" "status" || true)"
+      live_listing="$(json_field "$live_body" "listingId" || true)"
       live_board="${WORKDIR}/live-board.html"
       http_get "$live_base" "/c/london/movers" "$live_board" >/dev/null || true
+      live_url_host=""
+      if [[ "${live_url}" == https://* ]]; then
+        live_url_host="${live_url#https://}"
+        live_url_host="${live_url_host%%/*}"
+      fi
       if html_has "$live_board" "Live Polar Van"; then
         record "live-checkout" "FAIL" "unpaid live Polar session appeared on the board"
-      elif [[ "$live_code" == "200" && "$live_url" == https://*polar.sh* ]]; then
-        record "live-checkout" "PASS" "live Polar checkout URL; unpaid session not listed"
-      elif [[ "$live_code" == "503" ]]; then
-        record "live-checkout" "PASS-ERROR" "POLAR_LIVE=1 HTTP 503 ${live_err}; no invented paid rank"
+      elif [[ -n "${live_listing}" && "${live_listing}" != "null" ]]; then
+        record "live-checkout" "FAIL" "live checkout invented a paid listingId without webhook"
+      elif [[ "$live_status" == "paid" ]]; then
+        record "live-checkout" "FAIL" "live checkout returned fixture paid status"
+      elif [[ "$live_url" == /return* ]]; then
+        record "live-checkout" "FAIL" "live checkout returned fixture /return listing, not Polar"
+      elif [[ "$live_code" == "200" && "$live_url" == https://sandbox.polar.sh/checkout/* ]]; then
+        record "live-checkout" "PASS" "sandbox.polar.sh Checkout URL; unpaid session not listed"
+      elif [[ "$live_code" == "200" && "$live_url_host" == *polar.sh ]]; then
+        record "live-checkout" "FAIL" "live checkout host ${live_url_host} is not sandbox.polar.sh"
+      elif [[ "$live_code" == "503" && "$live_err" == "polar_not_live" ]]; then
+        record "live-checkout" "PASS-ERROR" "POLAR_LIVE=1 HTTP 503 polar_not_live; no invented paid rank"
       else
-        record "live-checkout" "PASS-ERROR" "POLAR_LIVE=1 HTTP ${live_code} error=${live_err}; no invented paid rank"
+        record "live-checkout" "FAIL" "POLAR_LIVE=1 HTTP ${live_code} error=${live_err} host=${live_url_host:-none}; no invented paid rank"
       fi
     fi
     if [[ -n "${LIVE_PID}" ]]; then

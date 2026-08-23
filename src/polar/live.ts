@@ -22,8 +22,22 @@ import {
   type PolarPort,
 } from "./port";
 
-/** Only used when POLAR_LIVE=1. tests/ and CI never fetch this host. */
+/** Production Polar API. Override with POLAR_API_BASE (sandbox smoke only). */
 export const POLAR_API_BASE = "https://api.polar.sh";
+
+/** Default stays production. Empty / unset POLAR_API_BASE does not change that. */
+function envText(env: PolarEnv, key: string): string | undefined {
+  const value = env[key]?.trim();
+  return value ? value : undefined;
+}
+
+export function polarApiBase(env: PolarEnv = process.env): string {
+  const fromEnv = envText(env, "POLAR_API_BASE");
+  if (fromEnv) {
+    return fromEnv.replace(/\/$/, "");
+  }
+  return POLAR_API_BASE;
+}
 
 export type LivePolarOptions = {
   env?: PolarEnv;
@@ -48,8 +62,7 @@ type CheckoutRow = {
 };
 
 export function polarAccessToken(env: PolarEnv = process.env): string | undefined {
-  const token = env.POLAR_ACCESS_TOKEN?.trim();
-  return token ? token : undefined;
+  return envText(env, "POLAR_ACCESS_TOKEN");
 }
 
 export function requirePolarAccessToken(env: PolarEnv = process.env): string {
@@ -61,11 +74,11 @@ export function requirePolarAccessToken(env: PolarEnv = process.env): string {
 }
 
 function publicBaseUrl(env: PolarEnv): string {
-  const fromSuccess = env.POLAR_SUCCESS_URL?.trim();
+  const fromSuccess = envText(env, "POLAR_SUCCESS_URL");
   if (fromSuccess) {
     return fromSuccess.replace(/\/return.*$/i, "").replace(/\/$/, "");
   }
-  const fromPublic = env.PUBLIC_BASE_URL?.trim();
+  const fromPublic = envText(env, "PUBLIC_BASE_URL");
   if (fromPublic) {
     return fromPublic.replace(/\/$/, "");
   }
@@ -144,7 +157,7 @@ export class LivePolarPort implements PolarPort {
 
     let response: Response;
     try {
-      response = await this.fetchFn(`${POLAR_API_BASE}/v1/checkouts/`, {
+      response = await this.fetchFn(`${polarApiBase(this.env)}/v1/checkouts/`, {
         method: "POST",
         headers: {
           authorization: `Bearer ${token}`,
@@ -263,25 +276,28 @@ function polarCheckoutBody(
   intent: CheckoutIntent,
 ): Record<string, unknown> {
   const successUrl = `${publicBaseUrl(env)}/return?checkout={CHECKOUT_ID}`;
+  const metadata: Record<string, string> = {
+    business: listing.business,
+    category: listing.category,
+    city: listing.city,
+    siteUrl: listing.siteUrl,
+    bidUsd: String(listing.bidUsd),
+    weekId: listing.weekId ?? "",
+    intent,
+    amountUsd: String(amountUsd),
+  };
+  if (listing.licenseId) {
+    metadata.licenseId = listing.licenseId;
+  }
   const body: Record<string, unknown> = {
     amount: amountUsd * 100,
     currency: "usd",
     success_url: successUrl,
-    metadata: {
-      business: listing.business,
-      category: listing.category,
-      city: listing.city,
-      siteUrl: listing.siteUrl,
-      licenseId: listing.licenseId ?? "",
-      bidUsd: String(listing.bidUsd),
-      weekId: listing.weekId ?? "",
-      intent,
-      amountUsd: String(amountUsd),
-    },
+    metadata,
   };
-  const productId = env.POLAR_PRODUCT_ID?.trim();
+  const productId = envText(env, "POLAR_PRODUCT_ID");
   if (productId) {
-    body.product_id = productId;
+    body.products = [productId];
   }
   return body;
 }

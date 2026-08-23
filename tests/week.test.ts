@@ -23,6 +23,7 @@ import {
   WeekError,
   currentWeekId,
   ensureWeek,
+  formatWeekLabel,
   previousWeekId,
   requireOpenWeek,
   weekId,
@@ -115,6 +116,7 @@ function insertListing(
 
 test("weekId is the Monday ISO date in Europe/London", () => {
   assert.equal(WEEK_TIMEZONE, "Europe/London");
+  assert.match(formatWeekLabel("2026-08-17"), /Mon.*17.*Aug.*2026/);
   assert.equal(weekId(new Date("2026-08-17T00:00:00.000Z"), WEEK_TIMEZONE), "2026-08-17");
   assert.equal(weekId(new Date("2026-08-22T12:00:00.000Z"), "Europe/London"), "2026-08-17");
   assert.equal(weekId(BEFORE_ROLLOVER, "Europe/London"), "2026-08-17");

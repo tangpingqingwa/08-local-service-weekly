@@ -18,7 +18,7 @@ import { CATEGORIES, CATEGORY_SLUGS, getCategory } from "../src/categories";
 import { getCity } from "../src/cities";
 import type { Listing } from "../src/db";
 import { openDatabase } from "../src/db";
-import { currentWeekId, ensureWeek, previousWeekId } from "../src/week";
+import { currentWeekId, ensureWeek, formatWeekLabel, previousWeekId } from "../src/week";
 import { CityHub } from "../src/ui/city-hub";
 import { LaneBoard } from "../src/ui/lane-board";
 import { ListingCard } from "../src/ui/listing-card";
@@ -163,9 +163,11 @@ test("unknown-city 404 chrome prints city_unknown", () => {
 test("empty London hub is empty: four lanes, Outbid, no invented cards or stars", () => {
   const london = getCity("london");
   assert.ok(london);
+  const weekId = currentWeekId();
   const html = renderToStaticMarkup(
     createElement(CityHub, {
       city: london,
+      weekId,
       lanes: {
         movers: [],
         dentists: [],
@@ -175,13 +177,26 @@ test("empty London hub is empty: four lanes, Outbid, no invented cards or stars"
     }),
   );
   assert.match(html, /data-city="london"/);
-  assert.match(html, />London</);
+  assert.match(html, /data-classified=""/);
+  assert.match(html, /data-edition=""/);
+  assert.match(html, /data-classified-columns=""/);
+  assert.match(html, /This week(?:&apos;|&#x27;|')s local classified/);
+  assert.match(html, new RegExp(`data-edition-week="${weekId}"`));
+  assert.match(html, new RegExp(formatWeekLabel(weekId)));
+  assert.match(html, /<h1 class="edition-city">London<\/h1>/);
   assert.match(html, /Rank is the bid/);
   assert.match(html, /data-bid-form/);
   assert.match(html, />Outbid</);
   assert.match(html, /name="business"/);
   assert.match(html, /name="siteUrl"/);
   assert.match(html, /name="amount"/);
+  assert.match(html, /Claim #1 for/);
+  assert.match(html, /aria-label="Classified columns"/);
+  const editionEnd = html.indexOf("data-classified-columns");
+  const claimAt = html.indexOf("data-bid-form");
+  const firstLane = html.indexOf("data-lane");
+  assert.ok(claimAt > -1 && editionEnd > claimAt);
+  assert.ok(firstLane > editionEnd);
   for (const category of CATEGORY_SLUGS) {
     assert.match(html, new RegExp(`data-category="${category}"`));
   }
@@ -190,6 +205,7 @@ test("empty London hub is empty: four lanes, Outbid, no invented cards or stars"
   assert.doesNotMatch(html, /data-listing-card/);
   assert.doesNotMatch(html, /★|⭐|&star;|rated\s+\d|review count|top rated/i);
   assert.doesNotMatch(html, /North London Movers|placeholder provider/i);
+  assert.doesNotMatch(html, /top rated in London|google map|★/i);
 });
 
 test("lane board empty state has no cards", () => {
@@ -214,6 +230,7 @@ test("rank card shows $bid, public clicks placeholder 0, and host", () => {
   const html = renderToStaticMarkup(
     createElement(ListingCard, {
       listing: ranked({
+        id: "lst_movers",
         business: "North London Movers",
         bidUsd: 20,
         clicks: 0,
@@ -223,14 +240,33 @@ test("rank card shows $bid, public clicks placeholder 0, and host", () => {
     }),
   );
   assert.match(html, /data-rank="1"/);
+  assert.match(html, /data-classified-ad=""/);
   assert.match(html, /#1/);
   assert.match(html, /North London Movers/);
   assert.match(html, /\$20/);
   assert.match(html, /0 clicks/);
   assert.match(html, /example.com/);
+  assert.match(html, /href="\/go\/lst_movers"/);
   assert.match(html, /London/);
   assert.match(html, /Movers/);
   assert.doesNotMatch(html, /★|⭐|rated|review/i);
+  assert.doesNotMatch(html, /top rated|map pin|yelp/i);
+
+  const dentist = renderToStaticMarkup(
+    createElement(ListingCard, {
+      listing: ranked({
+        id: "lst_dentist",
+        business: "Soho Smile",
+        category: "dentists",
+        licenseId: "GDC-12345",
+        siteHost: "soho.example",
+      }),
+    }),
+  );
+  assert.match(dentist, /Soho Smile/);
+  assert.match(dentist, /Dentists/);
+  assert.match(dentist, /Claimed license GDC-12345 \(not verified\)/);
+  assert.doesNotMatch(dentist, /verified license|license verified/i);
 });
 
 test("Outbid form chrome has business, site, amount, and license when required", () => {
@@ -266,7 +302,8 @@ test("GET / default page is the London hub", async () => {
   const { default: HomePage } = await import("../app/page");
   const html = renderToStaticMarkup(createElement(HomePage));
   assert.match(html, /data-city="london"/);
-  assert.match(html, />London</);
+  assert.match(html, /data-classified=""/);
+  assert.match(html, /<h1 class="edition-city">London<\/h1>/);
   assert.match(html, /data-empty-lane="true"/);
   assert.match(html, />Outbid</);
   assert.doesNotMatch(html, /★|⭐|review count/i);
@@ -303,8 +340,10 @@ test("city and lane pages 404 unknown slugs", async () => {
   });
   const moversHtml = renderToStaticMarkup(movers);
   assert.match(moversHtml, /data-category="movers"/);
+  assert.match(moversHtml, /data-classified=""/);
   assert.match(moversHtml, /This lane is empty/);
   assert.match(moversHtml, />Outbid</);
+  assert.match(moversHtml, /<h1 class="edition-city">London<\/h1>/);
 });
 
 function listing(overrides: Partial<Listing> = {}): Listing {

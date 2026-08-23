@@ -1,6 +1,6 @@
+import type { RankedListing } from "../board";
 import { getCategory } from "../categories";
 import { getCity } from "../cities";
-import type { RankedListing } from "../board";
 
 export function formatUsd(amount: number): string {
   return `$${amount.toLocaleString("en-US")}`;
@@ -16,8 +16,9 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
 
   return (
     <article
-      className="card"
+      className="card classified-ad"
       data-listing-card=""
+      data-classified-ad=""
       data-rank={listing.rank}
       data-listing-id={listing.id}
     >
@@ -30,17 +31,17 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
           </p>
         </div>
         <p className="meta">
-          <span data-city="">{city}</span>
-          <span aria-hidden="true"> · </span>
           <span data-category="">{category}</span>
+          <span aria-hidden="true"> · </span>
+          <span data-city="">{city}</span>
         </p>
         <p className="meta">
+          <a className="host" href={`/go/${listing.id}`} data-host="">
+            {listing.siteHost}
+          </a>
+          <span aria-hidden="true"> · </span>
           <span className="clicks" data-clicks="">
             {formatClicks(listing.clicks)}
-          </span>
-          <span aria-hidden="true"> · </span>
-          <span className="host" data-host="">
-            {listing.siteHost}
           </span>
         </p>
         {listing.licenseId ? (

@@ -9,7 +9,7 @@ import {
   getPolarPort,
   resetPolarFixture,
 } from "../src/polar/fake";
-import { LivePolarPort } from "../src/polar/live";
+import { LivePolarPort, POLAR_API_BASE, polarApiBase } from "../src/polar/live";
 import { isPolarLive, PolarError, polarFixtureOnly } from "../src/polar/port";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -40,6 +40,8 @@ test("live-smoke.sh is executable and operator-only", () => {
   assert.match(script, /\/api\/takedown/);
   assert.match(script, /data-empty-lane/);
   assert.match(script, /no invented provider|Do not invent a provider/i);
+  assert.match(script, /sandbox\.polar\.sh\/checkout/);
+  assert.match(script, /POLAR_API_BASE/);
   assert.doesNotMatch(script, /invented paid #1/);
 });
 
@@ -56,6 +58,7 @@ test("docs/live-smoke.md records verdict labels and is not a paid-rank invention
   );
   assert.match(docs, /POLAR_ACCESS_TOKEN/);
   assert.match(docs, /London/);
+  assert.match(docs, /sandbox\.polar\.sh|POLAR_API_BASE/);
   assert.doesNotMatch(docs, /invented paid #1|seeded fake #1|placeholder provider/);
 });
 
@@ -169,4 +172,67 @@ test("missing POLAR_ACCESS_TOKEN is BLOCKED-SECRET; constructor does not fetch",
     if (previousToken === undefined) delete process.env.POLAR_ACCESS_TOKEN;
     else process.env.POLAR_ACCESS_TOKEN = previousToken;
   }
+});
+
+test("POLAR_API_BASE overrides Polar host; default stays production", async () => {
+  assert.equal(POLAR_API_BASE, "https://api.polar.sh");
+  assert.equal(polarApiBase({}), "https://api.polar.sh");
+  assert.equal(polarApiBase({ POLAR_API_BASE: "" }), "https://api.polar.sh");
+  assert.equal(polarApiBase({ POLAR_API_BASE: "   " }), "https://api.polar.sh");
+  assert.equal(
+    polarApiBase({ POLAR_API_BASE: "https://sandbox-api.polar.sh/" }),
+    "https://sandbox-api.polar.sh",
+  );
+
+  const db = openDatabase(":memory:");
+  after(() => db.close());
+  const seen: string[] = [];
+  const stubFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    seen.push(String(input));
+    const raw = typeof init?.body === "string" ? init.body : "";
+    const body = JSON.parse(raw) as {
+      products?: string[];
+      metadata?: Record<string, unknown>;
+    };
+    assert.deepEqual(body.products, ["prod_test"]);
+    assert.equal(body.metadata?.licenseId, undefined);
+    return new Response(
+      JSON.stringify({
+        id: "chk_test",
+        url: "https://sandbox.polar.sh/checkout/chk_test",
+      }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      },
+    );
+  }) as typeof fetch;
+
+  const live = new LivePolarPort({
+    db,
+    env: {
+      POLAR_LIVE: "1",
+      POLAR_ACCESS_TOKEN: "polar_tok_test",
+      POLAR_API_BASE: "https://sandbox-api.polar.sh",
+      POLAR_PRODUCT_ID: "prod_test",
+    },
+    fetch: stubFetch,
+  });
+
+  const started = await live.createCheckout({
+    amountUsd: 5,
+    listing: {
+      business: "Override Van",
+      category: "movers",
+      city: "london",
+      siteUrl: "https://override.example/van",
+      licenseId: null,
+      bidUsd: 5,
+    },
+  });
+  assert.equal(started.status, "open");
+  assert.equal(started.url, "https://sandbox.polar.sh/checkout/chk_test");
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0], "https://sandbox-api.polar.sh/v1/checkouts/");
+  assert.doesNotMatch(seen[0] ?? "", /^https:\/\/api\.polar\.sh/);
 });

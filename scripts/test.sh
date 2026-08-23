@@ -135,7 +135,8 @@ if grep -nE 'fetch\(|polar\.sh|api\.polar' src/polar/fake.ts src/polar/port.ts >
   fail "fixture/port must not call Polar over the network"
 fi
 if grep -RInE 'https?://([^/]*\.)?polar\.sh' app src tests \
-  | grep -v 'src/polar/live.ts:' >/dev/null; then
+  | grep -v 'src/polar/live.ts:' \
+  | grep -v 'tests/live-smoke.test.ts:' >/dev/null; then
   fail "app/src/tests must not hard-code polar.sh HTTP (live.ts excepted)"
 fi
 
@@ -239,6 +240,13 @@ grep -q 'BLOCKED-SECRET: POLAR_ACCESS_TOKEN' src/polar/live.ts \
 grep -q 'POLAR_LIVE' src/polar/live.ts || fail "live.ts must gate on POLAR_LIVE"
 grep -q 'POLAR_FIXTURE_ONLY' src/polar/live.ts \
   || fail "live.ts must honor POLAR_FIXTURE_ONLY"
+grep -q 'export function polarApiBase' src/polar/live.ts \
+  || fail "live.ts must honor POLAR_API_BASE override"
+grep -q 'https://api.polar.sh' src/polar/live.ts \
+  || fail "live.ts default Polar API must stay production"
+if grep -Eq '^(export )?POLAR_LIVE=1' scripts/test.sh; then
+  fail "test.sh must not set POLAR_LIVE=1"
+fi
 grep -q 'getPolarPort' src/polar/fake.ts || fail "fake.ts must select the Polar port"
 grep -q 'LivePolarPort' src/polar/fake.ts \
   || fail "getPolarPort must select LivePolarPort when live"
@@ -246,6 +254,13 @@ grep -q 'BLOCKED-SECRET: POLAR_ACCESS_TOKEN' scripts/live-smoke.sh \
   || fail "live-smoke.sh must name BLOCKED-SECRET: POLAR_ACCESS_TOKEN"
 grep -q 'POLAR_LIVE' scripts/live-smoke.sh \
   || fail "live-smoke.sh must gate live Polar on POLAR_LIVE"
+grep -q 'sandbox.polar.sh/checkout' scripts/live-smoke.sh \
+  || fail "live-smoke.sh must require a sandbox.polar.sh Checkout URL"
+grep -q 'POLAR_API_BASE' scripts/live-smoke.sh \
+  || fail "live-smoke.sh must pass POLAR_API_BASE to the live process"
+if grep -nE '^[[:space:]]+local assignment=' scripts/live-smoke.sh >/dev/null; then
+  fail "live-smoke.sh must not local-scope Polar env exports"
+fi
 grep -q 'live-smoke refuses CI=true' scripts/live-smoke.sh \
   || fail "live-smoke.sh must refuse CI=true"
 grep -q 'live-smoke must not run in GitHub Actions' scripts/live-smoke.sh \
@@ -268,7 +283,13 @@ grep -q 'BLOCKED-SECRET' tests/live-smoke.test.ts \
   || fail "live-smoke tests must cover BLOCKED-SECRET"
 grep -q 'POLAR_FIXTURE_ONLY' tests/live-smoke.test.ts \
   || fail "live-smoke tests must cover POLAR_FIXTURE_ONLY wins"
-if grep -nE 'fetch\(|polar\.sh|api\.polar' tests/live-smoke.test.ts >/dev/null; then
+if grep -nE 'fetch\(|polar\.sh|api\.polar' tests/live-smoke.test.ts \
+  | grep -v 'polarApiBase' \
+  | grep -v 'POLAR_API_BASE' \
+  | grep -v 'sandbox-api' \
+  | grep -v 'sandbox.polar.sh' \
+  | grep -v 'api.polar.sh' \
+  | grep -v 'stubFetch' >/dev/null; then
   fail "live-smoke tests must stay offline (no Polar HTTP)"
 fi
 grep -q 'charged \$5' tests/raise.test.ts \

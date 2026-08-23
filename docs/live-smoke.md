@@ -2,7 +2,7 @@
 
 Operator-only. `bash scripts/live-smoke.sh` is **not** called from `scripts/test.sh` or GitHub Actions. CI and `scripts/test.sh` stay offline and must not set `POLAR_LIVE`.
 
-`100%` for this unit means a **local process** walked every SPEC §14 flow. Fixture checkout is the default path. Live Polar runs only when `POLAR_LIVE=1` and secrets exist. Missing Polar secret is `BLOCKED-SECRET` naming the env var — that is not a fixture success and not a paid listing. Do not invent a provider. An empty London lane is valid.
+`100%` for this unit means a **local process** walked every SPEC §14 flow. Fixture checkout is the default path. Live Polar runs only when `POLAR_LIVE=1` and secrets exist. Sandbox operator smoke must set `POLAR_API_BASE=https://sandbox-api.polar.sh` so checkout is a real `sandbox.polar.sh` URL, not a fixture `/return` listing. Missing Polar secret is `BLOCKED-SECRET` naming the env var — that is not a fixture success and not a paid listing. Do not invent a provider. An empty London lane is valid.
 
 ## How to run
 
@@ -21,13 +21,20 @@ The script:
 
 Overrides: `LIVE_SMOKE_BASE`, `LIVE_SMOKE_PORT`.
 
-Live Polar (operator machine with real secrets):
+Live Polar sandbox (operator machine; source `~/.polar/sandbox.env`, never commit it):
 
 ```bash
-POLAR_LIVE=1 POLAR_ACCESS_TOKEN=… bash scripts/live-smoke.sh
+set -a
+# shellcheck disable=SC1091
+source /Users/yann/.polar/sandbox.env
+set +a
+export POLAR_LIVE=1
+unset POLAR_FIXTURE_ONLY
+export POLAR_API_BASE=https://sandbox-api.polar.sh
+bash scripts/live-smoke.sh
 ```
 
-`POLAR_FIXTURE_ONLY=1` always wins over live.
+`POLAR_FIXTURE_ONLY=1` always wins over live. Default `POLAR_API_BASE` stays `https://api.polar.sh`. Production Polar rejects the sandbox token (`401`). Do not set `POLAR_LIVE` in `scripts/test.sh` or Actions.
 
 ## Verdicts
 
@@ -40,9 +47,7 @@ POLAR_LIVE=1 POLAR_ACCESS_TOKEN=… bash scripts/live-smoke.sh
 
 ## This session
 
-Ran `bash scripts/live-smoke.sh` on **2026-08-22** from `feat/live-smoke` (parent `fc7013c`, public clicks #11 on `origin/main`). Local Next.js process started by the script on `http://127.0.0.1:59734`. Temp SQLite. `POLAR_LIVE` unset. `POLAR_ACCESS_TOKEN` unset. Fixture path. No invented provider: empty London movers lane first, then unique `smoke.example/van-*` URLs for this run.
-
-Also refused `CI=true` (`FAIL: live-smoke refuses CI=true`) and `GITHUB_ACTIONS=true`.
+Ran `bash scripts/live-smoke.sh` on **2026-08-23** from `feat/live-polar-sandbox-smoke` (parent `9bb9f31`, live Polar gate #12 on `origin/main`). Sourced `/Users/yann/.polar/sandbox.env` (mode 600). `POLAR_LIVE=1`. `POLAR_FIXTURE_ONLY` unset. `POLAR_API_BASE=https://sandbox-api.polar.sh`. Token present (`len=53` only). Fixture process `http://127.0.0.1:57687`. Separate live-flagged local process for Polar checkout. Temp SQLite. No invented provider: empty London movers lane first, then unique `smoke.example/van-*` URLs for this run. Live checkout was a real `sandbox.polar.sh/checkout/…` URL, status `open`, unpaid session not listed. Production `https://api.polar.sh` stays the default and rejects this sandbox token (`401`).
 
 | Flow | Result | Note |
 |---|---|---|
@@ -52,17 +57,18 @@ Also refused `CI=true` (`FAIL: live-smoke refuses CI=true`) and `GITHUB_ACTIONS=
 | Bid $4 | **PASS-ERROR** | `POST /api/checkout` $4 → 400 `bid_too_low` |
 | Telegram URL | **PASS-ERROR** | `POST /api/checkout` `t.me` → 400 `chat_link` |
 | Dentist, no license | **PASS-ERROR** | `POST /api/checkout` → 400 `license_required` |
-| Live Polar checkout | **BLOCKED-SECRET** | `BLOCKED-SECRET: POLAR_ACCESS_TOKEN` |
+| Live Polar checkout | **PASS** | Real Polar sandbox Checkout URL (`sandbox.polar.sh`). Unpaid session not listed. Not a fixture `/return` listing. |
 | Fixture checkout | **PASS** | Paid $20 lists at rank 1. Tracking query stripped. |
 | Raise | **PASS** | $20→$25 charged $5. Stays #1. |
-| Click | **PASS** | `GET /go/lst_a325b9710f1e2cd4` **302** to cleaned URL. Clicks `0→1`. |
+| Click | **PASS** | `GET /go/lst_9b8162695fd2310c` **302** to cleaned URL. Clicks `0→1`. |
 | Takedown | **PASS** | Hidden listing absent from London movers. No invented replacement. |
 
-Process exit 0 (`PASS=7` `PASS-ERROR=3` `BLOCKED-SECRET=1` `FAIL=0`). Re-run with `POLAR_LIVE=1` and a real token to complete Polar Checkout; missing token must stay `BLOCKED-SECRET`, never a fixture listing.
+Process exit 0 (`PASS=8` `PASS-ERROR=3` `BLOCKED-SECRET=0` `FAIL=0`). Missing Polar secret must still record `BLOCKED-SECRET` and must not invent a paid row.
 
 ## What this does not do
 
 - Does not call `scripts/live-smoke.sh` from `scripts/test.sh` or Actions.
-- Does not set `POLAR_LIVE=1` in CI.
+- Does not set `POLAR_LIVE=1` in CI or `scripts/test.sh`.
 - Does not seed an invented provider on an empty London lane.
 - Does not treat a missing Polar secret as a paid listing.
+- Does not complete a paid Polar webhook in this session (unpaid live checkout stays off the board).

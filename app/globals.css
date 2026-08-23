@@ -353,6 +353,20 @@ a:hover {
   vertical-align: middle;
 }
 
+.call-after-claim-line {
+  margin: 0.65rem 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.call-after-claim {
+  display: inline-block;
+  text-decoration: none;
+  padding: 0.4rem 0.85rem;
+  vertical-align: middle;
+}
+
 .amount-stepper {
   display: inline-flex;
   align-items: center;

@@ -386,6 +386,13 @@ a:hover {
   flex-shrink: 0;
 }
 
+.call-this-one.call-after-claim-one,
+.call-this-one[data-call-after-claim-one] {
+  padding: 0.55rem 1.1rem;
+  font-size: 1.02rem;
+  letter-spacing: 0.04em;
+}
+
 .amount-stepper {
   display: inline-flex;
   align-items: center;

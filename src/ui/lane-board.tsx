@@ -21,6 +21,7 @@ export function LaneBoard({
   weekId,
   showForm = false,
 }: LaneBoardProps) {
+  const lead = listings.find((listing) => listing.rank === 1);
   const lastCall = [...listings].reverse().find((listing) => listing.rank > 1);
 
   return (
@@ -50,31 +51,33 @@ export function LaneBoard({
               </li>
             ))}
           </ol>
+          {lead ? (
+            <p className="claim-after-call-line">
+              <a
+                className="outbid claim-after-call claim-after-call-one"
+                href={`/c/${city.slug}/${category.slug}#claim`}
+                data-claim-after-call=""
+                data-claim-after-call-one=""
+                data-claim-job={category.slug}
+              >
+                {`Outbid my ${category.display.toLowerCase()} column`}
+              </a>{" "}
+              after Call this #1. Paying less than #1 still lists. Rank is the
+              bid.
+            </p>
+          ) : null}
           {lastCall ? (
-            <>
-              <p className="claim-after-call-line">
-                <a
-                  className="outbid claim-after-call"
-                  href="#claim"
-                  data-claim-after-call=""
-                  data-claim-job={category.slug}
-                >
-                  {`Outbid my ${category.display.toLowerCase()} column`}
-                </a>{" "}
-                {`after Call #${lastCall.rank}. Paying less than #1 still lists. Rank is the bid.`}
-              </p>
-              <p className="call-after-claim-line">
-                <a
-                  className="outbid call-after-claim"
-                  href={`/go/${lastCall.id}`}
-                  data-call-after-claim=""
-                  aria-label={`Call #${lastCall.rank} after the claim hop at ${lastCall.siteHost}`}
-                >
-                  {`Call #${lastCall.rank}`}
-                </a>{" "}
-                after the claim hop.
-              </p>
-            </>
+            <p className="call-after-claim-line">
+              <a
+                className="outbid call-after-claim"
+                href={`/go/${lastCall.id}`}
+                data-call-after-claim=""
+                aria-label={`Call #${lastCall.rank} after the claim hop at ${lastCall.siteHost}`}
+              >
+                {`Call #${lastCall.rank}`}
+              </a>{" "}
+              after the claim hop.
+            </p>
           ) : null}
         </>
       )}

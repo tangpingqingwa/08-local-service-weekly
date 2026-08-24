@@ -241,6 +241,29 @@ a:hover {
   font-size: 0.9rem;
 }
 
+.empty-lane[data-empty-honest] .empty-answer {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.empty-lane[data-empty-honest] .empty-note {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+}
+
+/* Empty lanes stay blank after Claim #1 is the first click. Occupied Call hops stay off this column. */
+.empty-lane[data-empty-honest] [data-call-this-one],
+.empty-lane[data-empty-honest] [data-call-later],
+.empty-lane[data-empty-honest] [data-call-ad],
+.empty-lane[data-empty-honest] [data-prize],
+.empty-lane[data-empty-honest] [data-listing-card],
+.empty-lane[data-empty-honest] [data-claim-after-call],
+.empty-lane[data-empty-honest] [data-call-after-claim] {
+  display: none;
+}
+
 .last-week {
   margin: 0.7rem 0 0;
   color: var(--muted);

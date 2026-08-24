@@ -108,6 +108,16 @@ grep -q 'city_unknown' app/c/\[city\]/not-found.tsx \
 grep -q 'Outbid' src/ui/outbid-form.tsx || fail "bid form must render Outbid"
 grep -q 'data-empty-lane' src/ui/lane-board.tsx \
   || fail "lane board must have an honest empty-lane state"
+grep -q 'data-empty-honest' src/ui/lane-board.tsx \
+  || fail "empty lanes must stamp data-empty-honest after Claim #1 is the first click"
+grep -q 'No #1' src/ui/lane-board.tsx \
+  || fail "empty lanes must say No #1, not invent a provider"
+grep -q 'No stars. No map.' src/ui/lane-board.tsx \
+  || fail "empty lanes must refuse stars and maps"
+grep -q 'empty-lane\[data-empty-honest\]' app/globals.css \
+  || fail "classified CSS must keep occupied Call hops off empty lanes"
+grep -q 'four empty lanes stay honest' tests/board.test.ts \
+  || fail "board tests must cover four empty lanes staying honest"
 grep -q 'data-clicks' src/ui/listing-card.tsx || fail "cards must show public clicks"
 grep -q 'data-bid' src/ui/listing-card.tsx || fail "cards must show \$bid"
 grep -q 'data-classified' src/ui/city-hub.tsx \
@@ -592,6 +602,12 @@ if [[ -f package.json ]]; then
   grep -q 'edition-city' "${home_body}" || fail "GET / city must be the edition masthead"
   grep -q 'data-classified-columns=""' "${home_body}" || fail "GET / categories must be classified columns"
   grep -q 'data-empty-lane="true"' "${home_body}" || fail "GET / empty London lane must be empty"
+  grep -q 'data-empty-honest=""' "${home_body}" || fail "GET / empty lanes must stamp honest empty"
+  home_empty_honest="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-empty-honest=\"\""))' "${home_body}")"
+  [[ "${home_empty_honest}" == "4" ]] \
+    || fail "GET / must keep four honest empty lanes (got ${home_empty_honest})"
+  grep -q 'No #1' "${home_body}" || fail "GET / empty lanes must say No #1"
+  grep -q 'No stars. No map.' "${home_body}" || fail "GET / empty lanes must refuse stars and maps"
   grep -q 'class="outbid claim-first-click"' "${home_body}" \
     || fail "GET / empty paper must keep Outbid chrome on the one Claim #1 first click"
   grep -q 'Claim #1' "${home_body}" || fail "GET / must keep Claim #1 after the classified columns"
@@ -668,6 +684,9 @@ if [[ -f package.json ]]; then
   if grep -qiE '★|⭐|top rated|review count|top rated in London' "${home_body}"; then
     fail "GET / must not show stars or review counts"
   fi
+  if grep -qiE 'google map|map pin|leaflet|OpenStreetMap' "${home_body}"; then
+    fail "GET / must not invent a map"
+  fi
 
   city_body="$(mktemp)"
   city_code="$(curl -sS -o "${city_body}" -w '%{http_code}' "http://127.0.0.1:${port}/c/manchester")"
@@ -681,6 +700,9 @@ if [[ -f package.json ]]; then
   lane_code="$(curl -sS -o "${lane_body}" -w '%{http_code}' "http://127.0.0.1:${port}/c/london/movers")"
   [[ "${lane_code}" == "200" ]] || fail "GET /c/london/movers expected 200 got ${lane_code}"
   grep -q 'data-empty-lane="true"' "${lane_body}" || fail "empty movers lane must be empty"
+  grep -q 'data-empty-honest=""' "${lane_body}" || fail "empty movers lane must stamp honest empty"
+  grep -q 'No #1' "${lane_body}" || fail "empty movers lane must say No #1"
+  grep -q 'No stars. No map.' "${lane_body}" || fail "empty movers lane must refuse stars and maps"
   if grep -qE 'Call #[0-9]|data-call-later|data-call-ad="later"' "${lane_body}"; then
     fail "empty movers lane must not invent a later-rank call"
   fi
@@ -891,6 +913,18 @@ print(chunk.find("data-prize"), chunk.find("North London Movers"), chunk.find("$
     || fail "GET / paid #1 business name must read before \$bid"
   empty_after_pay="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-empty-lane=\"true\""))' "${occupied_home}")"
   [[ "${empty_after_pay}" == "3" ]] || fail "GET / after one paid lane must keep three honest empty lanes (got ${empty_after_pay})"
+  empty_honest_after_pay="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-empty-honest=\"\""))' "${occupied_home}")"
+  [[ "${empty_honest_after_pay}" == "3" ]] \
+    || fail "GET / after one paid lane must keep three empty-honest stamps (got ${empty_honest_after_pay})"
+  empty_honest_on_movers="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"<section[^>]*data-category=\"movers\"[\s\S]*?</section>", html)
+chunk = m.group(0) if m else ""
+print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
+' "${occupied_home}")"
+  [[ "${empty_honest_on_movers}" == "no" ]] \
+    || fail "GET / paid movers column must keep Call this #1, not empty-honest No #1"
   home_call_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("Call this #1"))' "${occupied_home}")"
   home_claim_after="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-pick"))' "${occupied_home}")"
   [[ "${home_call_at}" -ge 0 && "${home_claim_after}" -gt "${home_call_at}" ]] \
@@ -1261,6 +1295,18 @@ print("yes" if "Call this #1" in chunk or "data-call-this-one" in chunk or "data
   fi
   empty_after_two="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-empty-lane=\"true\""))' "${occupied_later_home}")"
   [[ "${empty_after_two}" == "3" ]] || fail "GET / after two movers must keep three honest empty lanes (got ${empty_after_two})"
+  empty_honest_after_two="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-empty-honest=\"\""))' "${occupied_later_home}")"
+  [[ "${empty_honest_after_two}" == "3" ]] \
+    || fail "GET / after two movers must keep three empty-honest stamps (got ${empty_honest_after_two})"
+  empty_honest_on_later_movers="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"<section[^>]*data-category=\"movers\"[\s\S]*?</section>", html)
+chunk = m.group(0) if m else ""
+print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
+' "${occupied_later_home}")"
+  [[ "${empty_honest_on_later_movers}" == "no" ]] \
+    || fail "GET / occupied movers must keep Call this #1 / Call #N, not empty-honest No #1"
   home_later_call="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("Call #2"))' "${occupied_later_home}")"
   home_later_claim="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-after-call"))' "${occupied_later_home}")"
   home_later_claim_two="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-after-call-two"))' "${occupied_later_home}")"

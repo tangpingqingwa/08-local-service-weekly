@@ -243,6 +243,8 @@ test("last-week archive copy is not this week's #1 card", () => {
     }),
   );
   assert.match(html, /data-empty-lane="true"/);
+  assert.match(html, /data-empty-honest=""/);
+  assert.match(html, /No #1/);
   assert.match(html, /data-last-week/);
   assert.match(html, /Last week #1/);
   assert.match(html, /Last Week Van/);

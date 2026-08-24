@@ -39,9 +39,16 @@ export function LaneBoard({
         <p>Want ads. Rank is the bid.</p>
       </header>
       {listings.length === 0 ? (
-        <p className="empty-lane" data-empty-lane="true">
-          This lane is empty.
-        </p>
+        <div
+          className="empty-lane"
+          data-empty-lane="true"
+          data-empty-honest=""
+        >
+          <p className="empty-answer">No #1</p>
+          <p className="empty-note">
+            This lane is empty. Rank is the bid. No stars. No map.
+          </p>
+        </div>
       ) : (
         <>
           <ol className="leaderboard" data-leaderboard="">

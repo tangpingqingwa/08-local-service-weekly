@@ -65,20 +65,40 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
           <span data-category="">{category}</span>
           <span aria-hidden="true"> · </span>
           <span data-city="">{city}</span>
+          {lead ? (
+            <>
+              <span aria-hidden="true"> · </span>
+              <span className="host" data-host="">
+                {listing.siteHost}
+              </span>
+            </>
+          ) : null}
         </p>
-        <p className="meta">
-          <span className="bid" data-bid="">
-            {formatUsd(listing.bidUsd)}
-          </span>
-          <span aria-hidden="true"> · </span>
-          <span className="host" data-host="">
-            {listing.siteHost}
-          </span>
-          <span aria-hidden="true"> · </span>
-          <span className="clicks" data-clicks="">
-            {formatClicks(listing.clicks)}
-          </span>
-        </p>
+        {lead ? (
+          <p className="later-facts" data-later-fact="">
+            <span className="bid" data-bid="">
+              {formatUsd(listing.bidUsd)}
+            </span>
+            <span aria-hidden="true"> · </span>
+            <span className="clicks" data-clicks="">
+              {formatClicks(listing.clicks)}
+            </span>
+          </p>
+        ) : (
+          <p className="meta">
+            <span className="bid" data-bid="">
+              {formatUsd(listing.bidUsd)}
+            </span>
+            <span aria-hidden="true"> · </span>
+            <span className="host" data-host="">
+              {listing.siteHost}
+            </span>
+            <span aria-hidden="true"> · </span>
+            <span className="clicks" data-clicks="">
+              {formatClicks(listing.clicks)}
+            </span>
+          </p>
+        )}
         {listing.licenseId ? (
           <p className="meta license" data-license="">
             Claimed license {listing.licenseId} (not verified).

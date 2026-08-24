@@ -269,6 +269,8 @@ a:hover {
 .empty-lane[data-empty-honest] [data-call-later-quiet],
 .empty-lane[data-empty-honest] [data-call-ad],
 .empty-lane[data-empty-honest] [data-prize],
+.empty-lane[data-empty-honest] [data-later-fact],
+.empty-lane[data-empty-honest] .later-facts,
 .empty-lane[data-empty-honest] [data-listing-card],
 .empty-lane[data-empty-honest] [data-claim-after-call],
 .empty-lane[data-empty-honest] [data-call-after-claim] {
@@ -343,6 +345,22 @@ a:hover {
   margin: 0.2rem 0 0;
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+/* Occupied #1 only: $bid + clicks are one later-facts group after the prize name. */
+.card[data-call-ad="lead"] .later-facts[data-later-fact] {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.card[data-call-ad="lead"] .later-facts[data-later-fact] .bid,
+.card[data-call-ad="lead"] .later-facts[data-later-fact] .clicks {
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
 }
 
 .host {

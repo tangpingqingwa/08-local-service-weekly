@@ -28,8 +28,13 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
     >
       <span className="rank">#{listing.rank}</span>
       <div className="card-body">
+        {lead ? (
+          <h3 className="business" data-prize="">
+            {listing.business}
+          </h3>
+        ) : null}
         <div className="card-top">
-          <h3 className="business">{listing.business}</h3>
+          {later ? <h3 className="business">{listing.business}</h3> : null}
           {lead ? (
             <a
               className="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three call-after-claim-four call-after-claim-five"

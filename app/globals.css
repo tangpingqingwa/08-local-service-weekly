@@ -286,10 +286,23 @@ a:hover {
   line-height: 1.2;
 }
 
+.card[data-call-ad="lead"] .business[data-prize] {
+  font-size: 1.5rem;
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.28rem;
+}
+
 .bid {
   margin: 0;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.card[data-call-ad="lead"] .bid,
+.card[data-call-ad="lead"] .clicks {
+  font-weight: 400;
 }
 
 .meta {

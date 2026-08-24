@@ -44,6 +44,7 @@ grep -q '### PR 41:' BUILD.md || fail "BUILD.md missing ### PR 41:"
 grep -q '### PR 42:' BUILD.md || fail "BUILD.md missing ### PR 42:"
 grep -q '### PR 43:' BUILD.md || fail "BUILD.md missing ### PR 43:"
 grep -q '### PR 44:' BUILD.md || fail "BUILD.md missing ### PR 44:"
+grep -q '### PR 45:' BUILD.md || fail "BUILD.md missing ### PR 45:"
 grep -q 'live-smoke' BUILD.md || fail "BUILD.md missing live-smoke"
 if ! grep -E '^### PR [0-9]+:' BUILD.md >/dev/null; then
   fail "BUILD.md PR headings must be ### PR N: title"
@@ -367,6 +368,9 @@ grep -q 'Call this #1' src/ui/listing-card.tsx \
   || fail "paid #1 must offer Call this #1"
 grep -q 'data-call-this-one' src/ui/listing-card.tsx \
   || fail "paid #1 call hop must stamp data-call-this-one"
+grep -q 'data-first-click": "call"' src/ui/listing-card.tsx \
+  || grep -q 'data-first-click="call"' src/ui/listing-card.tsx \
+  || fail "paid #1 Call this #1 must stamp the occupied first click"
 grep -q 'outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three call-after-claim-four call-after-claim-five' src/ui/listing-card.tsx \
   || fail "paid #1 call hop must reuse Outbid button chrome"
 grep -q 'data-call-after-claim-one' src/ui/listing-card.tsx \
@@ -444,6 +448,10 @@ grep -q 'occupied later Call stays quieter in grouping, not a mute of the same h
   || fail "board tests must cover later-call grouping, not a mute stamp"
 grep -q 'data-claim-after-call' src/ui/lane-board.tsx \
   || fail "occupied later ranks must offer a claim-after-call hop"
+grep -q 'later-claim claim-after-call-line' src/ui/lane-board.tsx \
+  || fail "occupied claim hop must sit in a later-claim group after the listing"
+grep -q 'data-later-claim' src/ui/lane-board.tsx \
+  || fail "occupied claim hop must stamp later-claim grouping"
 grep -q 'after Call this #1' src/ui/lane-board.tsx \
   || fail "claim-after-call hop must sit after Call this #1"
 grep -q 'data-claim-after-call-one' src/ui/lane-board.tsx \
@@ -507,6 +515,15 @@ if grep -q 'claim-after-call-four' src/ui/claim-column.tsx; then
 fi
 if grep -q 'claim-after-call-five' src/ui/claim-column.tsx; then
   fail "hub pick hops must not stamp claim-after-call-five"
+fi
+grep -q 'later-claim' src/ui/claim-column.tsx \
+  || fail "occupied hub Claim must sit in a later-claim group after the listing"
+grep -q 'data-later-claim' src/ui/claim-column.tsx \
+  || fail "occupied hub Claim must stamp later-claim grouping"
+grep -q 'Then Claim #1' src/ui/claim-column.tsx \
+  || fail "occupied hub Claim must name itself a later write after Call this #1"
+if grep -n 'emptyPaper ? undefined : "outbid"' src/ui/claim-column.tsx >/dev/null; then
+  fail "occupied hub Claim must not reuse Outbid chrome of Call this #1"
 fi
 if grep -n 'data-call-after-claim' src/ui/lane-board.tsx | grep -q 'claim-after-call-two'; then
   fail "later-rank Call hop must not stamp claim-after-call-two"
@@ -756,6 +773,90 @@ grep -q 'data-later-write' src/ui/outbid-form.tsx \
 grep -q 'Claim #1' src/ui/outbid-form.tsx \
   || fail "unpaid-off cut must keep Claim #1"
 
+echo "== UX: occupied paper keeps one first click — Call this #1, Claim stays after the listing =="
+grep -q 'data-first-click": "call"' src/ui/listing-card.tsx \
+  || grep -q 'data-first-click="call"' src/ui/listing-card.tsx \
+  || fail "occupied Call this #1 must stamp the first click"
+grep -q 'data-later-claim' src/ui/lane-board.tsx \
+  || fail "occupied lane Claim must stamp later-claim grouping"
+grep -q 'later-claim claim-after-call-line' src/ui/lane-board.tsx \
+  || fail "occupied lane Claim must sit in a later-claim group"
+grep -q 'data-later-claim' src/ui/claim-column.tsx \
+  || fail "occupied hub Claim must stamp later-claim grouping"
+grep -q 'Then Claim #1' src/ui/claim-column.tsx \
+  || fail "occupied hub Claim must name itself a later write"
+grep -q 'data-later-claim' src/ui/outbid-form.tsx \
+  || fail "occupied lane form must stamp later-claim grouping"
+grep -q 'Then Claim #1' src/ui/outbid-form.tsx \
+  || fail "occupied lane form must name Claim a later write"
+grep -q 'Occupied paper: Call this #1 is the only first click' app/globals.css \
+  || fail "classified CSS must document occupied Call this #1 as the only first click"
+grep -q 'later-claim\[data-later-claim\]' app/globals.css \
+  || fail "classified CSS must keep occupied Claim in a later-claim group"
+python3 - app/globals.css <<'PY' || fail "occupied later Claim must stay quieter than Call this #1"
+import re
+import sys
+
+css = open(sys.argv[1], encoding="utf-8").read()
+
+def first(pattern):
+    match = re.search(pattern, css, re.S)
+    if not match:
+        raise SystemExit("missing " + pattern)
+    return match.group(1)
+
+lead = first(r"\.paper-occupied\[data-paper-occupied\] \.call-this-one\.call-after-claim-five\s*,\s*\.paper-occupied\[data-paper-occupied\] \.call-this-one\[data-call-after-claim-five\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
+later = first(r"\.paper-occupied\[data-paper-occupied\] \.later-claim\[data-later-claim\] h2\s*\{[^}]*font-size:\s*([\d.]+)rem")
+line = first(r"\.paper-occupied\[data-paper-occupied\] \.later-claim\.claim-after-call-line\[data-later-claim\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
+if float(later) >= float(lead):
+    raise SystemExit("occupied later Claim shouts like Call this #1")
+if float(line) >= float(lead):
+    raise SystemExit("occupied later Outbid my column shouts like Call this #1")
+block = re.search(
+    r"\.paper-occupied\[data-paper-occupied\] \.later-claim\[data-later-claim\]\s*\{[^}]*\}",
+    css,
+    re.S,
+)
+if not block or "var(--accent)" in block.group(0):
+    raise SystemExit("do not recolor occupied later Claim")
+if "color: var(--muted)" not in block.group(0):
+    raise SystemExit("occupied later Claim must recede")
+if "data-later-claim-quiet" in css:
+    raise SystemExit("stamp-only data-later-claim-quiet mute")
+inner = re.search(
+    r"\.paper-occupied\[data-paper-occupied\] \.later-claim\[data-later-claim\] \.claim-after-call\s*\{[^}]*\}",
+    css,
+    re.S,
+)
+if inner and "font-size:" in inner.group(0) and "inherit" not in inner.group(0):
+    raise SystemExit("occupied later Claim hop must inherit group type, not a second mute stamp")
+PY
+if grep -qE 'data-later-claim-quiet|data-call-after-claim-six|data-claim-after-call-six' \
+  src/ui/listing-card.tsx src/ui/lane-board.tsx src/ui/city-hub.tsx src/ui/outbid-form.tsx src/ui/claim-column.tsx; then
+  fail "occupied later Claim must not add another named hop"
+fi
+if grep -q 'outbid claim-after-call' src/ui/lane-board.tsx; then
+  fail "occupied later Claim must not reuse Outbid chrome of Call this #1"
+fi
+grep -q 'occupied paper keeps one first click' tests/board.test.ts \
+  || fail "board tests must cover occupied one first click: Call this #1, Claim after the listing"
+grep -q 'Call this #1, Claim stays after the listing' tests/board.test.ts \
+  || fail "board tests must keep Claim after the listing"
+grep -q 'data-prize' src/ui/listing-card.tsx \
+  || fail "occupied first-click cut must keep occupied #1 name as the prize"
+grep -q 'Call this #1' src/ui/listing-card.tsx \
+  || fail "occupied first-click cut must keep occupied Call this #1"
+grep -q 'data-later-call' src/ui/listing-card.tsx \
+  || fail "occupied first-click cut must keep later-call grouping"
+grep -q 'data-lane-occupied' src/ui/lane-board.tsx \
+  || fail "occupied first-click cut must keep occupied mixed-paper lane wraps"
+grep -q 'data-later-write' src/ui/outbid-form.tsx \
+  || fail "occupied first-click cut must keep empty later-write listing name"
+grep -q 'isPolarPaidListing' src/board.ts \
+  || fail "occupied first-click cut must keep unpaid leftover off the board"
+grep -q 'Claim #1' src/ui/outbid-form.tsx \
+  || fail "occupied first-click cut must keep empty Claim #1"
+
 echo "== polar checkout + fixture =="
 for f in src/polar/port.ts src/polar/fake.ts app/api/checkout/route.ts \
   app/return/page.tsx tests/checkout.test.ts src/migrations/004_checkouts.sql; do
@@ -983,6 +1084,8 @@ if [[ -f package.json ]]; then
     || fail "empty-paper listing-name later-write test did not run"
   grep -q 'unpaid stays off the classified paper — No #1 until Polar reports paid' "$test_log" \
     || fail "unpaid stays off the classified paper leftover test did not run"
+  grep -q 'occupied paper keeps one first click — Call this #1, Claim stays after the listing' "$test_log" \
+    || fail "occupied one-first-click leftover test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"
@@ -1329,6 +1432,8 @@ print(chunk.count("data-later-fact=\"\""), chunk.count("class=\"later-facts\""),
     || fail "lone paid #1 must not stamp class=bid later-fact (got ${paid_later_span})"
   grep -q 'Call this #1' "${movers_paid}" || fail "paid #1 must offer Call this #1"
   grep -q 'data-call-this-one' "${movers_paid}" || fail "paid #1 must stamp data-call-this-one"
+  grep -q 'data-first-click="call"' "${movers_paid}" \
+    || fail "paid #1 must stamp Call this #1 as the occupied first click"
   grep -q 'class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three call-after-claim-four call-after-claim-five"' "${movers_paid}" \
     || fail "paid #1 must concentrate Call this #1 on Outbid chrome"
   grep -q 'data-call-after-claim-one' "${movers_paid}" \
@@ -1423,8 +1528,16 @@ print("yes" if "data-category-tabs" in header or "data-column-index-after" in he
     || fail "lone paid #1 must concentrate the claim hop after the louder Call this #1"
   grep -q 'data-claim-after-call-five' "${movers_paid}" \
     || fail "lone paid #1 must concentrate the claim hop after the louder Call this #1 is re-concentrated again"
-  grep -q 'class="outbid claim-after-call claim-after-call-one claim-after-call-two claim-after-call-three claim-after-call-four claim-after-call-five"' "${movers_paid}" \
-    || fail "lone paid #1 must keep Outbid my column on one claim hop"
+  grep -q 'class="claim-after-call claim-after-call-one claim-after-call-two claim-after-call-three claim-after-call-four claim-after-call-five"' "${movers_paid}" \
+    || fail "lone paid #1 must keep Outbid my column on one later-claim hop"
+  grep -q 'class="later-claim claim-after-call-line"' "${movers_paid}" \
+    || fail "lone paid #1 must keep Outbid my column in a later-claim group"
+  grep -q 'data-later-claim=""' "${movers_paid}" \
+    || fail "lone paid #1 must stamp later-claim grouping"
+  grep -q 'class="claim later-claim"' "${movers_paid}" \
+    || fail "lone paid #1 form must sit in a later-claim group"
+  grep -q 'Then Claim #1' "${movers_paid}" \
+    || fail "lone paid #1 form must name Claim a later write"
   grep -q 'Outbid my movers column' "${movers_paid}" \
     || fail "lone paid #1 hop must name Outbid my movers column"
   grep -q 'after Call this #1' "${movers_paid}" \
@@ -1481,6 +1594,8 @@ print(chunk.find("name=\"business\""), chunk.find(">Outbid<"), sep=" ")
   fi
   grep -q 'Call this #1' "${occupied_home}" || fail "GET / paid movers column must offer Call this #1"
   grep -q 'data-call-this-one' "${occupied_home}" || fail "GET / paid #1 must stamp data-call-this-one"
+  grep -q 'data-first-click="call"' "${occupied_home}" \
+    || fail "GET / paid #1 must stamp Call this #1 as the occupied first click"
   grep -q 'class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three call-after-claim-four call-after-claim-five"' "${occupied_home}" \
     || fail "GET / paid #1 must concentrate Call this #1 on Outbid chrome"
   grep -q 'data-call-after-claim-one' "${occupied_home}" \
@@ -1557,8 +1672,14 @@ print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
     || fail "GET / paid #1 must concentrate the claim hop after the louder Call this #1"
   grep -q 'data-claim-after-call-five' "${occupied_home}" \
     || fail "GET / paid #1 must concentrate the claim hop after the louder Call this #1 is re-concentrated again"
-  grep -q 'class="outbid claim-after-call claim-after-call-one claim-after-call-two claim-after-call-three claim-after-call-four claim-after-call-five"' "${occupied_home}" \
-    || fail "GET / paid #1 must keep Outbid my column on one claim hop"
+  grep -q 'class="claim-after-call claim-after-call-one claim-after-call-two claim-after-call-three claim-after-call-four claim-after-call-five"' "${occupied_home}" \
+    || fail "GET / paid #1 must keep Outbid my column on one later-claim hop"
+  grep -q 'class="later-claim claim-after-call-line"' "${occupied_home}" \
+    || fail "GET / paid #1 must keep Outbid my column in a later-claim group"
+  grep -q 'data-later-claim=""' "${occupied_home}" \
+    || fail "GET / paid #1 must stamp later-claim grouping"
+  grep -q 'Then Claim #1' "${occupied_home}" \
+    || fail "GET / occupied Claim must name itself a later write"
   grep -q 'Outbid my movers column' "${occupied_home}" \
     || fail "GET / paid hop must name Outbid my movers column"
   grep -q 'data-category-tabs' "${occupied_home}" \
@@ -1573,17 +1694,21 @@ print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
 import sys
 html = open(sys.argv[1]).read()
 header = html.find("</header>")
-print(html.find("Call this #1"), html.find("North London Movers"), html.find("data-category-tabs"), html.find("data-column-index-after"), html.find("data-claim-pick"), header, sep=" ")
+print(html.find("Call this #1"), html.find("data-first-click=\"call\""), html.find("North London Movers"), html.find("data-category-tabs"), html.find("data-column-index-after"), html.find("data-claim-pick"), html.find("data-later-claim"), html.find("Then Claim #1"), header, sep=" ")
 ' "${occupied_home}")"
-  read -r home_call_pos home_name_pos home_tabs_pos home_after_pos home_claim_pos home_header_pos <<< "${home_tabs_order}"
+  read -r home_call_pos home_first_pos home_name_pos home_tabs_pos home_after_pos home_claim_pos home_later_claim_pos home_then_claim_pos home_header_pos <<< "${home_tabs_order}"
   [[ "${home_header_pos}" -ge 0 && "${home_name_pos}" -gt "${home_header_pos}" ]] \
     || fail "GET / occupied listing must sit after the edition masthead"
   [[ "${home_call_pos}" -ge 0 && "${home_tabs_pos}" -gt "${home_call_pos}" ]] \
     || fail "GET / occupied column tabs must stay after Call this #1"
+  [[ "${home_first_pos}" -ge 0 && $((home_first_pos - home_call_pos)) -lt 400 && $((home_call_pos - home_first_pos)) -lt 400 ]] \
+    || fail "GET / occupied first click must stay on Call this #1"
   [[ "${home_after_pos}" -gt "${home_name_pos}" && "${home_after_pos}" -gt "${home_call_pos}" ]] \
     || fail "GET / occupied column tabs must stay after the listing"
   [[ "${home_claim_pos}" -gt "${home_tabs_pos}" ]] \
     || fail "GET / occupied named column pick must stay after the listing tabs"
+  [[ "${home_later_claim_pos}" -gt "${home_call_pos}" && "${home_then_claim_pos}" -gt "${home_tabs_pos}" ]] \
+    || fail "GET / occupied Claim must stay a later write after Call this #1 and the listing tabs"
   home_header_has_tabs="$(python3 -c '
 import sys
 html = open(sys.argv[1]).read()
@@ -1826,8 +1951,12 @@ print(chunk.find("South London Movers"), chunk.find("class=\"later-call\""), chu
     || fail "occupied movers hop must concentrate after the louder Call this #1"
   grep -q 'data-claim-after-call-five' "${movers_two}" \
     || fail "occupied movers hop must concentrate after the louder Call this #1 is re-concentrated again"
-  grep -q 'class="outbid claim-after-call claim-after-call-one claim-after-call-two claim-after-call-three claim-after-call-four claim-after-call-five"' "${movers_two}" \
-    || fail "occupied movers hop must keep Outbid my column on one claim hop"
+  grep -q 'class="claim-after-call claim-after-call-one claim-after-call-two claim-after-call-three claim-after-call-four claim-after-call-five"' "${movers_two}" \
+    || fail "occupied movers hop must keep Outbid my column on one later-claim hop"
+  grep -q 'class="later-claim claim-after-call-line"' "${movers_two}" \
+    || fail "occupied movers hop must sit in a later-claim group"
+  grep -q 'data-later-claim=""' "${movers_two}" \
+    || fail "occupied movers hop must stamp later-claim grouping"
   grep -q 'Outbid my movers column' "${movers_two}" \
     || fail "occupied movers hop must name Outbid my movers column"
   grep -q 'after Call this #1' "${movers_two}" \
@@ -2005,8 +2134,14 @@ print("yes" if re.search(r"data-empty-honest=\"\"[\s\S]{0,800}data-later-call", 
     || fail "GET / later-rank movers hop must concentrate after the louder Call this #1"
   grep -q 'data-claim-after-call-five' "${occupied_later_home}" \
     || fail "GET / later-rank movers hop must concentrate after the louder Call this #1 is re-concentrated again"
-  grep -q 'class="outbid claim-after-call claim-after-call-one claim-after-call-two claim-after-call-three claim-after-call-four claim-after-call-five"' "${occupied_later_home}" \
-    || fail "GET / later-rank movers must keep Outbid my column on one claim hop"
+  grep -q 'class="claim-after-call claim-after-call-one claim-after-call-two claim-after-call-three claim-after-call-four claim-after-call-five"' "${occupied_later_home}" \
+    || fail "GET / later-rank movers must keep Outbid my column on one later-claim hop"
+  grep -q 'class="later-claim claim-after-call-line"' "${occupied_later_home}" \
+    || fail "GET / later-rank movers must keep Outbid my column in a later-claim group"
+  grep -q 'data-later-claim=""' "${occupied_later_home}" \
+    || fail "GET / later-rank movers must stamp later-claim grouping"
+  grep -q 'Then Claim #1' "${occupied_later_home}" \
+    || fail "GET / later-rank occupied Claim must name itself a later write"
   grep -q 'after Call this #1' "${occupied_later_home}" \
     || fail "GET / later-rank movers hop must sit after Call this #1"
   if grep -qE 'after Call #' "${occupied_later_home}"; then
@@ -2208,7 +2343,7 @@ print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
 
   movers_hygiene="$(mktemp)"
   curl -sS -o "${movers_hygiene}" "http://127.0.0.1:${port}/c/london/movers"
-  if grep -qiE 'Chat Van|Adult Clinic|Short Van|t.me|onlyfans|bit.ly' "${movers_hygiene}"; then
+  if grep -qiE 'Chat Van|Adult Clinic|Short Van|t\.me/|onlyfans|bit\.ly' "${movers_hygiene}"; then
     fail "rejected chat/NSFW/shortener URLs must not list"
   fi
 

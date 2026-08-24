@@ -178,6 +178,11 @@ Each heading is one fleet unit. Do not start the next PR in the same change.
 - **Dependencies:** PR 43
 - **Acceptance:** Unpaid or abandoned listing stays off the board. Empty leftover London `/` stays No #1 / no stars / no map / no Call this #1. Occupied #1 name stays the prize only after Polar reports paid. Call this #1 stays the first occupied click. Rank stays the bid. Column tabs stay after the listing. Empty lanes stay No #1. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Do not re-ship empty-lane isolation or later-call grouping. Stamp-only = REJECT.
 
+### PR 45: first-time neighbor — occupied paper keeps one first click
+- **Files:** `src/ui/listing-card.tsx`, `src/ui/lane-board.tsx`, `src/ui/claim-column.tsx`, `src/ui/outbid-form.tsx`, `app/globals.css`, `tests/board.test.ts`, `scripts/test.sh`, `BUILD.md`
+- **Dependencies:** PR 44
+- **Acceptance:** Occupied London `/` keeps Call this #1 as the first occupied click (`data-first-click="call"`). Claim / Outbid my column is a later write after the listing (`later-claim`, `data-later-claim`, “Then Claim #1”), not a same-weight rail above the prize. Occupied #1 name stays the prize. Unpaid stays off the board. Empty lanes stay No #1 / no stars / no map. Column tabs stay after the listing. Empty paper stays Claim #1. Do not add another named hop. Do not stamp `call-after-claim-N`. Do not recolor. Do not rebuild the classified paper. Do not re-ship unpaid-off, empty-lane isolation, or later-call grouping. Stamp-only = REJECT.
+
 ---
 
 ## 6. Live-smoke (operator)

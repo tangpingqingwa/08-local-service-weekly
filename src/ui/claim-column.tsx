@@ -18,7 +18,6 @@ export function ClaimColumn({ city, emptyPaper = false }: ClaimColumnProps) {
       {CATEGORIES.map((item) => (
         <a
           key={item.slug}
-          className={emptyPaper ? undefined : "outbid"}
           href={`/c/${city}/${item.slug}#claim`}
           data-claim-column={item.slug}
           data-claim-job={item.slug}
@@ -54,7 +53,13 @@ export function ClaimColumn({ city, emptyPaper = false }: ClaimColumnProps) {
   }
 
   return (
-    <section className="claim claim-pick" id="claim" data-claim-pick="">
+    <section
+      className="claim claim-pick later-claim"
+      id="claim"
+      data-claim-pick=""
+      data-later-claim=""
+    >
+      <p className="later-claim-label">Then Claim #1</p>
       <h2>
         <span>Claim #1 for</span>
         <span className="amount-stepper">

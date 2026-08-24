@@ -43,6 +43,7 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
               className="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three call-after-claim-four call-after-claim-five"
               href={`/go/${listing.id}`}
               data-call-this-one=""
+              data-first-click="call"
               data-call-after-claim-one=""
               data-call-after-claim-two=""
               data-call-after-claim-three=""

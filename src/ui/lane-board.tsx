@@ -72,9 +72,9 @@ export function LaneBoard({
             ))}
           </ol>
           {lead ? (
-            <p className="claim-after-call-line">
+            <p className="later-claim claim-after-call-line" data-later-claim="">
               <a
-                className="outbid claim-after-call claim-after-call-one claim-after-call-two claim-after-call-three claim-after-call-four claim-after-call-five"
+                className="claim-after-call claim-after-call-one claim-after-call-two claim-after-call-three claim-after-call-four claim-after-call-five"
                 href={`/c/${city.slug}/${category.slug}#claim`}
                 data-claim-after-call=""
                 data-claim-after-call-one=""

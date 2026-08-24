@@ -130,6 +130,22 @@ a:hover {
   padding-bottom: 2.6rem;
 }
 
+/* Empty paper stays Claim #1. Occupied later-facts / Call this #1 stay off this week. */
+.paper-empty[data-paper-empty] [data-call-this-one],
+.paper-empty[data-paper-empty] [data-call-later],
+.paper-empty[data-paper-empty] [data-call-later-quiet],
+.paper-empty[data-paper-empty] [data-call-ad],
+.paper-empty[data-paper-empty] [data-prize],
+.paper-empty[data-paper-empty] [data-later-fact],
+.paper-empty[data-paper-empty] .later-facts,
+.paper-empty[data-paper-empty] [data-listing-card],
+.paper-empty[data-paper-empty] [data-claim-after-call],
+.paper-empty[data-paper-empty] [data-call-after-claim],
+.paper-empty[data-paper-empty] [data-column-index-after],
+.paper-empty[data-paper-empty] [data-category-tabs] {
+  display: none;
+}
+
 .edition {
   text-align: center;
   padding: 0.55rem 0 1.15rem;
@@ -188,7 +204,7 @@ a:hover {
 }
 
 /* Occupied paper: column pick sits after the listing, quieter than Call this #1. */
-.column-index.column-index-after[data-column-index-after] {
+.paper-occupied[data-paper-occupied] .column-index.column-index-after[data-column-index-after] {
   margin: 0.85rem auto 0;
   max-width: 44rem;
   padding: 0.7rem 0 0.15rem;
@@ -264,6 +280,16 @@ a:hover {
 }
 
 /* Empty lanes stay blank after Claim #1 is the first click. Occupied Call hops stay off this column. */
+.paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-call-this-one],
+.paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-call-later],
+.paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-call-later-quiet],
+.paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-call-ad],
+.paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-prize],
+.paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-later-fact],
+.paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] .later-facts,
+.paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-listing-card],
+.paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-claim-after-call],
+.paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-call-after-claim],
 .empty-lane[data-empty-honest] [data-call-this-one],
 .empty-lane[data-empty-honest] [data-call-later],
 .empty-lane[data-empty-honest] [data-call-later-quiet],
@@ -322,7 +348,7 @@ a:hover {
   line-height: 1.2;
 }
 
-.card[data-call-ad="lead"] .business[data-prize] {
+.paper-occupied[data-paper-occupied] .card[data-call-ad="lead"] .business[data-prize] {
   font-size: 1.5rem;
   line-height: 1.08;
   font-weight: 700;
@@ -336,8 +362,8 @@ a:hover {
   font-variant-numeric: tabular-nums;
 }
 
-.card[data-call-ad="lead"] .bid,
-.card[data-call-ad="lead"] .clicks {
+.paper-occupied[data-paper-occupied] .card[data-call-ad="lead"] .bid,
+.paper-occupied[data-paper-occupied] .card[data-call-ad="lead"] .clicks {
   font-weight: 400;
 }
 
@@ -348,15 +374,15 @@ a:hover {
 }
 
 /* Occupied #1 only: $bid + clicks are one later-facts group after the prize name. */
-.card[data-call-ad="lead"] .later-facts[data-later-fact] {
+.paper-occupied[data-paper-occupied] .card[data-call-ad="lead"] .later-facts[data-later-fact] {
   margin: 0.35rem 0 0;
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 500;
 }
 
-.card[data-call-ad="lead"] .later-facts[data-later-fact] .bid,
-.card[data-call-ad="lead"] .later-facts[data-later-fact] .clicks {
+.paper-occupied[data-paper-occupied] .card[data-call-ad="lead"] .later-facts[data-later-fact] .bid,
+.paper-occupied[data-paper-occupied] .card[data-call-ad="lead"] .later-facts[data-later-fact] .clicks {
   margin: 0;
   color: inherit;
   font-size: inherit;
@@ -436,98 +462,98 @@ a:hover {
   padding: 0.1rem 0;
 }
 
-.claim-after-call-line {
+.paper-occupied[data-paper-occupied] .claim-after-call-line {
   margin: 0.85rem 0 0;
   color: var(--muted);
   font-size: 0.86rem;
   line-height: 1.45;
 }
 
-.claim-after-call {
+.paper-occupied[data-paper-occupied] .claim-after-call {
   display: inline-block;
   text-decoration: none;
   padding: 0.4rem 0.85rem;
   vertical-align: middle;
 }
 
-.claim-after-call-one {
+.paper-occupied[data-paper-occupied] .claim-after-call-one {
   display: inline-block;
   text-decoration: none;
   padding: 0.4rem 0.85rem;
   vertical-align: middle;
 }
 
-.claim-after-call-two {
+.paper-occupied[data-paper-occupied] .claim-after-call-two {
   display: inline-block;
   text-decoration: none;
   padding: 0.4rem 0.85rem;
   vertical-align: middle;
 }
 
-.claim-after-call.claim-after-call-two,
-.claim-after-call[data-claim-after-call-two] {
+.paper-occupied[data-paper-occupied] .claim-after-call.claim-after-call-two,
+.paper-occupied[data-paper-occupied] .claim-after-call[data-claim-after-call-two] {
   padding: 0.7rem 1.35rem;
   font-size: 1.12rem;
   letter-spacing: 0.05em;
 }
 
-.claim-after-call-three {
+.paper-occupied[data-paper-occupied] .claim-after-call-three {
   display: inline-block;
   text-decoration: none;
   padding: 0.4rem 0.85rem;
   vertical-align: middle;
 }
 
-.claim-after-call.claim-after-call-three,
-.claim-after-call[data-claim-after-call-three] {
+.paper-occupied[data-paper-occupied] .claim-after-call.claim-after-call-three,
+.paper-occupied[data-paper-occupied] .claim-after-call[data-claim-after-call-three] {
   padding: 0.95rem 1.8rem;
   font-size: 1.32rem;
   letter-spacing: 0.07em;
 }
 
-.claim-after-call-four {
+.paper-occupied[data-paper-occupied] .claim-after-call-four {
   display: inline-block;
   text-decoration: none;
   padding: 0.4rem 0.85rem;
   vertical-align: middle;
 }
 
-.claim-after-call.claim-after-call-four,
-.claim-after-call[data-claim-after-call-four] {
+.paper-occupied[data-paper-occupied] .claim-after-call.claim-after-call-four,
+.paper-occupied[data-paper-occupied] .claim-after-call[data-claim-after-call-four] {
   padding: 1.2rem 2.25rem;
   font-size: 1.52rem;
   letter-spacing: 0.09em;
 }
 
-.claim-after-call-five {
+.paper-occupied[data-paper-occupied] .claim-after-call-five {
   display: inline-block;
   text-decoration: none;
   padding: 0.4rem 0.85rem;
   vertical-align: middle;
 }
 
-.claim-after-call.claim-after-call-five,
-.claim-after-call[data-claim-after-call-five] {
+.paper-occupied[data-paper-occupied] .claim-after-call.claim-after-call-five,
+.paper-occupied[data-paper-occupied] .claim-after-call[data-claim-after-call-five] {
   padding: 1.45rem 2.7rem;
   font-size: 1.72rem;
   letter-spacing: 0.11em;
 }
 
-.call-after-claim-line {
+.paper-occupied[data-paper-occupied] .call-after-claim-line {
   margin: 0.65rem 0 0;
   color: var(--muted);
   font-size: 0.86rem;
   line-height: 1.45;
 }
 
-.call-after-claim {
+.paper-occupied[data-paper-occupied] .call-after-claim {
   display: inline-block;
   text-decoration: none;
   padding: 0.4rem 0.85rem;
   vertical-align: middle;
 }
 
-.call-later[data-call-later-quiet] {
+.paper-occupied[data-paper-occupied] .call-later[data-call-later-quiet] {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 600;
@@ -536,7 +562,7 @@ a:hover {
   border-bottom: 1px dotted currentColor;
 }
 
-.call-after-claim[data-call-later-quiet] {
+.paper-occupied[data-paper-occupied] .call-after-claim[data-call-later-quiet] {
   background: transparent;
   color: var(--muted);
   border: 0;
@@ -547,16 +573,16 @@ a:hover {
   vertical-align: baseline;
 }
 
-.call-after-claim[data-call-later-quiet]:hover {
+.paper-occupied[data-paper-occupied] .call-after-claim[data-call-later-quiet]:hover {
   background: transparent;
   color: var(--ink);
 }
 
-.card[data-call-ad="lead"] .card-top {
+.paper-occupied[data-paper-occupied] .card[data-call-ad="lead"] .card-top {
   align-items: center;
 }
 
-.call-this-one {
+.paper-occupied[data-paper-occupied] .call-this-one {
   display: inline-block;
   text-decoration: none;
   padding: 0.4rem 0.85rem;
@@ -564,64 +590,64 @@ a:hover {
   flex-shrink: 0;
 }
 
-.call-this-one.call-after-claim-one,
-.call-this-one[data-call-after-claim-one] {
+.paper-occupied[data-paper-occupied] .call-this-one.call-after-claim-one,
+.paper-occupied[data-paper-occupied] .call-this-one[data-call-after-claim-one] {
   padding: 0.55rem 1.1rem;
   font-size: 1.02rem;
   letter-spacing: 0.04em;
 }
 
-.call-after-claim-two {
+.paper-occupied[data-paper-occupied] .call-after-claim-two {
   display: inline-block;
   text-decoration: none;
   padding: 0.4rem 0.85rem;
   vertical-align: middle;
 }
 
-.call-this-one.call-after-claim-two,
-.call-this-one[data-call-after-claim-two] {
+.paper-occupied[data-paper-occupied] .call-this-one.call-after-claim-two,
+.paper-occupied[data-paper-occupied] .call-this-one[data-call-after-claim-two] {
   padding: 0.85rem 1.6rem;
   font-size: 1.22rem;
   letter-spacing: 0.06em;
 }
 
-.call-after-claim-three {
+.paper-occupied[data-paper-occupied] .call-after-claim-three {
   display: inline-block;
   text-decoration: none;
   padding: 0.4rem 0.85rem;
   vertical-align: middle;
 }
 
-.call-this-one.call-after-claim-three,
-.call-this-one[data-call-after-claim-three] {
+.paper-occupied[data-paper-occupied] .call-this-one.call-after-claim-three,
+.paper-occupied[data-paper-occupied] .call-this-one[data-call-after-claim-three] {
   padding: 1.15rem 2.1rem;
   font-size: 1.42rem;
   letter-spacing: 0.08em;
 }
 
-.call-after-claim-four {
+.paper-occupied[data-paper-occupied] .call-after-claim-four {
   display: inline-block;
   text-decoration: none;
   padding: 0.4rem 0.85rem;
   vertical-align: middle;
 }
 
-.call-this-one.call-after-claim-four,
-.call-this-one[data-call-after-claim-four] {
+.paper-occupied[data-paper-occupied] .call-this-one.call-after-claim-four,
+.paper-occupied[data-paper-occupied] .call-this-one[data-call-after-claim-four] {
   padding: 1.45rem 2.6rem;
   font-size: 1.62rem;
   letter-spacing: 0.1em;
 }
 
-.call-after-claim-five {
+.paper-occupied[data-paper-occupied] .call-after-claim-five {
   display: inline-block;
   text-decoration: none;
   padding: 0.4rem 0.85rem;
   vertical-align: middle;
 }
 
-.call-this-one.call-after-claim-five,
-.call-this-one[data-call-after-claim-five] {
+.paper-occupied[data-paper-occupied] .call-this-one.call-after-claim-five,
+.paper-occupied[data-paper-occupied] .call-this-one[data-call-after-claim-five] {
   padding: 1.75rem 3.1rem;
   font-size: 1.82rem;
   letter-spacing: 0.12em;

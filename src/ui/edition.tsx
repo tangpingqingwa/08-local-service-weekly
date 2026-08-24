@@ -5,6 +5,7 @@ import { formatWeekLabel } from "../week";
 type ClassifiedEditionProps = {
   city: City;
   weekId: string;
+  emptyPaper?: boolean;
   claim?: ReactNode;
   children: ReactNode;
 };
@@ -12,16 +13,24 @@ type ClassifiedEditionProps = {
 export function ClassifiedEdition({
   city,
   weekId,
+  emptyPaper = false,
   claim,
   children,
 }: ClassifiedEditionProps) {
   return (
     <main
-      className="paper classified"
+      className={
+        emptyPaper
+          ? "paper classified paper-empty"
+          : "paper classified paper-occupied"
+      }
       data-board=""
       data-classified=""
       data-city={city.slug}
       data-week={weekId}
+      {...(emptyPaper
+        ? { "data-paper-empty": "true" }
+        : { "data-paper-occupied": "true" })}
     >
       <header className="edition" data-edition="">
         <p className="edition-kicker">This week&apos;s local classified</p>

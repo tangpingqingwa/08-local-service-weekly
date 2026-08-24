@@ -20,7 +20,7 @@ export function CityHub({ city, lanes, lastWeek, weekId }: CityHubProps) {
     (category) => (lanes[category.slug] ?? []).length === 0,
   );
   return (
-    <ClassifiedEdition city={city} weekId={openWeek}>
+    <ClassifiedEdition city={city} weekId={openWeek} emptyPaper={emptyPaper}>
       <div className="classified-columns" data-classified-columns="">
         {CATEGORIES.map((category) => (
           <LaneBoard

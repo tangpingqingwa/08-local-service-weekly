@@ -352,6 +352,38 @@ a:hover {
   text-decoration: none;
 }
 
+.claim-pick.claim-first details {
+  margin: 0;
+  text-align: center;
+}
+
+.claim-pick.claim-first summary.claim-first-click {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem 0.6rem;
+  list-style: none;
+  cursor: pointer;
+  font-size: clamp(1.45rem, 3.6vw, 2.15rem);
+  letter-spacing: -0.03em;
+}
+
+.claim-pick.claim-first summary.claim-first-click::-webkit-details-marker,
+.claim-pick.claim-first summary.claim-first-click::marker {
+  display: none;
+  content: "";
+}
+
+.claim-columns.claim-next a {
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.1rem 0;
+}
+
 .claim-after-call-line {
   margin: 0.85rem 0 0;
   color: var(--muted);

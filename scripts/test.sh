@@ -124,6 +124,22 @@ grep -q 'data-claim-job' src/ui/claim-column.tsx \
   || fail "hub Outbid hops must name the column as a job the tradesperson owns"
 grep -q 'Outbid my' src/ui/claim-column.tsx \
   || fail "hub hops must say Outbid my {job} column, not a generic Outbid {category}"
+grep -q 'claim-first-click' src/ui/claim-column.tsx \
+  || fail "empty paper must lead with one Claim #1 first click"
+grep -q 'Then pick the column' src/ui/claim-column.tsx \
+  || fail "empty paper must treat the trade pick as the next step after Claim #1"
+grep -q 'claim-next' src/ui/claim-column.tsx \
+  || fail "empty paper column pick must stay quieter than Claim #1"
+grep -q 'emptyPaper' src/ui/city-hub.tsx \
+  || fail "city hub must tell the empty paper to lead with one first click"
+grep -q 'showColumnIndex={!emptyPaper}' src/ui/city-hub.tsx \
+  || fail "empty paper must not print a same-weight four-tab column index"
+grep -q 'claim-first-click' app/globals.css \
+  || fail "classified CSS must make Claim #1 the empty-paper first click"
+grep -q 'claim-columns.claim-next a' app/globals.css \
+  || fail "classified CSS must keep the empty-paper trade pick quieter than Outbid"
+grep -q 'empty paper has one first click' tests/board.test.ts \
+  || fail "board tests must cover one first click on empty paper"
 grep -q 'ClaimColumn' src/ui/city-hub.tsx \
   || fail "city hub must send first-time locals into one column"
 grep -q 'amount-field' src/ui/outbid-form.tsx || fail "bid form must keep the dashed amount"
@@ -576,19 +592,31 @@ if [[ -f package.json ]]; then
   grep -q 'edition-city' "${home_body}" || fail "GET / city must be the edition masthead"
   grep -q 'data-classified-columns=""' "${home_body}" || fail "GET / categories must be classified columns"
   grep -q 'data-empty-lane="true"' "${home_body}" || fail "GET / empty London lane must be empty"
-  grep -q 'Outbid' "${home_body}" || fail "GET / must show Outbid form chrome"
+  grep -q 'class="outbid claim-first-click"' "${home_body}" \
+    || fail "GET / empty paper must keep Outbid chrome on the one Claim #1 first click"
   grep -q 'Claim #1' "${home_body}" || fail "GET / must keep Claim #1 after the classified columns"
   grep -q 'data-claim-pick' "${home_body}" || fail "GET / must pick a column before the want-ad fields"
+  grep -q 'claim-first-click' "${home_body}" || fail "GET / empty paper must lead with one Claim #1 first click"
+  grep -q 'Then pick the column' "${home_body}" || fail "GET / empty paper must treat the trade pick as the next step"
+  grep -q 'claim-columns claim-next' "${home_body}" || fail "GET / empty paper must keep the trade pick quieter than Claim #1"
   home_empty_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-empty-lane"))' "${home_body}")"
   home_claim_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-pick"))' "${home_body}")"
+  home_first_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("claim-first-click"))' "${home_body}")"
+  home_pick_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("Then pick the column"))' "${home_body}")"
   [[ "${home_empty_at}" -ge 0 && "${home_claim_at}" -gt "${home_empty_at}" ]] \
     || fail "GET / must show empty columns before the Outbid claim"
+  [[ "${home_first_at}" -gt "${home_empty_at}" && "${home_pick_at}" -gt "${home_first_at}" ]] \
+    || fail "GET / empty paper must show Claim #1 before the quieter column pick"
   grep -q 'href="/c/london/movers#claim"' "${home_body}" \
     || fail "GET / claim must send a first-time local into one column"
-  grep -q 'Outbid my movers column' "${home_body}" \
-    || fail "GET / hop must name the movers column as a job a tradesperson owns"
   grep -q 'data-claim-job="movers"' "${home_body}" \
     || fail "GET / hop must stamp the movers job on the claim link"
+  if grep -q 'Outbid my movers column' "${home_body}"; then
+    fail "GET / empty paper must not print four same-weight Outbid-my-column buttons"
+  fi
+  if grep -q 'data-category-tabs' "${home_body}"; then
+    fail "GET / empty paper must not print a same-weight four-tab column index"
+  fi
   if grep -q 'Outbid Movers' "${home_body}"; then
     fail "GET / must not keep generic Outbid {category} hops"
   fi
@@ -886,6 +914,13 @@ print(chunk.find("data-prize"), chunk.find("North London Movers"), chunk.find("$
     || fail "GET / paid #1 must keep Outbid my column on one claim hop"
   grep -q 'Outbid my movers column' "${occupied_home}" \
     || fail "GET / paid hop must name Outbid my movers column"
+  grep -q 'data-category-tabs' "${occupied_home}" \
+    || fail "GET / occupied paper must keep the classified column index"
+  grep -q 'Pick one column' "${occupied_home}" \
+    || fail "GET / occupied paper must keep the named column pick"
+  if grep -qE 'claim-first-click|Then pick the column' "${occupied_home}"; then
+    fail "GET / occupied paper must not use the empty-paper first-click chrome"
+  fi
   grep -q 'after Call this #1' "${occupied_home}" \
     || fail "GET / paid hop must sit after Call this #1"
   home_claim_one="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-after-call-one"))' "${occupied_home}")"

@@ -187,31 +187,43 @@ test("empty London hub is empty: four lanes, Outbid, no invented cards or stars"
   assert.match(html, /<h1 class="edition-city">London<\/h1>/);
   assert.match(html, /Rank is the bid/);
   assert.match(html, /data-claim-pick/);
-  assert.match(html, /Outbid my movers column/);
+  assert.match(html, /claim-first-click/);
   assert.match(html, /Claim #1 for/);
-  assert.match(html, /Pick one column/);
-  assert.match(html, /aria-label="Classified columns"/);
+  assert.match(html, /Then pick the column/);
+  assert.match(html, /class="claim-columns claim-next"/);
+  assert.doesNotMatch(html, /Outbid my movers column/);
+  assert.doesNotMatch(html, /data-category-tabs/);
+  assert.doesNotMatch(html, /aria-label="Classified columns"/);
   const editionEnd = html.indexOf("data-classified-columns");
   const claimAt = html.indexOf("data-claim-pick");
   const firstLane = html.indexOf("data-lane");
   const firstEmpty = html.indexOf('data-empty-lane="true"');
-  const firstOutbid = html.indexOf("Outbid");
+  const firstClick = html.indexOf("claim-first-click");
+  const firstClaim = html.indexOf("Claim #1 for");
+  const firstPick = html.indexOf("Then pick the column");
   assert.ok(editionEnd > -1 && firstLane > editionEnd);
   assert.ok(claimAt > firstLane);
   assert.ok(firstEmpty > -1 && firstEmpty < claimAt);
-  assert.ok(firstOutbid > firstEmpty);
+  assert.ok(firstClick > firstEmpty);
+  assert.ok(firstClaim > firstEmpty && firstPick > firstClaim);
+  assert.ok(firstClick < firstPick);
   assert.ok(html.indexOf("data-bid-form") === -1 || html.indexOf("data-bid-form") > editionEnd);
   assert.doesNotMatch(html, /name="business"/);
   assert.doesNotMatch(html, /name="siteUrl"/);
   assert.doesNotMatch(html, /class="fields want-ad-fields"/);
   for (const category of CATEGORY_SLUGS) {
     assert.match(html, new RegExp(`data-category="${category}"`));
+    assert.match(html, new RegExp(`data-claim-column="${category}"`));
     assert.match(html, new RegExp(`data-claim-job="${category}"`));
     assert.match(
       html,
       new RegExp(`href="/c/london/${category}#claim"`),
     );
   }
+  const firstClickHops = html.match(/claim-first-click/g) ?? [];
+  assert.equal(firstClickHops.length, 1);
+  assert.equal((html.match(/class="outbid claim-first-click"/g) ?? []).length, 1);
+  assert.equal((html.match(/class="outbid"/g) ?? []).length, 0);
   const emptyLanes = html.match(/data-empty-lane="true"/g) ?? [];
   assert.equal(emptyLanes.length, 4);
   assert.doesNotMatch(html, /data-listing-card/);
@@ -533,6 +545,9 @@ test("occupied hub makes calling the paid #1 the neighbor move", () => {
   assert.ok(outbidAt > -1 && outbidAt < claimAt);
   assert.match(html, /after Call this #1/);
   assert.match(html, /href="\/c\/london\/movers#claim"/);
+  assert.match(html, /data-category-tabs/);
+  assert.match(html, /Pick one column/);
+  assert.doesNotMatch(html, /claim-first-click|Then pick the column/);
   assert.equal((html.match(/data-claim-after-call=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-claim-after-call-one=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-claim-after-call-two=""/g) ?? []).length, 1);
@@ -2867,6 +2882,40 @@ test("hub claim picks one column and does not print the want-ad field grid", () 
   assert.doesNotMatch(html, /name="siteUrl"/);
   assert.doesNotMatch(html, /name="amount"/);
   assert.doesNotMatch(html, /Outbid Movers|Outbid Dentists|Outbid Tutors/);
+  assert.doesNotMatch(html, /claim-first-click|Then pick the column/);
+  assert.doesNotMatch(html, /★|⭐|map/i);
+});
+
+test("empty paper has one first click: Claim #1, then a quieter column pick", () => {
+  const html = renderToStaticMarkup(
+    createElement(ClaimColumn, { city: "london", emptyPaper: true }),
+  );
+  assert.match(html, /data-claim-pick/);
+  assert.match(html, /class="outbid claim-first-click"/);
+  assert.match(html, /Claim #1 for/);
+  assert.match(html, /\$5/);
+  assert.match(html, /Then pick the column/);
+  assert.match(html, /class="claim-columns claim-next"/);
+  assert.match(html, /<summary class="outbid claim-first-click">/);
+  assert.match(html, /data-claim-columns=""/);
+  assert.match(html, /data-claim-job="movers"/);
+  assert.match(html, /href="\/c\/london\/movers#claim"/);
+  assert.match(html, /href="\/c\/london\/dentists#claim"/);
+  assert.match(html, /href="\/c\/london\/immigration_lawyers#claim"/);
+  assert.match(html, /href="\/c\/london\/tutors#claim"/);
+  const firstClick = html.indexOf("claim-first-click");
+  const pickAt = html.indexOf("Then pick the column");
+  const moversAt = html.indexOf("data-claim-job=\"movers\"");
+  assert.ok(firstClick >= 0 && pickAt > firstClick && moversAt > pickAt);
+  assert.equal((html.match(/class="outbid claim-first-click"/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /Outbid my movers column/);
+  assert.doesNotMatch(html, /Outbid my dentists column/);
+  assert.doesNotMatch(html, /class="outbid"[^>]*data-claim-job/);
+  assert.doesNotMatch(html, /data-bid-form/);
+  assert.doesNotMatch(html, /name="business"/);
+  assert.doesNotMatch(html, /name="siteUrl"/);
+  assert.doesNotMatch(html, /name="amount"/);
+  assert.doesNotMatch(html, /data-claim-after-call|call-after-claim/);
   assert.doesNotMatch(html, /★|⭐|map/i);
 });
 
@@ -2907,9 +2956,13 @@ test("GET / default page is the London hub", async () => {
   assert.match(html, /<h1 class="edition-city">London<\/h1>/);
   assert.match(html, /data-empty-lane="true"/);
   assert.match(html, /data-claim-pick/);
-  assert.match(html, /Outbid my movers column/);
+  assert.match(html, /claim-first-click/);
+  assert.match(html, /Then pick the column/);
   assert.match(html, /data-claim-job="movers"/);
   assert.ok(html.indexOf('data-empty-lane="true"') < html.indexOf("data-claim-pick"));
+  assert.ok(html.indexOf("Claim #1 for") < html.indexOf("Then pick the column"));
+  assert.doesNotMatch(html, /Outbid my movers column/);
+  assert.doesNotMatch(html, /data-category-tabs/);
   assert.doesNotMatch(html, /name="business"/);
   assert.doesNotMatch(html, /★|⭐|review count/i);
 });

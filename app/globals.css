@@ -463,6 +463,20 @@ a:hover {
   letter-spacing: 0.08em;
 }
 
+.call-after-claim-four {
+  display: inline-block;
+  text-decoration: none;
+  padding: 0.4rem 0.85rem;
+  vertical-align: middle;
+}
+
+.call-this-one.call-after-claim-four,
+.call-this-one[data-call-after-claim-four] {
+  padding: 1.45rem 2.6rem;
+  font-size: 1.62rem;
+  letter-spacing: 0.1em;
+}
+
 .amount-stepper {
   display: inline-flex;
   align-items: center;

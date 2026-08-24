@@ -235,6 +235,9 @@ test("empty London hub is empty: four lanes, Outbid, no invented cards or stars"
   assert.equal((html.match(/class="outbid"/g) ?? []).length, 0);
   const emptyLanes = html.match(/data-empty-lane="true"/g) ?? [];
   assert.equal(emptyLanes.length, 4);
+  assert.equal((html.match(/data-lane-empty="true"/g) ?? []).length, 4);
+  assert.equal((html.match(/class="lane classified-column lane-empty"/g) ?? []).length, 4);
+  assert.doesNotMatch(html, /lane-occupied|data-lane-occupied/);
   const honestLanes = html.match(/data-empty-honest=""/g) ?? [];
   assert.equal(honestLanes.length, 4);
   assert.match(html, /No #1/);
@@ -281,6 +284,9 @@ test("four empty lanes stay honest after Claim #1 is the first click", () => {
     }),
   );
   assert.match(emptyLane, /data-empty-lane="true"/);
+  assert.match(emptyLane, /class="lane classified-column lane-empty"/);
+  assert.match(emptyLane, /data-lane-empty="true"/);
+  assert.doesNotMatch(emptyLane, /lane-occupied|data-lane-occupied/);
   assert.match(emptyLane, /data-empty-honest=""/);
   assert.match(emptyLane, /<p class="empty-answer">No #1<\/p>/);
   assert.match(emptyLane, /This lane is empty\. Rank is the bid\. No stars\. No map\./);
@@ -318,6 +324,9 @@ test("four empty lanes stay honest after Claim #1 is the first click", () => {
     }),
   );
   assert.equal((emptyHub.match(/data-empty-lane="true"/g) ?? []).length, 4);
+  assert.equal((emptyHub.match(/data-lane-empty="true"/g) ?? []).length, 4);
+  assert.equal((emptyHub.match(/class="lane classified-column lane-empty"/g) ?? []).length, 4);
+  assert.doesNotMatch(emptyHub, /lane-occupied|data-lane-occupied/);
   assert.equal((emptyHub.match(/data-empty-honest=""/g) ?? []).length, 4);
   assert.equal((emptyHub.match(/No #1/g) ?? []).length, 4);
   assert.match(emptyHub, /class="paper classified paper-empty"/);
@@ -362,6 +371,8 @@ test("four empty lanes stay honest after Claim #1 is the first click", () => {
   assert.match(occupiedHub, /class="paper classified paper-occupied"/);
   assert.match(occupiedHub, /data-paper-occupied="true"/);
   assert.doesNotMatch(occupiedHub, /paper-empty|data-paper-empty/);
+  assert.equal((occupiedHub.match(/data-lane-occupied="true"/g) ?? []).length, 1);
+  assert.equal((occupiedHub.match(/data-lane-empty="true"/g) ?? []).length, 3);
   assert.match(occupiedHub, /Call this #1/);
   assert.match(occupiedHub, /Call #2/);
   assert.match(occupiedHub, /data-prize=""/);
@@ -373,7 +384,7 @@ test("four empty lanes stay honest after Claim #1 is the first click", () => {
   assert.equal((occupiedHub.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((occupiedHub.match(/data-call-later=""/g) ?? []).length, 1);
   const moversLane = occupiedHub.match(
-    /<section class="lane classified-column"[^>]*data-category="movers"[\s\S]*?<\/section>/,
+    /<section class="lane classified-column lane-occupied"[^>]*data-category="movers"[\s\S]*?<\/section>/,
   );
   assert.ok(moversLane);
   assert.match(moversLane[0], /Call this #1/);
@@ -1681,7 +1692,7 @@ test("occupied later Call stays quieter in grouping, not a mute of the same hop"
     /\.paper-occupied\[data-paper-occupied\] \.call-this-one\.call-after-claim-five\s*,\s*\.paper-occupied\[data-paper-occupied\] \.call-this-one\[data-call-after-claim-five\]\s*\{[^}]*font-size:\s*([\d.]+)rem/,
   );
   const laterGroup = css.match(
-    /\.paper-occupied\[data-paper-occupied\] \.later-call\[data-later-call\]\s*\{([^}]*)\}/,
+    /\.paper-occupied\[data-paper-occupied\] \.lane-occupied\[data-lane-occupied\] \.later-call\[data-later-call\]\s*\{([^}]*)\}/,
   );
   assert.ok(leadSize);
   assert.ok(laterGroup);
@@ -1823,6 +1834,191 @@ test("occupied later Call stays quieter in grouping, not a mute of the same hop"
   assert.equal((hub.match(/data-empty-honest=""/g) ?? []).length, 3);
   assert.doesNotMatch(hub, /data-call-later-quiet/);
   assert.doesNotMatch(hub, /claim-first-click|Then pick the column/);
+});
+
+test("occupied mixed paper keeps empty lanes honest — later Call cannot leak onto No #1", () => {
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+  assert.match(
+    css,
+    /\.paper-occupied\[data-paper-occupied\] \.lane-occupied\[data-lane-occupied\] \.later-call\[data-later-call\]/,
+  );
+  assert.match(
+    css,
+    /\.paper-occupied\[data-paper-occupied\] \.lane-empty\[data-lane-empty\] \[data-later-call\]/,
+  );
+  assert.match(
+    css,
+    /\.paper-occupied\[data-paper-occupied\] \.lane-empty\[data-lane-empty\] \.later-call/,
+  );
+  assert.doesNotMatch(
+    css,
+    /^\.paper-occupied\[data-paper-occupied\] \.later-call\[data-later-call\]/m,
+  );
+  const laterCss = css.match(
+    /\.paper-occupied\[data-paper-occupied\] \.lane-occupied\[data-lane-occupied\] \.later-call\[data-later-call\]\s*\{([^}]*)\}/,
+  );
+  assert.ok(laterCss);
+  assert.match(laterCss[1], /color:\s*var\(--muted\)/);
+  assert.doesNotMatch(laterCss[1], /color:\s*var\(--accent\)/);
+  assert.doesNotMatch(css, /data-call-later-quiet/);
+  assert.doesNotMatch(css, /call-after-claim-six|claim-after-call-six/);
+
+  const london = getCity("london");
+  const movers = getCategory("movers");
+  assert.ok(london && movers);
+
+  const emptyLane = renderToStaticMarkup(
+    createElement(LaneBoard, {
+      city: london,
+      category: movers,
+      listings: [],
+      showForm: true,
+    }),
+  );
+  assert.match(emptyLane, /class="lane classified-column lane-empty"/);
+  assert.match(emptyLane, /data-lane-empty="true"/);
+  assert.doesNotMatch(emptyLane, /lane-occupied|data-lane-occupied/);
+  assert.match(emptyLane, /data-empty-honest=""/);
+  assert.match(emptyLane, /No #1/);
+  assert.match(emptyLane, /No stars\. No map\./);
+  assert.match(emptyLane, /data-later-write=""/);
+  assert.match(emptyLane, /Then the listing name/);
+  assert.doesNotMatch(
+    emptyLane,
+    /data-later-call|later-call|data-call-later|Call #2|Call this #1|data-call-this-one|data-prize/,
+  );
+
+  const occupiedLane = renderToStaticMarkup(
+    createElement(LaneBoard, {
+      city: london,
+      category: movers,
+      listings: [
+        ranked({
+          id: "lst_movers",
+          business: "North London Movers",
+          bidUsd: 20,
+          siteHost: "north.example",
+        }),
+        ranked({
+          id: "lst_south",
+          rank: 2,
+          business: "South London Movers",
+          bidUsd: 15,
+          siteHost: "south.example",
+        }),
+      ],
+      showForm: true,
+    }),
+  );
+  assert.match(occupiedLane, /class="lane classified-column lane-occupied"/);
+  assert.match(occupiedLane, /data-lane-occupied="true"/);
+  assert.doesNotMatch(occupiedLane, /lane-empty|data-lane-empty/);
+  const prizeAt = occupiedLane.indexOf('data-prize=""');
+  const nameAt = occupiedLane.indexOf("North London Movers");
+  const callAt = occupiedLane.indexOf("Call this #1");
+  const laterNameAt = occupiedLane.indexOf("South London Movers");
+  const laterGroupAt = occupiedLane.indexOf('class="later-call"');
+  const laterCallAt = occupiedLane.indexOf("Call #2");
+  assert.ok(prizeAt >= 0 && nameAt >= 0 && nameAt < callAt);
+  assert.ok(callAt > nameAt && laterNameAt > callAt && laterGroupAt > laterNameAt);
+  assert.ok(laterCallAt > laterGroupAt);
+  assert.equal((occupiedLane.match(/data-later-call=""/g) ?? []).length, 2);
+  assert.equal((occupiedLane.match(/data-call-this-one=""/g) ?? []).length, 1);
+  assert.doesNotMatch(occupiedLane, /data-empty-honest|No #1/);
+  assert.doesNotMatch(occupiedLane, /Then the listing name|data-later-write|data-empty-claim-first/);
+  assert.doesNotMatch(occupiedLane, /data-call-later-quiet|data-call-after-claim-six|data-claim-after-call-six/);
+
+  const mixed = renderToStaticMarkup(
+    createElement(CityHub, {
+      city: london,
+      weekId: currentWeekId(),
+      lanes: {
+        movers: [
+          ranked({
+            id: "lst_movers",
+            business: "North London Movers",
+            bidUsd: 20,
+            siteHost: "north.example",
+          }),
+          ranked({
+            id: "lst_south",
+            rank: 2,
+            business: "South London Movers",
+            bidUsd: 15,
+            siteHost: "south.example",
+          }),
+        ],
+        dentists: [],
+        immigration_lawyers: [],
+        tutors: [],
+      },
+    }),
+  );
+  assert.match(mixed, /class="paper classified paper-occupied"/);
+  assert.match(mixed, /data-paper-occupied="true"/);
+  assert.doesNotMatch(mixed, /paper-empty|data-paper-empty/);
+  assert.equal((mixed.match(/data-lane-occupied="true"/g) ?? []).length, 1);
+  assert.equal((mixed.match(/data-lane-empty="true"/g) ?? []).length, 3);
+  assert.equal((mixed.match(/class="lane classified-column lane-occupied"/g) ?? []).length, 1);
+  assert.equal((mixed.match(/class="lane classified-column lane-empty"/g) ?? []).length, 3);
+  assert.equal((mixed.match(/data-empty-honest=""/g) ?? []).length, 3);
+  assert.equal((mixed.match(/No #1/g) ?? []).length, 3);
+  assert.match(mixed, /No stars\. No map\./);
+  assert.match(mixed, /North London Movers/);
+  assert.match(mixed, /data-prize=""/);
+  assert.match(mixed, /Call this #1/);
+  assert.match(mixed, /Call #2/);
+  assert.match(mixed, /class="later-call"/);
+  assert.match(mixed, /data-later-call=""/);
+  assert.equal((mixed.match(/data-call-this-one=""/g) ?? []).length, 1);
+  assert.equal((mixed.match(/data-later-call=""/g) ?? []).length, 2);
+  const mixedPrize = mixed.indexOf('data-prize=""');
+  const mixedName = mixed.indexOf("North London Movers");
+  const mixedCall = mixed.indexOf("Call this #1");
+  const mixedLater = mixed.indexOf("Call #2");
+  const mixedTabs = mixed.indexOf("data-category-tabs");
+  const mixedAfter = mixed.indexOf("data-column-index-after");
+  const mixedHeader = mixed.indexOf("</header>");
+  assert.ok(mixedPrize >= 0 && mixedName >= 0 && mixedCall > mixedName);
+  assert.ok(mixedLater > mixedCall);
+  assert.ok(mixedTabs > mixedCall && mixedAfter > mixedCall);
+  assert.ok(mixedHeader >= 0 && mixedTabs > mixedHeader);
+  const moversChunk = mixed.match(
+    /<section class="lane classified-column lane-occupied"[^>]*data-category="movers"[\s\S]*?<\/section>/,
+  );
+  assert.ok(moversChunk);
+  assert.match(moversChunk[0], /data-lane-occupied="true"/);
+  assert.match(moversChunk[0], /Call this #1/);
+  assert.match(moversChunk[0], /Call #2/);
+  assert.match(moversChunk[0], /data-later-call=""/);
+  assert.doesNotMatch(moversChunk[0], /data-empty-honest|No #1|lane-empty/);
+  const dentistChunk = mixed.match(
+    /<section class="lane classified-column lane-empty"[^>]*data-category="dentists"[\s\S]*?<\/section>/,
+  );
+  assert.ok(dentistChunk);
+  assert.match(dentistChunk[0], /data-lane-empty="true"/);
+  assert.match(dentistChunk[0], /data-empty-honest=""/);
+  assert.match(dentistChunk[0], /No #1/);
+  assert.match(dentistChunk[0], /No stars\. No map\./);
+  assert.doesNotMatch(
+    dentistChunk[0],
+    /Call this #1|Call #2|data-later-call|later-call|data-call-later|data-call-this-one|data-prize|data-call-ad/,
+  );
+  const lawyerChunk = mixed.match(
+    /<section class="lane classified-column lane-empty"[^>]*data-category="immigration_lawyers"[\s\S]*?<\/section>/,
+  );
+  const tutorChunk = mixed.match(
+    /<section class="lane classified-column lane-empty"[^>]*data-category="tutors"[\s\S]*?<\/section>/,
+  );
+  assert.ok(lawyerChunk && tutorChunk);
+  for (const emptyChunk of [dentistChunk[0], lawyerChunk[0], tutorChunk[0]]) {
+    assert.match(emptyChunk, /data-lane-empty="true"/);
+    assert.match(emptyChunk, /No #1/);
+    assert.doesNotMatch(emptyChunk, /Call this #1|Call #2|data-later-call|later-call|data-call-later|data-prize/);
+  }
+  assert.doesNotMatch(mixed, /claim-first-click|Then pick the column|Then the listing name|data-later-write/);
+  assert.doesNotMatch(mixed, /data-call-later-quiet|data-call-after-claim-six|data-claim-after-call-six/);
+  assert.doesNotMatch(mixed, /★|⭐|review count|google map|map pin/i);
 });
 
 test("occupied column concentrates Outbid my column after Call this #1", () => {
@@ -4011,6 +4207,9 @@ test("GET / default page is the London hub", async () => {
   assert.doesNotMatch(html, /paper-occupied|data-paper-occupied/);
   assert.match(html, /<h1 class="edition-city">London<\/h1>/);
   assert.match(html, /data-empty-lane="true"/);
+  assert.match(html, /class="lane classified-column lane-empty"/);
+  assert.match(html, /data-lane-empty="true"/);
+  assert.doesNotMatch(html, /lane-occupied|data-lane-occupied/);
   assert.match(html, /data-empty-honest=""/);
   assert.equal((html.match(/data-empty-honest=""/g) ?? []).length, 4);
   assert.match(html, /No #1/);

@@ -233,6 +233,26 @@ a:hover {
   min-width: 0;
 }
 
+/* Occupied mixed paper: later Call stays on the paid column. Empty columns stay No #1. */
+.paper-occupied[data-paper-occupied] .lane-occupied[data-lane-occupied],
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] {
+  isolation: isolate;
+}
+
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-call-this-one],
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-call-later],
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-later-call],
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] .later-call,
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-call-ad],
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-prize],
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-later-fact],
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] .later-facts,
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-listing-card],
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-claim-after-call],
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-call-after-claim] {
+  display: none;
+}
+
 .classified-columns .lane:last-child,
 .classified-single .lane {
   border-right: 0;
@@ -584,7 +604,7 @@ a:hover {
   letter-spacing: 0.11em;
 }
 
-.paper-occupied[data-paper-occupied] .later-call[data-later-call] {
+.paper-occupied[data-paper-occupied] .lane-occupied[data-lane-occupied] .later-call[data-later-call] {
   margin: 0.28rem 0 0;
   color: var(--muted);
   font-size: 0.78rem;
@@ -593,7 +613,7 @@ a:hover {
   line-height: 1.35;
 }
 
-.paper-occupied[data-paper-occupied] .later-call[data-later-call] .call-later {
+.paper-occupied[data-paper-occupied] .lane-occupied[data-lane-occupied] .later-call[data-later-call] .call-later {
   color: inherit;
   font-size: inherit;
   font-weight: inherit;
@@ -602,11 +622,11 @@ a:hover {
   border-bottom: 1px dotted currentColor;
 }
 
-.paper-occupied[data-paper-occupied] .later-call.call-after-claim-line[data-later-call] {
+.paper-occupied[data-paper-occupied] .lane-occupied[data-lane-occupied] .later-call.call-after-claim-line[data-later-call] {
   margin: 0.65rem 0 0;
 }
 
-.paper-occupied[data-paper-occupied] .later-call[data-later-call] .call-after-claim {
+.paper-occupied[data-paper-occupied] .lane-occupied[data-lane-occupied] .later-call[data-later-call] .call-after-claim {
   display: inline;
   background: transparent;
   color: inherit;
@@ -618,7 +638,7 @@ a:hover {
   vertical-align: baseline;
 }
 
-.paper-occupied[data-paper-occupied] .later-call[data-later-call] .call-after-claim:hover {
+.paper-occupied[data-paper-occupied] .lane-occupied[data-lane-occupied] .later-call[data-later-call] .call-after-claim:hover {
   background: transparent;
   color: var(--ink);
 }

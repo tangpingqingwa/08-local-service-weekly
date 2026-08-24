@@ -45,7 +45,7 @@ export function ClaimColumn({ city, emptyPaper = false }: ClaimColumnProps) {
           </summary>
           <p className="claim-note">
             Then pick the column. New spots start at ${MIN_BID_USD}. Rank is the
-            bid.
+            bid. Unpaid checkout stays off the board until Polar reports paid.
           </p>
           {columns}
         </details>
@@ -65,6 +65,8 @@ export function ClaimColumn({ city, emptyPaper = false }: ClaimColumnProps) {
       </h2>
       <p className="claim-note">
         Pick one column. New spots start at ${MIN_BID_USD}. Rank is the bid.
+        Unpaid checkout stays off the board until Polar reports paid. An
+        abandoned listing is not #1.
       </p>
       {columns}
     </section>

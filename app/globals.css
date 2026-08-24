@@ -147,6 +147,12 @@ a:hover {
   display: none;
 }
 
+/* Unpaid leftover stays off the classified paper. Call this #1 is Polar-paid only. */
+.paper-occupied[data-paper-occupied] .card:not([data-polar-paid]),
+.paper-empty[data-paper-empty] .card:not([data-polar-paid]) {
+  display: none;
+}
+
 .edition {
   text-align: center;
   padding: 0.55rem 0 1.15rem;

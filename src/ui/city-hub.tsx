@@ -1,4 +1,4 @@
-import type { RankedListing } from "../board";
+import { rankLane, type RankedListing } from "../board";
 import { CATEGORIES, type CategorySlug } from "../categories";
 import type { City } from "../cities";
 import { currentWeekId } from "../week";
@@ -16,8 +16,14 @@ type CityHubProps = {
 
 export function CityHub({ city, lanes, lastWeek, weekId }: CityHubProps) {
   const openWeek = weekId ?? currentWeekId();
+  const paidLanes = Object.fromEntries(
+    CATEGORIES.map((category) => [
+      category.slug,
+      rankLane(lanes[category.slug] ?? []),
+    ]),
+  ) as Record<CategorySlug, RankedListing[]>;
   const emptyPaper = CATEGORIES.every(
-    (category) => (lanes[category.slug] ?? []).length === 0,
+    (category) => paidLanes[category.slug].length === 0,
   );
   return (
     <ClassifiedEdition city={city} weekId={openWeek} emptyPaper={emptyPaper}>
@@ -27,7 +33,7 @@ export function CityHub({ city, lanes, lastWeek, weekId }: CityHubProps) {
             key={category.slug}
             city={city}
             category={category}
-            listings={lanes[category.slug]}
+            listings={paidLanes[category.slug]}
             lastWeek={lastWeek?.[category.slug]}
             weekId={openWeek}
           />

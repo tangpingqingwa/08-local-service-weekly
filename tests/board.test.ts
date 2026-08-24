@@ -8,9 +8,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 (globalThis as { React?: typeof React }).React = React;
 import {
   DEFAULT_CITY_SLUG,
+  isPolarPaidListing,
   lastWeekNumberOne,
   listCityLanes,
   listLane,
+  paidListings,
   rankLane,
   resolveCategory,
   resolveCity,
@@ -2019,6 +2021,245 @@ test("occupied mixed paper keeps empty lanes honest — later Call cannot leak o
   assert.doesNotMatch(mixed, /claim-first-click|Then pick the column|Then the listing name|data-later-write/);
   assert.doesNotMatch(mixed, /data-call-later-quiet|data-call-after-claim-six|data-claim-after-call-six/);
   assert.doesNotMatch(mixed, /★|⭐|review count|google map|map pin/i);
+});
+
+test("unpaid stays off the classified paper — No #1 until Polar reports paid", () => {
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+  assert.match(
+    css,
+    /\.paper-occupied\[data-paper-occupied\] \.card:not\(\[data-polar-paid\]\)/,
+  );
+  assert.match(
+    css,
+    /\.paper-empty\[data-paper-empty\] \.card:not\(\[data-polar-paid\]\)/,
+  );
+  const unpaidHide = css.match(
+    /\.paper-occupied\[data-paper-occupied\] \.card:not\(\[data-polar-paid\]\),\s*\.paper-empty\[data-paper-empty\] \.card:not\(\[data-polar-paid\]\)\s*\{([^}]*)\}/,
+  );
+  assert.ok(unpaidHide);
+  assert.match(unpaidHide[1], /display:\s*none/);
+  assert.doesNotMatch(unpaidHide[1], /background:|var\(--accent\)/);
+  assert.doesNotMatch(css, /data-call-after-claim-six|data-claim-after-call-six|call-after-claim-N/);
+  assert.doesNotMatch(css, /data-unpaid-off|data-unpaid-off-board/);
+
+  const unpaid = listing({
+    id: "lst_ghost",
+    business: "Ghost Van",
+    bidUsd: 99,
+    createdAt: "",
+  });
+  const abandoned = listing({
+    id: "lst_abandoned",
+    business: "Abandoned Van",
+    bidUsd: 50,
+    createdAt: "1970-01-01T00:00:00.000Z",
+  });
+  const paid = listing({
+    id: "lst_paid_only",
+    business: "North London Movers",
+    bidUsd: 20,
+    createdAt: "2026-08-17T00:00:00.000Z",
+  });
+
+  assert.equal(isPolarPaidListing(unpaid), false);
+  assert.equal(isPolarPaidListing(abandoned), false);
+  assert.equal(isPolarPaidListing(paid), true);
+  assert.deepEqual(paidListings([unpaid, abandoned]), []);
+  assert.deepEqual(rankLane([unpaid, abandoned]), []);
+  const rankedPaid = rankLane([unpaid, abandoned, paid]);
+  assert.equal(rankedPaid.length, 1);
+  assert.equal(rankedPaid[0]?.id, "lst_paid_only");
+  assert.equal(rankedPaid[0]?.rank, 1);
+  assert.equal(rankedPaid[0]?.business, "North London Movers");
+  assert.doesNotMatch(
+    rankedPaid.map((row) => row.id).join(","),
+    /lst_ghost|lst_abandoned/,
+  );
+
+  const unpaidCard = renderToStaticMarkup(
+    createElement(ListingCard, {
+      listing: ranked({
+        id: "lst_ghost",
+        business: "Ghost Van",
+        bidUsd: 99,
+        createdAt: "",
+        siteHost: "ghost.example",
+      }),
+    }),
+  );
+  const abandonedCard = renderToStaticMarkup(
+    createElement(ListingCard, {
+      listing: ranked({
+        id: "lst_abandoned",
+        business: "Abandoned Van",
+        bidUsd: 50,
+        createdAt: "1970-01-01T00:00:00.000Z",
+        siteHost: "abandoned.example",
+      }),
+    }),
+  );
+  assert.equal(unpaidCard, "");
+  assert.equal(abandonedCard, "");
+
+  const london = getCity("london");
+  const movers = getCategory("movers");
+  assert.ok(london && movers);
+
+  const leftoverLane = renderToStaticMarkup(
+    createElement(LaneBoard, {
+      city: london,
+      category: movers,
+      listings: [
+        ranked({
+          id: "lst_ghost",
+          business: "Ghost Van",
+          bidUsd: 99,
+          createdAt: "",
+          siteHost: "ghost.example",
+        }),
+        ranked({
+          id: "lst_abandoned",
+          business: "Abandoned Van",
+          bidUsd: 50,
+          createdAt: "1970-01-01T00:00:00.000Z",
+          siteHost: "abandoned.example",
+        }),
+      ],
+      showForm: true,
+    }),
+  );
+  assert.match(leftoverLane, /class="lane classified-column lane-empty"/);
+  assert.match(leftoverLane, /data-lane-empty="true"/);
+  assert.match(leftoverLane, /data-empty-lane="true"/);
+  assert.match(leftoverLane, /data-empty-honest=""/);
+  assert.match(leftoverLane, /<p class="empty-answer">No #1<\/p>/);
+  assert.match(leftoverLane, /This lane is empty\. Rank is the bid\. No stars\. No map\./);
+  assert.match(leftoverLane, /Unpaid checkout stays off the board until Polar reports paid/);
+  assert.match(leftoverLane, /An abandoned listing is not #1/);
+  assert.match(leftoverLane, />Outbid</);
+  assert.match(leftoverLane, /Claim #1 for/);
+  assert.match(leftoverLane, /data-later-write=""/);
+  assert.match(leftoverLane, /Then the listing name/);
+  const leftoverNoOne = leftoverLane.indexOf("No #1");
+  const leftoverClaim = leftoverLane.indexOf("Claim #1 for");
+  const leftoverOutbid = leftoverLane.indexOf(">Outbid<");
+  const leftoverLater = leftoverLane.indexOf("Then the listing name");
+  assert.ok(leftoverNoOne >= 0 && leftoverClaim > leftoverNoOne);
+  assert.ok(leftoverOutbid > leftoverClaim && leftoverLater > leftoverOutbid);
+  assert.doesNotMatch(leftoverLane, /Ghost Van|Abandoned Van/);
+  assert.doesNotMatch(leftoverLane, /\$99|\$50/);
+  assert.doesNotMatch(leftoverLane, /Call this #1|data-call-this-one|data-prize|data-listing-card/);
+  assert.doesNotMatch(leftoverLane, /Call #2|data-later-call|later-call|data-call-later|data-call-ad/);
+  assert.doesNotMatch(leftoverLane, /lane-occupied|data-lane-occupied/);
+  assert.doesNotMatch(leftoverLane, /data-call-later-quiet|data-call-after-claim-six|data-claim-after-call-six/);
+  assert.doesNotMatch(leftoverLane, /★|⭐|review count|google map|map pin/i);
+
+  const leftoverHub = renderToStaticMarkup(
+    createElement(CityHub, {
+      city: london,
+      weekId: currentWeekId(),
+      lanes: {
+        movers: [
+          ranked({
+            id: "lst_ghost",
+            business: "Ghost Van",
+            bidUsd: 99,
+            createdAt: "",
+            siteHost: "ghost.example",
+          }),
+        ],
+        dentists: [
+          ranked({
+            id: "lst_abandoned",
+            business: "Abandoned Van",
+            category: "dentists",
+            bidUsd: 50,
+            createdAt: "1970-01-01T00:00:00.000Z",
+            siteHost: "abandoned.example",
+          }),
+        ],
+        immigration_lawyers: [],
+        tutors: [],
+      },
+    }),
+  );
+  assert.match(leftoverHub, /class="paper classified paper-empty"/);
+  assert.match(leftoverHub, /data-paper-empty="true"/);
+  assert.doesNotMatch(leftoverHub, /paper-occupied|data-paper-occupied/);
+  assert.equal((leftoverHub.match(/data-empty-lane="true"/g) ?? []).length, 4);
+  assert.equal((leftoverHub.match(/data-lane-empty="true"/g) ?? []).length, 4);
+  assert.equal((leftoverHub.match(/No #1/g) ?? []).length, 4);
+  assert.match(leftoverHub, /claim-first-click/);
+  assert.match(leftoverHub, /Then pick the column/);
+  assert.match(leftoverHub, /Unpaid checkout stays off the board until Polar reports paid/);
+  assert.doesNotMatch(leftoverHub, /Ghost Van|Abandoned Van/);
+  assert.doesNotMatch(leftoverHub, /Call this #1|data-call-this-one|data-prize|data-listing-card/);
+  assert.doesNotMatch(leftoverHub, /data-category-tabs|data-column-index-after/);
+  assert.doesNotMatch(leftoverHub, /lane-occupied|data-lane-occupied/);
+  assert.doesNotMatch(leftoverHub, /★|⭐|review count|google map|map pin/i);
+
+  const occupied = renderToStaticMarkup(
+    createElement(CityHub, {
+      city: london,
+      weekId: currentWeekId(),
+      lanes: {
+        movers: [
+          ranked({
+            id: "lst_ghost",
+            business: "Ghost Van",
+            bidUsd: 99,
+            createdAt: "",
+            siteHost: "ghost.example",
+          }),
+          ranked({
+            id: "lst_paid_only",
+            business: "North London Movers",
+            bidUsd: 20,
+            createdAt: "2026-08-17T00:00:00.000Z",
+            siteHost: "north.example",
+          }),
+          ranked({
+            id: "lst_south",
+            rank: 2,
+            business: "South London Movers",
+            bidUsd: 15,
+            createdAt: "2026-08-17T01:00:00.000Z",
+            siteHost: "south.example",
+          }),
+        ],
+        dentists: [],
+        immigration_lawyers: [],
+        tutors: [],
+      },
+    }),
+  );
+  assert.match(occupied, /class="paper classified paper-occupied"/);
+  assert.match(occupied, /data-paper-occupied="true"/);
+  assert.doesNotMatch(occupied, /paper-empty|data-paper-empty/);
+  assert.match(occupied, /North London Movers/);
+  assert.match(occupied, /data-prize=""/);
+  assert.match(occupied, /data-polar-paid=""/);
+  assert.match(occupied, /Call this #1/);
+  assert.match(occupied, /Call #2/);
+  assert.match(occupied, /South London Movers/);
+  const occupiedPrize = occupied.indexOf('data-prize=""');
+  const occupiedName = occupied.indexOf("North London Movers");
+  const occupiedCall = occupied.indexOf("Call this #1");
+  const occupiedLater = occupied.indexOf("Call #2");
+  const occupiedTabs = occupied.indexOf("data-category-tabs");
+  assert.ok(occupiedPrize >= 0 && occupiedName >= 0 && occupiedCall > occupiedName);
+  assert.ok(occupiedLater > occupiedCall && occupiedTabs > occupiedCall);
+  assert.equal((occupied.match(/data-call-this-one=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-prize=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-lane-occupied="true"/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-lane-empty="true"/g) ?? []).length, 3);
+  assert.equal((occupied.match(/No #1/g) ?? []).length, 3);
+  assert.match(occupied, /Unpaid checkout stays off the board until Polar reports paid/);
+  assert.match(occupied, /An abandoned listing is not #1/);
+  assert.doesNotMatch(occupied, /Ghost Van|Abandoned Van/);
+  assert.doesNotMatch(occupied, /claim-first-click|Then pick the column|Then the listing name|data-later-write/);
+  assert.doesNotMatch(occupied, /data-call-later-quiet|data-call-after-claim-six|data-claim-after-call-six/);
+  assert.doesNotMatch(occupied, /★|⭐|review count|google map|map pin/i);
 });
 
 test("occupied column concentrates Outbid my column after Call this #1", () => {

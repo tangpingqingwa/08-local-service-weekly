@@ -1,4 +1,4 @@
-import type { RankedListing } from "../board";
+import { isPolarPaidListing, rankLane, type RankedListing } from "../board";
 import type { Category } from "../categories";
 import type { City } from "../cities";
 import { ListingCard } from "./listing-card";
@@ -21,9 +21,12 @@ export function LaneBoard({
   weekId,
   showForm = false,
 }: LaneBoardProps) {
-  const occupied = listings.length > 0;
-  const lead = listings.find((listing) => listing.rank === 1);
-  const lastCall = [...listings].reverse().find((listing) => listing.rank > 1);
+  const paid = rankLane(listings);
+  const occupied = paid.length > 0;
+  const lead = paid.find((listing) => listing.rank === 1);
+  const lastCall = [...paid].reverse().find((listing) => listing.rank > 1);
+  const lastWeekPaid =
+    lastWeek && isPolarPaidListing(lastWeek) ? lastWeek : undefined;
 
   return (
     <section
@@ -46,7 +49,7 @@ export function LaneBoard({
         </h2>
         <p>Want ads. Rank is the bid.</p>
       </header>
-      {listings.length === 0 ? (
+      {paid.length === 0 ? (
         <div
           className="empty-lane"
           data-empty-lane="true"
@@ -54,13 +57,15 @@ export function LaneBoard({
         >
           <p className="empty-answer">No #1</p>
           <p className="empty-note">
-            This lane is empty. Rank is the bid. No stars. No map.
+            This lane is empty. Rank is the bid. No stars. No map. Unpaid
+            checkout stays off the board until Polar reports paid. An abandoned
+            listing is not #1.
           </p>
         </div>
       ) : (
         <>
           <ol className="leaderboard" data-leaderboard="">
-            {listings.map((listing) => (
+            {paid.map((listing) => (
               <li key={listing.id}>
                 <ListingCard listing={listing} />
               </li>
@@ -100,11 +105,12 @@ export function LaneBoard({
           ) : null}
         </>
       )}
-      {lastWeek ? (
+      {lastWeekPaid ? (
         <aside className="last-week" data-last-week="">
           <p>
-            Last week #1: <strong>{lastWeek.business}</strong> at $
-            {lastWeek.bidUsd}. Not this week&apos;s #1 unless they pay again.
+            Last week #1: <strong>{lastWeekPaid.business}</strong> at $
+            {lastWeekPaid.bidUsd}. Not this week&apos;s #1 unless they pay
+            again.
           </p>
         </aside>
       ) : null}
@@ -114,7 +120,7 @@ export function LaneBoard({
           category={category.slug}
           lockCity
           lockCategory
-          emptyPaper={listings.length === 0}
+          emptyPaper={paid.length === 0}
         />
       ) : null}
     </section>

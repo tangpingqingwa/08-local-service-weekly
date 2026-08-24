@@ -43,6 +43,7 @@ grep -q '### PR 40:' BUILD.md || fail "BUILD.md missing ### PR 40:"
 grep -q '### PR 41:' BUILD.md || fail "BUILD.md missing ### PR 41:"
 grep -q '### PR 42:' BUILD.md || fail "BUILD.md missing ### PR 42:"
 grep -q '### PR 43:' BUILD.md || fail "BUILD.md missing ### PR 43:"
+grep -q '### PR 44:' BUILD.md || fail "BUILD.md missing ### PR 44:"
 grep -q 'live-smoke' BUILD.md || fail "BUILD.md missing live-smoke"
 if ! grep -E '^### PR [0-9]+:' BUILD.md >/dev/null; then
   fail "BUILD.md PR headings must be ### PR N: title"
@@ -256,8 +257,8 @@ grep -q 'data-empty-claim-first' src/ui/outbid-form.tsx \
   || fail "empty-lane form must stamp empty Claim #1 as the first click"
 grep -q 'data-first-click": "claim"' src/ui/outbid-form.tsx \
   || fail "empty-lane Claim #1 must stamp the first click"
-grep -q 'emptyPaper={listings.length === 0}' src/ui/lane-board.tsx \
-  || fail "empty lane page must tell the form the paper is empty"
+grep -q 'emptyPaper={paid.length === 0}' src/ui/lane-board.tsx \
+  || fail "empty lane page must tell the form the paper is empty after Polar-paid occupancy"
 grep -q 'listing-identity\[data-later-write\]' app/globals.css \
   || fail "classified CSS must keep the empty-paper listing name quieter than Outbid"
 grep -q 'Empty paper: listing name is a later write' app/globals.css \
@@ -680,6 +681,81 @@ if grep -RInE '★|⭐|top rated|review count|top rated in London' app src >/dev
   fail "board UI must not render stars or review counts"
 fi
 
+echo "== UX: unpaid stays off the classified paper — No #1 until Polar reports paid =="
+grep -q 'export function isPolarPaidListing' src/board.ts \
+  || fail "board.ts must export isPolarPaidListing"
+grep -q 'export function paidListings' src/board.ts \
+  || fail "board.ts must drop unpaid Polar checkout before ranking"
+grep -q 'paidListings(listings)' src/board.ts \
+  || fail "rankLane must rank Polar-paid rows only"
+grep -q 'if (!isPolarPaidListing(listing)) return null' src/ui/listing-card.tsx \
+  || fail "listing card must not print unpaid Call this #1"
+grep -q 'data-polar-paid' src/ui/listing-card.tsx \
+  || fail "paid listing card must stamp Polar-paid occupancy"
+grep -q 'const paid = rankLane(listings)' src/ui/lane-board.tsx \
+  || fail "lane occupancy must compose Polar-paid rows only"
+grep -q 'rankLane(lanes\[category.slug\] ?? \[\])' src/ui/city-hub.tsx \
+  || fail "city hub occupancy must compose Polar-paid rows only"
+grep -q 'Unpaid' src/ui/lane-board.tsx \
+  || fail "empty leftover lane must mention unpaid checkout"
+grep -q 'checkout stays off the board until Polar reports paid' src/ui/lane-board.tsx \
+  || fail "empty leftover lane must say unpaid checkout stays off the board"
+grep -q 'An abandoned' src/ui/lane-board.tsx \
+  || fail "empty leftover lane must mention abandoned leftover"
+grep -q 'listing is not #1' src/ui/lane-board.tsx \
+  || fail "empty leftover lane must say an abandoned listing is not #1"
+grep -q 'Unpaid checkout stays off' src/ui/outbid-form.tsx \
+  || fail "claim form must mention unpaid checkout stays off"
+grep -q 'the board until Polar reports paid' src/ui/outbid-form.tsx \
+  || fail "claim form must say unpaid checkout stays off the board"
+grep -q 'An abandoned listing is not #1' src/ui/outbid-form.tsx \
+  || fail "claim form must say an abandoned listing is not #1"
+grep -q 'Unpaid checkout stays off the board until Polar reports paid' src/ui/claim-column.tsx \
+  || fail "hub claim must say unpaid checkout stays off the board"
+grep -q 'abandoned listing is not #1' src/ui/claim-column.tsx \
+  || fail "occupied hub claim must say an abandoned listing is not #1"
+grep -q 'card:not(\[data-polar-paid\])' app/globals.css \
+  || fail "classified CSS must hide unpaid leftover cards"
+python3 - app/globals.css <<'PY' || fail "unpaid leftover CSS must hide unpaid cards, not recolor the paper"
+import re
+import sys
+
+css = open(sys.argv[1], encoding="utf-8").read()
+block = re.search(
+    r"\.paper-occupied\[data-paper-occupied\] \.card:not\(\[data-polar-paid\]\),\s*\.paper-empty\[data-paper-empty\] \.card:not\(\[data-polar-paid\]\)\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not block:
+    raise SystemExit("unpaid leftover hide rule missing")
+if "display: none" not in block.group(1):
+    raise SystemExit("unpaid leftover must hide unpaid cards")
+if "background:" in block.group(1) or "var(--accent)" in block.group(1):
+    raise SystemExit("do not recolor unpaid leftover")
+PY
+if grep -qE 'data-unpaid-off|data-unpaid-off-board|data-call-after-claim-six|data-claim-after-call-six' \
+  src/ui/listing-card.tsx src/ui/lane-board.tsx src/ui/city-hub.tsx src/ui/outbid-form.tsx src/ui/claim-column.tsx; then
+  fail "unpaid-off occupancy must not add another named hop"
+fi
+grep -q 'unpaid stays off the classified paper' tests/board.test.ts \
+  || fail "board tests must keep unpaid occupancy off the classified paper"
+grep -q 'No #1 until Polar reports paid' tests/board.test.ts \
+  || fail "board tests must wait for Polar paid before #1"
+grep -q 'An abandoned listing is not #1' tests/board.test.ts \
+  || fail "board tests must keep abandoned leftover off Call this #1"
+grep -q 'data-prize' src/ui/listing-card.tsx \
+  || fail "unpaid-off cut must keep occupied #1 name as the prize"
+grep -q 'Call this #1' src/ui/listing-card.tsx \
+  || fail "unpaid-off cut must keep occupied Call this #1"
+grep -q 'data-later-call' src/ui/listing-card.tsx \
+  || fail "unpaid-off cut must keep later-call grouping"
+grep -q 'data-lane-occupied' src/ui/lane-board.tsx \
+  || fail "unpaid-off cut must keep occupied mixed-paper lane wraps"
+grep -q 'data-later-write' src/ui/outbid-form.tsx \
+  || fail "unpaid-off cut must keep empty later-write listing name"
+grep -q 'Claim #1' src/ui/outbid-form.tsx \
+  || fail "unpaid-off cut must keep Claim #1"
+
 echo "== polar checkout + fixture =="
 for f in src/polar/port.ts src/polar/fake.ts app/api/checkout/route.ts \
   app/return/page.tsx tests/checkout.test.ts src/migrations/004_checkouts.sql; do
@@ -905,6 +981,8 @@ if [[ -f package.json ]]; then
     || fail "empty-paper isolation test did not run"
   grep -q 'empty paper has one first click: Claim #1, then the listing name' "$test_log" \
     || fail "empty-paper listing-name later-write test did not run"
+  grep -q 'unpaid stays off the classified paper — No #1 until Polar reports paid' "$test_log" \
+    || fail "unpaid stays off the classified paper leftover test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"

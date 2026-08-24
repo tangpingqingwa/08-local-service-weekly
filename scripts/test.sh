@@ -133,6 +133,12 @@ grep -q 'Increase bid by one dollar' src/ui/outbid-form.tsx \
   || fail "bid form must expose a plus stepper"
 grep -q 'data-classified-ad' src/ui/listing-card.tsx \
   || fail "listing card must read as a classified ad"
+grep -q 'data-prize' src/ui/listing-card.tsx \
+  || fail "occupied #1 must stamp the business name as the prize"
+grep -q 'data-prize' app/globals.css \
+  || fail "classified CSS must make the #1 business name larger than \$bid"
+grep -q 'occupied #1 names the business as the prize before \$bid' tests/board.test.ts \
+  || fail "board tests must cover prize-before-price on occupied #1"
 grep -q 'Claimed license' src/ui/listing-card.tsx \
   || fail "cards must show claimed license when present"
 grep -q 'href={`/go/${listing.id}`}' src/ui/listing-card.tsx \
@@ -592,6 +598,9 @@ if [[ -f package.json ]]; then
   if grep -q 'Call this #1' "${home_body}"; then
     fail "empty GET / must not invent Call this #1"
   fi
+  if grep -q 'data-prize' "${home_body}"; then
+    fail "empty GET / must not invent a prize business name"
+  fi
   if grep -qE 'Call #[0-9]|data-call-later|data-call-ad="later"' "${home_body}"; then
     fail "empty GET / must not invent a later-rank call"
   fi
@@ -704,6 +713,21 @@ if [[ -f package.json ]]; then
   grep -q 'data-rank="1"' "${movers_paid}" || fail "paid $20 must list at rank 1"
   grep -q 'North London Movers' "${movers_paid}" || fail "paid listing must appear on the board"
   grep -q '\$20' "${movers_paid}" || fail "paid listing must show \$20"
+  grep -q 'data-prize' "${movers_paid}" || fail "paid #1 must stamp the business name as the prize"
+  grep -q 'class="business" data-prize' "${movers_paid}" \
+    || fail "paid #1 prize must be the business name"
+  prize_order="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"<article[^>]*data-rank=\"1\"[\s\S]*?</article>", html)
+chunk = m.group(0) if m else ""
+print(chunk.find("data-prize"), chunk.find("North London Movers"), chunk.find("$20"), chunk.find("0 clicks"), sep=" ")
+' "${movers_paid}")"
+  read -r prize_at name_at paid_bid_at paid_clicks_at <<< "${prize_order}"
+  [[ "${prize_at}" -ge 0 && "${name_at}" -ge 0 && "${name_at}" -lt "${paid_bid_at}" ]] \
+    || fail "paid #1 business name must read before \$bid"
+  [[ "${prize_at}" -lt "${paid_bid_at}" && "${prize_at}" -lt "${paid_clicks_at}" ]] \
+    || fail "paid #1 prize must read before \$bid and clicks"
   grep -q 'Call this #1' "${movers_paid}" || fail "paid #1 must offer Call this #1"
   grep -q 'data-call-this-one' "${movers_paid}" || fail "paid #1 must stamp data-call-this-one"
   grep -q 'class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three call-after-claim-four call-after-claim-five"' "${movers_paid}" \
@@ -826,6 +850,17 @@ print(chunk.count("data-call-this-one"), chunk.count("data-call-after-claim-one"
   grep -q 'data-call-after-claim-five' "${occupied_home}" \
     || fail "GET / paid #1 must concentrate Call this #1 after Outbid my column is re-concentrated again"
   grep -q 'North London Movers' "${occupied_home}" || fail "GET / must show the paid movers ad"
+  grep -q 'data-prize' "${occupied_home}" || fail "GET / paid #1 must stamp the business prize"
+  home_prize_order="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"<article[^>]*data-rank=\"1\"[\s\S]*?</article>", html)
+chunk = m.group(0) if m else ""
+print(chunk.find("data-prize"), chunk.find("North London Movers"), chunk.find("$20"), sep=" ")
+' "${occupied_home}")"
+  read -r home_prize_at home_name_at home_bid_at <<< "${home_prize_order}"
+  [[ "${home_prize_at}" -ge 0 && "${home_name_at}" -ge 0 && "${home_name_at}" -lt "${home_bid_at}" ]] \
+    || fail "GET / paid #1 business name must read before \$bid"
   empty_after_pay="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-empty-lane=\"true\""))' "${occupied_home}")"
   [[ "${empty_after_pay}" == "3" ]] || fail "GET / after one paid lane must keep three honest empty lanes (got ${empty_after_pay})"
   home_call_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("Call this #1"))' "${occupied_home}")"
@@ -898,6 +933,13 @@ print("yes" if re.search(r"data-empty-lane=\"true\"[\s\S]{0,800}claim-after-call
 ' "${occupied_home}")"
   [[ "${empty_claim_five}" == "no" ]] \
     || fail "GET / empty lanes must not pick up claim-after-call-five"
+  empty_prize="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+print("yes" if re.search(r"data-empty-lane=\"true\"[\s\S]{0,800}data-prize", html) else "no")
+' "${occupied_home}")"
+  [[ "${empty_prize}" == "no" ]] \
+    || fail "GET / empty lanes must not invent a prize business name"
   empty_call_two="$(python3 -c '
 import re, sys
 html = open(sys.argv[1]).read()
@@ -1105,6 +1147,15 @@ print("yes" if "data-call-after-claim-one" in chunk or "data-call-after-claim-tw
 ' "${movers_two}")"
   [[ "${later_rank_stamp}" == "no" ]] \
     || fail "rank 2 must not pick up the Call this #1 after-claim stamp"
+  later_prize="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"<article[^>]*data-rank=\"2\"[\s\S]*?</article>", html)
+chunk = m.group(0) if m else ""
+print("yes" if "data-prize" in chunk else "no")
+' "${movers_two}")"
+  [[ "${later_prize}" == "no" ]] \
+    || fail "rank 2 must stay quieter than the #1 prize"
 
   occupied_later_home="$(mktemp)"
   occupied_later_home_code="$(curl -sS -o "${occupied_later_home}" -w '%{http_code}' "http://127.0.0.1:${port}/")"
@@ -1389,7 +1440,7 @@ print("yes" if "Call this #1" in chunk or "data-call-this-one" in chunk or "data
   grep -q 'Last Week Van' "${movers_week}" || fail "last week #1 may appear as archive copy"
   occupant_week_rank="$(python3 -c 'import re,sys; html=open(sys.argv[1]).read(); m=re.search(r"data-rank=\"(\d)\"[\s\S]{0,400}Last Week Van", html); print(m.group(1) if m else "")' "${movers_week}")"
   [[ -z "${occupant_week_rank}" ]] || fail "last week must not be current #1 (rank=${occupant_week_rank})"
-  current_one="$(python3 -c 'import re,sys; html=open(sys.argv[1]).read(); m=re.search(r"data-rank=\"1\"[\s\S]{0,400}<h3 class=\"business\">([^<]+)", html); print(m.group(1) if m else "")' "${movers_week}")"
+  current_one="$(python3 -c 'import re,sys; html=open(sys.argv[1]).read(); m=re.search(r"data-rank=\"1\"[\s\S]{0,400}<h3 class=\"business\"(?: data-prize=\"\")?>([^<]+)", html); print(m.group(1) if m else "")' "${movers_week}")"
   [[ "${current_one}" != "Last Week Van" ]] || fail "last week occupant must not be this week #1"
   grep -q 'North London Movers' "${movers_week}" || fail "current-week occupant must remain listed"
 

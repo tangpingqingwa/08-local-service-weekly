@@ -187,6 +187,16 @@ a:hover {
   border-bottom: 1px dotted currentColor;
 }
 
+/* Occupied paper: column pick sits after the listing, quieter than Call this #1. */
+.column-index.column-index-after[data-column-index-after] {
+  margin: 0.85rem auto 0;
+  max-width: 44rem;
+  padding: 0.7rem 0 0.15rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
 .classified-columns {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

@@ -3,6 +3,7 @@ import { CATEGORIES, type CategorySlug } from "../categories";
 import type { City } from "../cities";
 import { currentWeekId } from "../week";
 import { ClaimColumn } from "./claim-column";
+import { ColumnIndex } from "./column-index";
 import { ClassifiedEdition } from "./edition";
 import { LaneBoard } from "./lane-board";
 
@@ -19,11 +20,7 @@ export function CityHub({ city, lanes, lastWeek, weekId }: CityHubProps) {
     (category) => (lanes[category.slug] ?? []).length === 0,
   );
   return (
-    <ClassifiedEdition
-      city={city}
-      weekId={openWeek}
-      showColumnIndex={!emptyPaper}
-    >
+    <ClassifiedEdition city={city} weekId={openWeek}>
       <div className="classified-columns" data-classified-columns="">
         {CATEGORIES.map((category) => (
           <LaneBoard
@@ -36,6 +33,7 @@ export function CityHub({ city, lanes, lastWeek, weekId }: CityHubProps) {
           />
         ))}
       </div>
+      {emptyPaper ? null : <ColumnIndex city={city} />}
       <ClaimColumn city={city.slug} emptyPaper={emptyPaper} />
     </ClassifiedEdition>
   );

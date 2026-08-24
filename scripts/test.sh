@@ -95,7 +95,7 @@ for f in app/page.tsx app/c/\[city\]/page.tsx app/c/\[city\]/\[category\]/page.t
   app/c/\[city\]/not-found.tsx app/c/\[city\]/\[category\]/not-found.tsx \
   src/board.ts src/categories.ts src/ui/city-hub.tsx src/ui/lane-board.tsx \
   src/ui/listing-card.tsx src/ui/outbid-form.tsx src/ui/not-found-code.tsx \
-  src/ui/edition.tsx src/ui/claim-column.tsx tests/board.test.ts; do
+  src/ui/edition.tsx src/ui/claim-column.tsx src/ui/column-index.tsx tests/board.test.ts; do
   [[ -f "$f" ]] || fail "missing $f"
   [[ -s "$f" ]] || fail "empty $f"
 done
@@ -142,8 +142,54 @@ grep -q 'claim-next' src/ui/claim-column.tsx \
   || fail "empty paper column pick must stay quieter than Claim #1"
 grep -q 'emptyPaper' src/ui/city-hub.tsx \
   || fail "city hub must tell the empty paper to lead with one first click"
-grep -q 'showColumnIndex={!emptyPaper}' src/ui/city-hub.tsx \
-  || fail "empty paper must not print a same-weight four-tab column index"
+if grep -q 'showColumnIndex' src/ui/city-hub.tsx src/ui/edition.tsx; then
+  fail "occupied column tabs must not hang in the edition masthead"
+fi
+if grep -q 'data-category-tabs' src/ui/edition.tsx; then
+  fail "edition masthead must not print the four-tab column index"
+fi
+grep -q 'data-category-tabs' src/ui/column-index.tsx \
+  || fail "occupied column tabs must stay as one classified column index"
+grep -q 'data-column-index-after' src/ui/column-index.tsx \
+  || fail "occupied column tabs must stamp after the listing"
+grep -q 'column-index-after' src/ui/column-index.tsx \
+  || fail "occupied column tabs must use the after-listing column-index class"
+grep -q 'ColumnIndex' src/ui/city-hub.tsx \
+  || fail "occupied hub must keep column tabs after the listing"
+grep -q '{emptyPaper ? null : <ColumnIndex city={city} />}' src/ui/city-hub.tsx \
+  || fail "empty paper must not print occupied column tabs"
+grep -q '{occupied ? <ColumnIndex city={city.value} /> : null}' app/c/\[city\]/\[category\]/page.tsx \
+  || fail "empty lane page must not print occupied column tabs"
+if grep -q 'data-later-fact' src/ui/column-index.tsx src/ui/city-hub.tsx src/ui/edition.tsx; then
+  fail "column tabs must not stamp later-fact on \$bid"
+fi
+if grep -qE 'data-call-after-claim-six|data-claim-after-call-six|tabs-after-listing-N' src/ui/column-index.tsx src/ui/city-hub.tsx src/ui/edition.tsx; then
+  fail "column tabs must not stamp *-after-*-N"
+fi
+grep -q 'column-index-after\[data-column-index-after\]' app/globals.css \
+  || fail "classified CSS must keep occupied column tabs after the listing"
+python3 - app/globals.css <<'PY' || fail "occupied column tabs must stay quieter than Call this #1"
+import re
+import sys
+
+css = open(sys.argv[1], encoding="utf-8").read()
+
+def first(pattern):
+    match = re.search(pattern, css, re.S)
+    if not match:
+        raise SystemExit("missing " + pattern)
+    return match.group(1)
+
+lead = first(r"\.call-this-one\.call-after-claim-five\s*,\s*\.call-this-one\[data-call-after-claim-five\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
+tabs = first(r"\.column-index\.column-index-after\[data-column-index-after\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
+if float(tabs) >= float(lead):
+    raise SystemExit("column tabs shout like Call this #1")
+block = re.search(r"\.column-index\.column-index-after\[data-column-index-after\]\s*\{[^}]*\}", css, re.S)
+if not block or "var(--accent)" in block.group(0):
+    raise SystemExit("do not recolor occupied column tabs")
+PY
+grep -q 'occupied paper keeps column tabs after the listing' tests/board.test.ts \
+  || fail "board tests must cover occupied column tabs after the listing"
 grep -q 'claim-first-click' app/globals.css \
   || fail "classified CSS must make Claim #1 the empty-paper first click"
 grep -q 'claim-columns.claim-next a' app/globals.css \
@@ -606,6 +652,8 @@ if [[ -f package.json ]]; then
     || fail "test runner reported 0 tests"
   grep -q 'occupied later Call #N stays quieter than Call this #1' "$test_log" \
     || fail "occupied later-rank quiet test did not run"
+  grep -q 'occupied paper keeps column tabs after the listing' "$test_log" \
+    || fail "occupied column-tabs-after-listing test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"
@@ -682,6 +730,9 @@ if [[ -f package.json ]]; then
   fi
   if grep -q 'data-category-tabs' "${home_body}"; then
     fail "GET / empty paper must not print a same-weight four-tab column index"
+  fi
+  if grep -q 'data-column-index-after' "${home_body}"; then
+    fail "GET / empty paper must not hang occupied column tabs after the listing"
   fi
   if grep -q 'Outbid Movers' "${home_body}"; then
     fail "GET / must not keep generic Outbid {category} hops"
@@ -792,6 +843,12 @@ if [[ -f package.json ]]; then
   grep -q 'Outbid' "${lane_body}" || fail "lane board must show Outbid form chrome"
   grep -q 'data-classified=""' "${lane_body}" || fail "lane page must stay inside the classified edition"
   grep -q 'edition-city' "${lane_body}" || fail "lane page must keep the city edition masthead"
+  if grep -q 'data-category-tabs' "${lane_body}"; then
+    fail "empty movers lane must not hang a four-tab column index"
+  fi
+  if grep -q 'data-column-index-after' "${lane_body}"; then
+    fail "empty movers lane must not hang occupied column tabs after the listing"
+  fi
 
   unknown_cat="$(mktemp)"
   unknown_cat_code="$(curl -sS -o "${unknown_cat}" -w '%{http_code}' "http://127.0.0.1:${port}/c/london/plumbers")"
@@ -881,6 +938,31 @@ print(chunk.count("data-call-this-one"), chunk.count("data-call-after-claim-one"
     || fail "lone paid #1 must keep call-after-claim-five on the same hop"
   [[ "${call_at}" -ge 0 && "${bid_at}" -gt "${call_at}" ]] \
     || fail "occupied movers ad must show Call this #1 before \$bid"
+  grep -q 'data-category-tabs' "${movers_paid}" \
+    || fail "paid movers lane must keep the classified column index"
+  grep -q 'data-column-index-after=""' "${movers_paid}" \
+    || fail "paid movers lane must keep column tabs after the listing"
+  paid_tabs_order="$(python3 -c '
+import sys
+html = open(sys.argv[1]).read()
+header = html.find("</header>")
+print(html.find("Call this #1"), html.find("North London Movers"), html.find("data-category-tabs"), html.find("data-column-index-after"), header, sep=" ")
+' "${movers_paid}")"
+  read -r paid_call_pos paid_name_pos paid_tabs_pos paid_after_pos paid_header_pos <<< "${paid_tabs_order}"
+  [[ "${paid_header_pos}" -ge 0 && "${paid_name_pos}" -gt "${paid_header_pos}" ]] \
+    || fail "paid movers listing must sit after the edition masthead"
+  [[ "${paid_call_pos}" -ge 0 && "${paid_tabs_pos}" -gt "${paid_call_pos}" ]] \
+    || fail "paid movers column tabs must stay after Call this #1"
+  [[ "${paid_after_pos}" -gt "${paid_name_pos}" ]] \
+    || fail "paid movers column tabs must stay after the listing"
+  paid_header_has_tabs="$(python3 -c '
+import sys
+html = open(sys.argv[1]).read()
+header = html[:html.find("</header>")] if "</header>" in html else html
+print("yes" if "data-category-tabs" in header or "data-column-index-after" in header else "no")
+' "${movers_paid}")"
+  [[ "${paid_header_has_tabs}" == "no" ]] \
+    || fail "paid movers masthead must not hang the four-tab column index"
   if grep -q 'data-empty-lane="true"' "${movers_paid}"; then
     fail "paid lane must not stay empty"
   fi
@@ -1000,10 +1082,40 @@ print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
     || fail "GET / paid hop must name Outbid my movers column"
   grep -q 'data-category-tabs' "${occupied_home}" \
     || fail "GET / occupied paper must keep the classified column index"
+  grep -q 'data-column-index-after=""' "${occupied_home}" \
+    || fail "GET / occupied paper must keep column tabs after the listing"
+  grep -q 'class="column-index column-index-after"' "${occupied_home}" \
+    || fail "GET / occupied paper must keep the after-listing column index class"
   grep -q 'Pick one column' "${occupied_home}" \
     || fail "GET / occupied paper must keep the named column pick"
+  home_tabs_order="$(python3 -c '
+import sys
+html = open(sys.argv[1]).read()
+header = html.find("</header>")
+print(html.find("Call this #1"), html.find("North London Movers"), html.find("data-category-tabs"), html.find("data-column-index-after"), html.find("data-claim-pick"), header, sep=" ")
+' "${occupied_home}")"
+  read -r home_call_pos home_name_pos home_tabs_pos home_after_pos home_claim_pos home_header_pos <<< "${home_tabs_order}"
+  [[ "${home_header_pos}" -ge 0 && "${home_name_pos}" -gt "${home_header_pos}" ]] \
+    || fail "GET / occupied listing must sit after the edition masthead"
+  [[ "${home_call_pos}" -ge 0 && "${home_tabs_pos}" -gt "${home_call_pos}" ]] \
+    || fail "GET / occupied column tabs must stay after Call this #1"
+  [[ "${home_after_pos}" -gt "${home_name_pos}" && "${home_after_pos}" -gt "${home_call_pos}" ]] \
+    || fail "GET / occupied column tabs must stay after the listing"
+  [[ "${home_claim_pos}" -gt "${home_tabs_pos}" ]] \
+    || fail "GET / occupied named column pick must stay after the listing tabs"
+  home_header_has_tabs="$(python3 -c '
+import sys
+html = open(sys.argv[1]).read()
+header = html[:html.find("</header>")] if "</header>" in html else html
+print("yes" if "data-category-tabs" in header or "data-column-index-after" in header else "no")
+' "${occupied_home}")"
+  [[ "${home_header_has_tabs}" == "no" ]] \
+    || fail "GET / occupied masthead must not hang the four-tab column index"
   if grep -qE 'claim-first-click|Then pick the column' "${occupied_home}"; then
     fail "GET / occupied paper must not use the empty-paper first-click chrome"
+  fi
+  if grep -qE 'data-later-fact|later-fact' "${occupied_home}"; then
+    fail "GET / occupied paper must not stamp later-fact on \$bid"
   fi
   grep -q 'after Call this #1' "${occupied_home}" \
     || fail "GET / paid hop must sit after Call this #1"

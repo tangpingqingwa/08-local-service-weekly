@@ -4,6 +4,7 @@ import {
   resolveCategory,
   resolveCity,
 } from "../../../../src/board";
+import { ColumnIndex } from "../../../../src/ui/column-index";
 import { ClassifiedEdition } from "../../../../src/ui/edition";
 import { LaneBoard } from "../../../../src/ui/lane-board";
 import { NotFoundCode } from "../../../../src/ui/not-found-code";
@@ -30,6 +31,7 @@ export default async function LanePage({ params }: LanePageProps) {
   const weekId = currentWeekId();
   const listings = listLane(city.value.slug, category.value.slug);
   const lastWeek = lastWeekNumberOne(city.value.slug, category.value.slug);
+  const occupied = listings.length > 0;
   return (
     <ClassifiedEdition city={city.value} weekId={weekId}>
       <div className="classified-columns classified-single" data-classified-columns="">
@@ -42,6 +44,7 @@ export default async function LanePage({ params }: LanePageProps) {
           showForm
         />
       </div>
+      {occupied ? <ColumnIndex city={city.value} /> : null}
     </ClassifiedEdition>
   );
 }

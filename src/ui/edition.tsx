@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { CATEGORIES } from "../categories";
 import type { City } from "../cities";
 import { formatWeekLabel } from "../week";
 
@@ -7,7 +6,6 @@ type ClassifiedEditionProps = {
   city: City;
   weekId: string;
   claim?: ReactNode;
-  showColumnIndex?: boolean;
   children: ReactNode;
 };
 
@@ -15,7 +13,6 @@ export function ClassifiedEdition({
   city,
   weekId,
   claim,
-  showColumnIndex = true,
   children,
 }: ClassifiedEditionProps) {
   return (
@@ -37,23 +34,6 @@ export function ClassifiedEdition({
           tutor in this edition is whoever paid the most. Rank is the bid.
         </p>
         {claim}
-        {showColumnIndex ? (
-          <nav
-            className="column-index"
-            aria-label="Classified columns"
-            data-category-tabs=""
-          >
-            {CATEGORIES.map((category) => (
-              <a
-                key={category.slug}
-                href={`/c/${city.slug}/${category.slug}`}
-                data-category={category.slug}
-              >
-                {category.display}
-              </a>
-            ))}
-          </nav>
-        ) : null}
       </header>
       {children}
     </main>

@@ -42,6 +42,7 @@ grep -q '### PR 9:' BUILD.md || fail "BUILD.md missing ### PR 9:"
 grep -q '### PR 40:' BUILD.md || fail "BUILD.md missing ### PR 40:"
 grep -q '### PR 41:' BUILD.md || fail "BUILD.md missing ### PR 41:"
 grep -q '### PR 42:' BUILD.md || fail "BUILD.md missing ### PR 42:"
+grep -q '### PR 43:' BUILD.md || fail "BUILD.md missing ### PR 43:"
 grep -q 'live-smoke' BUILD.md || fail "BUILD.md missing live-smoke"
 if ! grep -E '^### PR [0-9]+:' BUILD.md >/dev/null; then
   fail "BUILD.md PR headings must be ### PR N: title"
@@ -121,6 +122,27 @@ grep -q 'empty-lane\[data-empty-honest\]' app/globals.css \
   || fail "classified CSS must keep occupied Call hops off empty lanes"
 grep -q 'four empty lanes stay honest' tests/board.test.ts \
   || fail "board tests must cover four empty lanes staying honest"
+grep -q 'lane-occupied' src/ui/lane-board.tsx \
+  || fail "paid columns must wrap in lane-occupied so later Call stays off empty lanes"
+grep -q 'lane-empty' src/ui/lane-board.tsx \
+  || fail "empty columns must wrap in lane-empty so later Call cannot leak onto No #1"
+grep -q 'data-lane-occupied' src/ui/lane-board.tsx \
+  || fail "paid columns must stamp data-lane-occupied"
+grep -q 'data-lane-empty' src/ui/lane-board.tsx \
+  || fail "empty columns must stamp data-lane-empty"
+grep -q 'lane-occupied\[data-lane-occupied\]' app/globals.css \
+  || fail "classified CSS must keep later Call scoped to occupied lanes"
+grep -q 'lane-empty\[data-lane-empty\]' app/globals.css \
+  || fail "classified CSS must hide later Call on empty mixed-paper columns"
+grep -q 'paper-occupied\[data-paper-occupied\] .lane-occupied\[data-lane-occupied\] .later-call\[data-later-call\]' app/globals.css \
+  || fail "later-call CSS must stay scoped to occupied lanes on occupied paper"
+grep -q 'paper-occupied\[data-paper-occupied\] .lane-empty\[data-lane-empty\] \[data-later-call\]' app/globals.css \
+  || fail "classified CSS must hide later-call on empty mixed-paper columns"
+if grep -qE '^\.paper-occupied\[data-paper-occupied\] \.later-call\[data-later-call\]' app/globals.css; then
+  fail "later-call CSS must not paint paper-wide onto empty No #1 columns"
+fi
+grep -q 'occupied mixed paper keeps empty lanes honest' tests/board.test.ts \
+  || fail "board tests must cover occupied mixed paper keeping empty lanes honest"
 grep -q 'data-clicks' src/ui/listing-card.tsx || fail "cards must show public clicks"
 grep -q 'data-bid' src/ui/listing-card.tsx || fail "cards must show \$bid"
 grep -q 'data-classified' src/ui/city-hub.tsx \
@@ -552,18 +574,20 @@ def first(pattern):
     return match.group(1)
 
 lead = first(r"\.paper-occupied\[data-paper-occupied\] \.call-this-one\.call-after-claim-five\s*,\s*\.paper-occupied\[data-paper-occupied\] \.call-this-one\[data-call-after-claim-five\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
-later_group = first(r"\.paper-occupied\[data-paper-occupied\] \.later-call\[data-later-call\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
+later_group = first(r"\.paper-occupied\[data-paper-occupied\] \.lane-occupied\[data-lane-occupied\] \.later-call\[data-later-call\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
 if float(later_group) >= float(lead):
     raise SystemExit("later Call #N shouts like Call this #1")
-later_block = re.search(r"\.paper-occupied\[data-paper-occupied\] \.later-call\[data-later-call\]\s*\{[^}]*\}", css, re.S)
+later_block = re.search(r"\.paper-occupied\[data-paper-occupied\] \.lane-occupied\[data-lane-occupied\] \.later-call\[data-later-call\]\s*\{[^}]*\}", css, re.S)
 if not later_block or "var(--accent)" in later_block.group(0):
     raise SystemExit("do not recolor later Call #N")
 if "color: var(--muted)" not in later_block.group(0):
     raise SystemExit("later-call group must recede")
 if "data-call-later-quiet" in css:
     raise SystemExit("stamp-only data-call-later-quiet mute")
+if re.search(r"\.paper-occupied\[data-paper-occupied\] \.later-call\[data-later-call\]\s*\{", css) and not re.search(r"\.paper-occupied\[data-paper-occupied\] \.lane-occupied\[data-lane-occupied\] \.later-call\[data-later-call\]\s*\{", css):
+    raise SystemExit("later-call CSS must not apply paper-wide")
 inner = re.search(
-    r"\.paper-occupied\[data-paper-occupied\] \.later-call\[data-later-call\] \.call-later\s*\{[^}]*\}",
+    r"\.paper-occupied\[data-paper-occupied\] \.lane-occupied\[data-lane-occupied\] \.later-call\[data-later-call\] \.call-later\s*\{[^}]*\}",
     css,
     re.S,
 )
@@ -871,6 +895,8 @@ if [[ -f package.json ]]; then
     || fail "occupied later-rank quiet test did not run"
   grep -q 'occupied later Call stays quieter in grouping, not a mute of the same hop' "$test_log" \
     || fail "occupied later-call grouping test did not run"
+  grep -q 'occupied mixed paper keeps empty lanes honest — later Call cannot leak onto No #1' "$test_log" \
+    || fail "occupied mixed-paper empty-lane honesty test did not run"
   grep -q 'occupied paper keeps column tabs after the listing' "$test_log" \
     || fail "occupied column-tabs-after-listing test did not run"
   grep -q 'occupied #1 \$bid stays a later fact in grouping, not a muted stamp on the same \$bid span' "$test_log" \
@@ -935,6 +961,16 @@ if [[ -f package.json ]]; then
   grep -q 'edition-city' "${home_body}" || fail "GET / city must be the edition masthead"
   grep -q 'data-classified-columns=""' "${home_body}" || fail "GET / categories must be classified columns"
   grep -q 'data-empty-lane="true"' "${home_body}" || fail "GET / empty London lane must be empty"
+  grep -q 'class="lane classified-column lane-empty"' "${home_body}" \
+    || fail "GET / empty paper must wrap columns as lane-empty"
+  grep -q 'data-lane-empty="true"' "${home_body}" \
+    || fail "GET / empty paper must stamp data-lane-empty"
+  if grep -q 'lane-occupied' "${home_body}"; then
+    fail "GET / empty paper must not wrap columns as occupied lanes"
+  fi
+  if grep -q 'data-lane-occupied' "${home_body}"; then
+    fail "GET / empty paper must not stamp occupied lanes"
+  fi
   grep -q 'data-empty-honest=""' "${home_body}" || fail "GET / empty lanes must stamp honest empty"
   home_empty_honest="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-empty-honest=\"\""))' "${home_body}")"
   [[ "${home_empty_honest}" == "4" ]] \
@@ -1042,6 +1078,13 @@ if [[ -f package.json ]]; then
   lane_code="$(curl -sS -o "${lane_body}" -w '%{http_code}' "http://127.0.0.1:${port}/c/london/movers")"
   [[ "${lane_code}" == "200" ]] || fail "GET /c/london/movers expected 200 got ${lane_code}"
   grep -q 'data-empty-lane="true"' "${lane_body}" || fail "empty movers lane must be empty"
+  grep -q 'class="lane classified-column lane-empty"' "${lane_body}" \
+    || fail "empty movers lane must wrap as lane-empty"
+  grep -q 'data-lane-empty="true"' "${lane_body}" \
+    || fail "empty movers lane must stamp data-lane-empty"
+  if grep -q 'lane-occupied\|data-lane-occupied' "${lane_body}"; then
+    fail "empty movers lane must not wrap as occupied"
+  fi
   grep -q 'data-empty-honest=""' "${lane_body}" || fail "empty movers lane must stamp honest empty"
   grep -q 'No #1' "${lane_body}" || fail "empty movers lane must say No #1"
   grep -q 'No stars. No map.' "${lane_body}" || fail "empty movers lane must refuse stars and maps"
@@ -1152,6 +1195,13 @@ print(
   movers_paid_code="$(curl -sS -o "${movers_paid}" -w '%{http_code}' "http://127.0.0.1:${port}/c/london/movers")"
   [[ "${movers_paid_code}" == "200" ]] || fail "GET /c/london/movers after pay expected 200 got ${movers_paid_code}"
   grep -q 'data-rank="1"' "${movers_paid}" || fail "paid $20 must list at rank 1"
+  grep -q 'class="lane classified-column lane-occupied"' "${movers_paid}" \
+    || fail "paid movers lane must wrap as lane-occupied"
+  grep -q 'data-lane-occupied="true"' "${movers_paid}" \
+    || fail "paid movers lane must stamp data-lane-occupied"
+  if grep -q 'lane-empty\|data-lane-empty' "${movers_paid}"; then
+    fail "paid movers lane must not wrap as empty"
+  fi
   grep -q 'North London Movers' "${movers_paid}" || fail "paid listing must appear on the board"
   grep -q '\$20' "${movers_paid}" || fail "paid listing must show \$20"
   grep -q 'class="paper classified paper-occupied"' "${movers_paid}" \
@@ -1388,6 +1438,16 @@ print(chunk.find("data-prize"), chunk.find("North London Movers"), chunk.find("c
     || fail "GET / paid #1 later-facts \$bid must sit after the listing name"
   empty_after_pay="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-empty-lane=\"true\""))' "${occupied_home}")"
   [[ "${empty_after_pay}" == "3" ]] || fail "GET / after one paid lane must keep three honest empty lanes (got ${empty_after_pay})"
+  occupied_lanes_after_pay="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-lane-occupied=\"true\""))' "${occupied_home}")"
+  [[ "${occupied_lanes_after_pay}" == "1" ]] \
+    || fail "GET / after one paid lane must wrap one occupied column (got ${occupied_lanes_after_pay})"
+  empty_lane_wraps_after_pay="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-lane-empty=\"true\""))' "${occupied_home}")"
+  [[ "${empty_lane_wraps_after_pay}" == "3" ]] \
+    || fail "GET / after one paid lane must wrap three empty columns (got ${empty_lane_wraps_after_pay})"
+  grep -q 'class="lane classified-column lane-occupied"' "${occupied_home}" \
+    || fail "GET / paid movers column must wrap as lane-occupied"
+  grep -q 'class="lane classified-column lane-empty"' "${occupied_home}" \
+    || fail "GET / mixed paper must wrap empty columns as lane-empty"
   empty_honest_after_pay="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-empty-honest=\"\""))' "${occupied_home}")"
   [[ "${empty_honest_after_pay}" == "3" ]] \
     || fail "GET / after one paid lane must keep three empty-honest stamps (got ${empty_honest_after_pay})"
@@ -1633,6 +1693,10 @@ print("yes" if re.search(r"data-empty-lane=\"true\"[\s\S]{0,800}call-after-claim
   curl -sS -o "${movers_two}" "http://127.0.0.1:${port}/c/london/movers"
   grep -q 'South London Movers' "${movers_two}" || fail "\$15 underbid must still list"
   grep -q 'data-rank="2"' "${movers_two}" || fail "\$15 must list below \$20"
+  grep -q 'class="lane classified-column lane-occupied"' "${movers_two}" \
+    || fail "occupied movers with #2 must wrap as lane-occupied"
+  grep -q 'data-lane-occupied="true"' "${movers_two}" \
+    || fail "occupied movers with #2 must stamp data-lane-occupied"
   grep -q 'Call #2' "${movers_two}" || fail "rank 2 must offer Call #2"
   grep -q 'data-call-later' "${movers_two}" || fail "rank 2 must stamp data-call-later"
   grep -q 'data-later-call' "${movers_two}" || fail "rank 2 Call #N must sit in a later-call group"
@@ -1872,6 +1936,24 @@ print("yes" if re.search(r"data-empty-honest=\"\"[\s\S]{0,800}data-later-call", 
   fi
   empty_after_two="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-empty-lane=\"true\""))' "${occupied_later_home}")"
   [[ "${empty_after_two}" == "3" ]] || fail "GET / after two movers must keep three honest empty lanes (got ${empty_after_two})"
+  occupied_lanes_after_two="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-lane-occupied=\"true\""))' "${occupied_later_home}")"
+  [[ "${occupied_lanes_after_two}" == "1" ]] \
+    || fail "GET / after two movers must wrap one occupied column (got ${occupied_lanes_after_two})"
+  empty_lane_wraps_after_two="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-lane-empty=\"true\""))' "${occupied_later_home}")"
+  [[ "${empty_lane_wraps_after_two}" == "3" ]] \
+    || fail "GET / after two movers must wrap three empty columns (got ${empty_lane_wraps_after_two})"
+  mixed_empty_later="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+chunks = re.findall(r"<section class=\"lane classified-column lane-empty\"[\s\S]*?</section>", html)
+print(len(chunks), end=" ")
+print("yes" if any("later-call" in chunk or "data-later-call" in chunk or "Call #" in chunk or "Call this #1" in chunk for chunk in chunks) else "no")
+' "${occupied_later_home}")"
+  read -r mixed_empty_count mixed_empty_call <<< "${mixed_empty_later}"
+  [[ "${mixed_empty_count}" == "3" ]] \
+    || fail "GET / mixed paper must keep three lane-empty wraps (got ${mixed_empty_count})"
+  [[ "${mixed_empty_call}" == "no" ]] \
+    || fail "GET / empty mixed-paper columns must not pick up later Call"
   empty_honest_after_two="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-empty-honest=\"\""))' "${occupied_later_home}")"
   [[ "${empty_honest_after_two}" == "3" ]] \
     || fail "GET / after two movers must keep three empty-honest stamps (got ${empty_honest_after_two})"

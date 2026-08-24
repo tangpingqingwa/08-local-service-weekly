@@ -21,16 +21,24 @@ export function LaneBoard({
   weekId,
   showForm = false,
 }: LaneBoardProps) {
+  const occupied = listings.length > 0;
   const lead = listings.find((listing) => listing.rank === 1);
   const lastCall = [...listings].reverse().find((listing) => listing.rank > 1);
 
   return (
     <section
-      className="lane classified-column"
+      className={
+        occupied
+          ? "lane classified-column lane-occupied"
+          : "lane classified-column lane-empty"
+      }
       data-lane=""
       data-city={city.slug}
       data-category={category.slug}
       data-week={weekId}
+      {...(occupied
+        ? { "data-lane-occupied": "true" }
+        : { "data-lane-empty": "true" })}
     >
       <header className="lane-header">
         <h2>

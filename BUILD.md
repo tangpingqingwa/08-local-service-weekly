@@ -168,6 +168,11 @@ Each heading is one fleet unit. Do not start the next PR in the same change.
 - **Dependencies:** PR 41
 - **Acceptance:** Occupied London `/` with #2+ groups later Call as a `later-call` block after identity (`data-later-call`), not a mute stamp on the same hop. Occupied #1 business name is the prize. Call this #1 stays the first occupied click. Later Call stays quieter via order / grouping / card anatomy. Empty stays Claim #1, then a quieter column pick. Column tabs stay after the listing. Rank stays the bid. Do not add another named hop. Do not stamp `call-after-claim-N`. Do not recolor. Do not rebuild the classified paper. Do not re-ship empty/occupied wraps or empty later-write. Stamp-only mute / `data-call-later-quiet` on the same node = REJECT.
 
+### PR 43: first-time neighbor — occupied mixed paper keeps empty lanes honest
+- **Files:** `src/ui/lane-board.tsx`, `app/globals.css`, `tests/board.test.ts`, `scripts/test.sh`, `BUILD.md`
+- **Dependencies:** PR 42
+- **Acceptance:** Occupied London `/` with one paid movers lane + three empty lanes wraps paid columns `lane-occupied` (`data-lane-occupied`) and empty columns `lane-empty` (`data-lane-empty`). Later-call CSS is scoped to `.lane-occupied` so later Call cannot leak onto No #1. Occupied #1 name stays the prize. Call this #1 stays the first occupied click. Later Call stays after identity. Empty lanes stay No #1 / no stars / no map / no Call hop. Column tabs stay after the listing. Rank stays the bid. Do not add another named hop. Do not stamp `call-after-claim-N`. Do not recolor. Do not rebuild the classified paper. Do not re-ship later-call grouping or empty later-write. Stamp-only = REJECT.
+
 ---
 
 ## 6. Live-smoke (operator)

@@ -7,6 +7,7 @@ type ClassifiedEditionProps = {
   city: City;
   weekId: string;
   claim?: ReactNode;
+  showColumnIndex?: boolean;
   children: ReactNode;
 };
 
@@ -14,6 +15,7 @@ export function ClassifiedEdition({
   city,
   weekId,
   claim,
+  showColumnIndex = true,
   children,
 }: ClassifiedEditionProps) {
   return (
@@ -35,21 +37,23 @@ export function ClassifiedEdition({
           tutor in this edition is whoever paid the most. Rank is the bid.
         </p>
         {claim}
-        <nav
-          className="column-index"
-          aria-label="Classified columns"
-          data-category-tabs=""
-        >
-          {CATEGORIES.map((category) => (
-            <a
-              key={category.slug}
-              href={`/c/${city.slug}/${category.slug}`}
-              data-category={category.slug}
-            >
-              {category.display}
-            </a>
-          ))}
-        </nav>
+        {showColumnIndex ? (
+          <nav
+            className="column-index"
+            aria-label="Classified columns"
+            data-category-tabs=""
+          >
+            {CATEGORIES.map((category) => (
+              <a
+                key={category.slug}
+                href={`/c/${city.slug}/${category.slug}`}
+                data-category={category.slug}
+              >
+                {category.display}
+              </a>
+            ))}
+          </nav>
+        ) : null}
       </header>
       {children}
     </main>

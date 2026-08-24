@@ -33,7 +33,11 @@ export default async function LanePage({ params }: LanePageProps) {
   const lastWeek = lastWeekNumberOne(city.value.slug, category.value.slug);
   const occupied = listings.length > 0;
   return (
-    <ClassifiedEdition city={city.value} weekId={weekId}>
+    <ClassifiedEdition
+      city={city.value}
+      weekId={weekId}
+      emptyPaper={!occupied}
+    >
       <div className="classified-columns classified-single" data-classified-columns="">
         <LaneBoard
           city={city.value}

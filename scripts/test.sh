@@ -39,6 +39,7 @@ grep -q 'older' SPEC.md || fail "SPEC.md missing older-wins-ties rule"
 echo "== BUILD PR sequence =="
 grep -q '### PR 1:' BUILD.md || fail "BUILD.md missing ### PR 1:"
 grep -q '### PR 9:' BUILD.md || fail "BUILD.md missing ### PR 9:"
+grep -q '### PR 40:' BUILD.md || fail "BUILD.md missing ### PR 40:"
 grep -q 'live-smoke' BUILD.md || fail "BUILD.md missing live-smoke"
 if ! grep -E '^### PR [0-9]+:' BUILD.md >/dev/null; then
   fail "BUILD.md PR headings must be ### PR N: title"
@@ -148,6 +149,31 @@ fi
 if grep -q 'data-category-tabs' src/ui/edition.tsx; then
   fail "edition masthead must not print the four-tab column index"
 fi
+grep -q 'paper-empty' src/ui/edition.tsx \
+  || fail "empty paper must wrap in paper-empty so occupied later-facts / Call this #1 cannot leak"
+grep -q 'paper-occupied' src/ui/edition.tsx \
+  || fail "occupied paper must wrap in paper-occupied so Call this #1 CSS stays scoped"
+grep -q 'data-paper-empty' src/ui/edition.tsx \
+  || fail "empty paper must stamp data-paper-empty"
+grep -q 'data-paper-occupied' src/ui/edition.tsx \
+  || fail "occupied paper must stamp data-paper-occupied"
+grep -q 'emptyPaper={emptyPaper}' src/ui/city-hub.tsx \
+  || fail "city hub must tell the edition when the paper is empty"
+grep -q 'emptyPaper={!occupied}' app/c/\[city\]/\[category\]/page.tsx \
+  || fail "empty lane page must wrap as empty paper"
+grep -q 'paper-empty\[data-paper-empty\] \[data-later-fact\]' app/globals.css \
+  || fail "classified CSS must hide later-fact \$bid on empty paper"
+grep -q 'paper-empty\[data-paper-empty\] \[data-call-this-one\]' app/globals.css \
+  || fail "classified CSS must hide Call this #1 on empty paper"
+grep -q 'paper-occupied\[data-paper-occupied\] .card\[data-call-ad="lead"\] .later-facts\[data-later-fact\]' app/globals.css \
+  || fail "occupied later-facts CSS must stay scoped to paper-occupied"
+grep -q 'paper-occupied\[data-paper-occupied\] .call-this-one.call-after-claim-five' app/globals.css \
+  || fail "occupied Call this #1 CSS must stay scoped to paper-occupied"
+if grep -qE '^\.card\[data-call-ad="lead"\] \.later-facts|^\.call-this-one\.call-after-claim-five' app/globals.css; then
+  fail "occupied later-facts / Call this #1 CSS must not apply outside paper-occupied"
+fi
+grep -q 'empty paper stays Claim #1 — later-facts / Call this #1 cannot leak' tests/board.test.ts \
+  || fail "board tests must cover empty paper isolation from occupied later-facts / Call this #1"
 grep -q 'data-category-tabs' src/ui/column-index.tsx \
   || fail "occupied column tabs must stay as one classified column index"
 grep -q 'data-column-index-after' src/ui/column-index.tsx \
@@ -180,11 +206,11 @@ def first(pattern):
         raise SystemExit("missing " + pattern)
     return match.group(1)
 
-lead = first(r"\.call-this-one\.call-after-claim-five\s*,\s*\.call-this-one\[data-call-after-claim-five\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
-tabs = first(r"\.column-index\.column-index-after\[data-column-index-after\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
+lead = first(r"\.paper-occupied\[data-paper-occupied\] \.call-this-one\.call-after-claim-five\s*,\s*\.paper-occupied\[data-paper-occupied\] \.call-this-one\[data-call-after-claim-five\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
+tabs = first(r"\.paper-occupied\[data-paper-occupied\] \.column-index\.column-index-after\[data-column-index-after\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
 if float(tabs) >= float(lead):
     raise SystemExit("column tabs shout like Call this #1")
-block = re.search(r"\.column-index\.column-index-after\[data-column-index-after\]\s*\{[^}]*\}", css, re.S)
+block = re.search(r"\.paper-occupied\[data-paper-occupied\] \.column-index\.column-index-after\[data-column-index-after\]\s*\{[^}]*\}", css, re.S)
 if not block or "var(--accent)" in block.group(0):
     raise SystemExit("do not recolor occupied column tabs")
 PY
@@ -461,15 +487,15 @@ def first(pattern):
         raise SystemExit(1)
     return match.group(1)
 
-lead = first(r"\.call-this-one\.call-after-claim-five\s*,\s*\.call-this-one\[data-call-after-claim-five\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
-later_card = first(r"\.call-later\[data-call-later-quiet\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
-later_after = first(r"\.call-after-claim\[data-call-later-quiet\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
+lead = first(r"\.paper-occupied\[data-paper-occupied\] \.call-this-one\.call-after-claim-five\s*,\s*\.paper-occupied\[data-paper-occupied\] \.call-this-one\[data-call-after-claim-five\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
+later_card = first(r"\.paper-occupied\[data-paper-occupied\] \.call-later\[data-call-later-quiet\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
+later_after = first(r"\.paper-occupied\[data-paper-occupied\] \.call-after-claim\[data-call-later-quiet\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
 if float(later_card) >= float(lead):
     raise SystemExit("later Call #N shouts like Call this #1")
 if float(later_after) >= float(lead):
     raise SystemExit("Call after the claim hop shouts like Call this #1")
-later_block = re.search(r"\.call-later\[data-call-later-quiet\]\s*\{[^}]*\}", css, re.S)
-after_block = re.search(r"\.call-after-claim\[data-call-later-quiet\]\s*\{[^}]*\}", css, re.S)
+later_block = re.search(r"\.paper-occupied\[data-paper-occupied\] \.call-later\[data-call-later-quiet\]\s*\{[^}]*\}", css, re.S)
+after_block = re.search(r"\.paper-occupied\[data-paper-occupied\] \.call-after-claim\[data-call-later-quiet\]\s*\{[^}]*\}", css, re.S)
 if not later_block or "var(--accent)" in later_block.group(0):
     raise SystemExit("do not recolor later Call #N")
 if not after_block or "var(--accent)" in after_block.group(0):
@@ -496,9 +522,9 @@ def first(pattern):
         raise SystemExit("missing " + pattern)
     return match.group(1)
 
-prize = first(r'\.card\[data-call-ad="lead"\] \.business\[data-prize\]\s*\{[^}]*font-size:\s*([\d.]+)rem')
+prize = first(r'\.paper-occupied\[data-paper-occupied\] \.card\[data-call-ad="lead"\] \.business\[data-prize\]\s*\{[^}]*font-size:\s*([\d.]+)rem')
 facts = re.search(
-    r'\.card\[data-call-ad="lead"\] \.later-facts\[data-later-fact\]\s*\{[^}]*\}',
+    r'\.paper-occupied\[data-paper-occupied\] \.card\[data-call-ad="lead"\] \.later-facts\[data-later-fact\]\s*\{[^}]*\}',
     css,
     re.S,
 )
@@ -511,12 +537,12 @@ if "color: var(--accent)" in facts.group(0):
 if ".bid.later-fact" in css:
     raise SystemExit("stamp-only .bid.later-fact mute")
 bid_size = first(
-    r'\.card\[data-call-ad="lead"\] \.later-facts\[data-later-fact\]\s*\{[^}]*font-size:\s*([\d.]+)rem'
+    r'\.paper-occupied\[data-paper-occupied\] \.card\[data-call-ad="lead"\] \.later-facts\[data-later-fact\]\s*\{[^}]*font-size:\s*([\d.]+)rem'
 )
 if float(bid_size) >= float(prize):
     raise SystemExit("occupied #1 later-facts $bid shouts like the listing name")
 inner = re.search(
-    r'\.card\[data-call-ad="lead"\] \.later-facts\[data-later-fact\] \.bid[\s\S]*?\{[^}]*\}',
+    r'\.paper-occupied\[data-paper-occupied\] \.card\[data-call-ad="lead"\] \.later-facts\[data-later-fact\] \.bid[\s\S]*?\{[^}]*\}',
     css,
     re.S,
 )
@@ -750,6 +776,8 @@ if [[ -f package.json ]]; then
     || fail "occupied column-tabs-after-listing test did not run"
   grep -q 'occupied #1 \$bid stays a later fact in grouping, not a muted stamp on the same \$bid span' "$test_log" \
     || fail "occupied later-fact grouping test did not run"
+  grep -q 'empty paper stays Claim #1 — later-facts / Call this #1 cannot leak' "$test_log" \
+    || fail "empty-paper isolation test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"
@@ -792,6 +820,16 @@ if [[ -f package.json ]]; then
   grep -q 'data-city="london"' "${home_body}" || fail "GET / must default to London"
   grep -q 'data-week="' "${home_body}" || fail "GET / must stamp the open weekId"
   grep -q 'data-classified=""' "${home_body}" || fail "GET / must render the classified edition"
+  grep -q 'class="paper classified paper-empty"' "${home_body}" \
+    || fail "GET / empty paper must wrap in paper-empty"
+  grep -q 'data-paper-empty="true"' "${home_body}" \
+    || fail "GET / empty paper must stamp data-paper-empty"
+  if grep -q 'paper-occupied' "${home_body}"; then
+    fail "GET / empty paper must not wrap as occupied"
+  fi
+  if grep -q 'data-paper-occupied' "${home_body}"; then
+    fail "GET / empty paper must not stamp occupied"
+  fi
   grep -q 'data-edition=""' "${home_body}" || fail "GET / must stamp the city edition header"
   grep -q 'edition-city' "${home_body}" || fail "GET / city must be the edition masthead"
   grep -q 'data-classified-columns=""' "${home_body}" || fail "GET / categories must be classified columns"
@@ -944,6 +982,13 @@ if [[ -f package.json ]]; then
   fi
   grep -q 'Outbid' "${lane_body}" || fail "lane board must show Outbid form chrome"
   grep -q 'data-classified=""' "${lane_body}" || fail "lane page must stay inside the classified edition"
+  grep -q 'class="paper classified paper-empty"' "${lane_body}" \
+    || fail "empty movers lane must wrap in paper-empty"
+  grep -q 'data-paper-empty="true"' "${lane_body}" \
+    || fail "empty movers lane must stamp data-paper-empty"
+  if grep -q 'paper-occupied' "${lane_body}"; then
+    fail "empty movers lane must not wrap as occupied"
+  fi
   grep -q 'edition-city' "${lane_body}" || fail "lane page must keep the city edition masthead"
   if grep -q 'data-category-tabs' "${lane_body}"; then
     fail "empty movers lane must not hang a four-tab column index"
@@ -972,6 +1017,13 @@ if [[ -f package.json ]]; then
   grep -q 'data-rank="1"' "${movers_paid}" || fail "paid $20 must list at rank 1"
   grep -q 'North London Movers' "${movers_paid}" || fail "paid listing must appear on the board"
   grep -q '\$20' "${movers_paid}" || fail "paid listing must show \$20"
+  grep -q 'class="paper classified paper-occupied"' "${movers_paid}" \
+    || fail "paid movers lane must wrap in paper-occupied"
+  grep -q 'data-paper-occupied="true"' "${movers_paid}" \
+    || fail "paid movers lane must stamp data-paper-occupied"
+  if grep -q 'paper-empty' "${movers_paid}"; then
+    fail "paid movers lane must not wrap as empty paper"
+  fi
   grep -q 'data-prize' "${movers_paid}" || fail "paid #1 must stamp the business name as the prize"
   grep -q 'class="business" data-prize' "${movers_paid}" \
     || fail "paid #1 prize must be the business name"
@@ -1142,6 +1194,13 @@ print("yes" if "data-category-tabs" in header or "data-column-index-after" in he
   occupied_home="$(mktemp)"
   occupied_home_code="$(curl -sS -o "${occupied_home}" -w '%{http_code}' "http://127.0.0.1:${port}/")"
   [[ "${occupied_home_code}" == "200" ]] || fail "GET / after pay expected 200 got ${occupied_home_code}"
+  grep -q 'class="paper classified paper-occupied"' "${occupied_home}" \
+    || fail "GET / after pay must wrap occupied paper"
+  grep -q 'data-paper-occupied="true"' "${occupied_home}" \
+    || fail "GET / after pay must stamp data-paper-occupied"
+  if grep -q 'paper-empty' "${occupied_home}"; then
+    fail "GET / after pay must not keep the empty-paper wrap"
+  fi
   grep -q 'Call this #1' "${occupied_home}" || fail "GET / paid movers column must offer Call this #1"
   grep -q 'data-call-this-one' "${occupied_home}" || fail "GET / paid #1 must stamp data-call-this-one"
   grep -q 'class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three call-after-claim-four call-after-claim-five"' "${occupied_home}" \

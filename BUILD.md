@@ -153,6 +153,11 @@ Each heading is one fleet unit. Do not start the next PR in the same change.
 - **Dependencies:** PR 8
 - **Acceptance:** `POLAR_LIVE=1` + secrets selects Polar. `POLAR_FIXTURE_ONLY=1` wins. `scripts/live-smoke.sh` is executable and is **not** called from `scripts/test.sh` or `.github/workflows/ci.yml`. Missing secret → `BLOCKED-SECRET` naming the env var. Empty London board is honest (no invented provider). CI never sets `POLAR_LIVE`.
 
+### PR 40: first-time neighbor — empty paper stays Claim #1
+- **Files:** `src/ui/edition.tsx`, `src/ui/city-hub.tsx`, `app/c/[city]/[category]/page.tsx`, `app/globals.css`, `tests/board.test.ts`, `scripts/test.sh`
+- **Dependencies:** PR 39
+- **Acceptance:** Empty London `/` wraps `paper-empty` (`data-paper-empty`). Occupied paper wraps `paper-occupied`. Occupied later-facts / Call this #1 CSS is scoped to `.paper-occupied`. Empty hide rules cover `.paper-empty` so that chrome cannot paint a week with no paid listing. Empty stays Claim #1. Occupied #1 name still reads before `$bid`. Call this #1 stays the first occupied click. Column tabs stay after the listing. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
+
 ---
 
 ## 6. Live-smoke (operator)

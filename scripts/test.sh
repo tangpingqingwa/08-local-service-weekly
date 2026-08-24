@@ -40,6 +40,7 @@ echo "== BUILD PR sequence =="
 grep -q '### PR 1:' BUILD.md || fail "BUILD.md missing ### PR 1:"
 grep -q '### PR 9:' BUILD.md || fail "BUILD.md missing ### PR 9:"
 grep -q '### PR 40:' BUILD.md || fail "BUILD.md missing ### PR 40:"
+grep -q '### PR 41:' BUILD.md || fail "BUILD.md missing ### PR 41:"
 grep -q 'live-smoke' BUILD.md || fail "BUILD.md missing live-smoke"
 if ! grep -E '^### PR [0-9]+:' BUILD.md >/dev/null; then
   fail "BUILD.md PR headings must be ### PR N: title"
@@ -222,6 +223,57 @@ grep -q 'claim-columns.claim-next a' app/globals.css \
   || fail "classified CSS must keep the empty-paper trade pick quieter than Outbid"
 grep -q 'empty paper has one first click' tests/board.test.ts \
   || fail "board tests must cover one first click on empty paper"
+grep -q 'Then the listing name' src/ui/outbid-form.tsx \
+  || fail "empty-lane form must treat the listing name as the next write after Claim #1"
+grep -q 'data-later-write' src/ui/outbid-form.tsx \
+  || fail "empty-lane form must stamp the listing name as a later write"
+grep -q 'data-listing-identity' src/ui/outbid-form.tsx \
+  || fail "empty-lane form must group listing identity after Outbid"
+grep -q 'data-empty-claim-first' src/ui/outbid-form.tsx \
+  || fail "empty-lane form must stamp empty Claim #1 as the first click"
+grep -q 'data-first-click": "claim"' src/ui/outbid-form.tsx \
+  || fail "empty-lane Claim #1 must stamp the first click"
+grep -q 'emptyPaper={listings.length === 0}' src/ui/lane-board.tsx \
+  || fail "empty lane page must tell the form the paper is empty"
+grep -q 'listing-identity\[data-later-write\]' app/globals.css \
+  || fail "classified CSS must keep the empty-paper listing name quieter than Outbid"
+grep -q 'Empty paper: listing name is a later write' app/globals.css \
+  || fail "classified CSS must document the empty-paper listing-name later write"
+grep -q 'empty paper has one first click: Claim #1, then the listing name' tests/board.test.ts \
+  || fail "board tests must cover Claim #1 then the listing name on empty paper"
+if grep -q 'data-later-write' src/ui/claim-column.tsx src/ui/listing-card.tsx src/ui/column-index.tsx; then
+  fail "later-write listing name must stay on the empty-lane form, not occupied chrome"
+fi
+if grep -qE 'data-claim-after-empty|data-empty-after-claim|listing-after-claim-N' src/ui/outbid-form.tsx src/ui/lane-board.tsx; then
+  fail "empty-lane later write must not stamp *-after-*-N"
+fi
+python3 - app/globals.css <<'PY' || fail "empty-paper listing name must stay quieter than Claim #1"
+import re
+import sys
+
+css = open(sys.argv[1], encoding="utf-8").read()
+claim = re.search(
+    r"\.claim-pick\.claim-first summary\.claim-first-click\s*\{[^}]*font-size:\s*clamp\(([\d.]+)rem",
+    css,
+    re.S,
+)
+later = re.search(
+    r"\.paper-empty\[data-paper-empty\] \.claim\.empty-claim-first\[data-empty-claim-first\] \.later-write-label\s*\{[^}]*font-size:\s*([\d.]+)rem",
+    css,
+    re.S,
+)
+if not claim or not later:
+    raise SystemExit("missing empty-paper later-write type")
+if float(later.group(1)) >= float(claim.group(1)):
+    raise SystemExit("listing name later-write shouts like Claim #1")
+block = re.search(
+    r"\.paper-empty\[data-paper-empty\] \.claim\.empty-claim-first\[data-empty-claim-first\] \.listing-identity\[data-later-write\]\s*\{[^}]*\}",
+    css,
+    re.S,
+)
+if not block or "var(--accent)" in block.group(0):
+    raise SystemExit("do not recolor the empty-paper listing-name later write")
+PY
 grep -q 'ClaimColumn' src/ui/city-hub.tsx \
   || fail "city hub must send first-time locals into one column"
 grep -q 'amount-field' src/ui/outbid-form.tsx || fail "bid form must keep the dashed amount"
@@ -778,6 +830,8 @@ if [[ -f package.json ]]; then
     || fail "occupied later-fact grouping test did not run"
   grep -q 'empty paper stays Claim #1 — later-facts / Call this #1 cannot leak' "$test_log" \
     || fail "empty-paper isolation test did not run"
+  grep -q 'empty paper has one first click: Claim #1, then the listing name' "$test_log" \
+    || fail "empty-paper listing-name later-write test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"
@@ -873,6 +927,9 @@ if [[ -f package.json ]]; then
   fi
   if grep -q 'name="business"' "${home_body}"; then
     fail "GET / must not print the tall want-ad field grid"
+  fi
+  if grep -qE 'data-later-write|Then the listing name|data-empty-claim-first' "${home_body}"; then
+    fail "GET / empty hub must keep the listing name off the column pick"
   fi
   if grep -q 'Call this #1' "${home_body}"; then
     fail "empty GET / must not invent Call this #1"
@@ -981,6 +1038,39 @@ if [[ -f package.json ]]; then
     fail "empty movers lane must not invent later-fact \$bid"
   fi
   grep -q 'Outbid' "${lane_body}" || fail "lane board must show Outbid form chrome"
+  grep -q 'class="claim empty-claim-first"' "${lane_body}" \
+    || fail "empty movers lane must stamp empty Claim #1 as the first click"
+  grep -q 'data-empty-claim-first=""' "${lane_body}" \
+    || fail "empty movers lane must stamp data-empty-claim-first"
+  grep -q 'data-first-click="claim"' "${lane_body}" \
+    || fail "empty movers lane must keep Claim #1 as the first click"
+  grep -q 'data-later-write=""' "${lane_body}" \
+    || fail "empty movers lane must stamp the listing name as a later write"
+  grep -q 'Then the listing name' "${lane_body}" \
+    || fail "empty movers lane must treat the listing name as the next write after Claim #1"
+  grep -q 'data-listing-identity=""' "${lane_body}" \
+    || fail "empty movers lane must group listing identity after Outbid"
+  grep -q 'name="business"' "${lane_body}" \
+    || fail "empty movers lane must still collect the listing name after Outbid"
+  lane_write_order="$(python3 -c '
+import sys
+html = open(sys.argv[1]).read()
+print(
+    html.find("Claim #1 for"),
+    html.find(">Outbid<"),
+    html.find("data-later-write"),
+    html.find("Then the listing name"),
+    html.find("name=\"business\""),
+    sep=" ",
+)
+' "${lane_body}")"
+  read -r lane_claim_at lane_outbid_at lane_later_at lane_label_at lane_name_at <<< "${lane_write_order}"
+  [[ "${lane_claim_at}" -ge 0 && "${lane_outbid_at}" -gt "${lane_claim_at}" ]] \
+    || fail "empty movers lane must keep Outbid with Claim #1"
+  [[ "${lane_later_at}" -gt "${lane_outbid_at}" && "${lane_label_at}" -gt "${lane_later_at}" ]] \
+    || fail "empty movers lane must keep the listing name after Outbid"
+  [[ "${lane_name_at}" -gt "${lane_label_at}" ]] \
+    || fail "empty movers lane must not put the listing name in the same-weight field grid as Outbid"
   grep -q 'data-classified=""' "${lane_body}" || fail "lane page must stay inside the classified edition"
   grep -q 'class="paper classified paper-empty"' "${lane_body}" \
     || fail "empty movers lane must wrap in paper-empty"
@@ -1166,6 +1256,19 @@ print("yes" if "data-category-tabs" in header or "data-column-index-after" in he
     || fail "lone paid #1 hop must sit after Call this #1"
   grep -q 'href="/c/london/movers#claim"' "${movers_paid}" \
     || fail "lone paid #1 hop must land on the lane claim form"
+  if grep -qE 'data-later-write|Then the listing name|data-empty-claim-first|data-first-click="claim"' "${movers_paid}"; then
+    fail "paid movers lane must not use the empty-paper listing-name later write"
+  fi
+  paid_form_business="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"<form[^>]*data-bid-form=\"\"[\s\S]*?</form>", html)
+chunk = m.group(0) if m else ""
+print(chunk.find("name=\"business\""), chunk.find(">Outbid<"), sep=" ")
+' "${movers_paid}")"
+  read -r paid_business_at paid_outbid_in_form <<< "${paid_form_business}"
+  [[ "${paid_business_at}" -ge 0 && "${paid_outbid_in_form}" -gt "${paid_business_at}" ]] \
+    || fail "occupied movers form must keep the listing name with Outbid"
   paid_claim_at="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-after-call-one"))' "${movers_paid}")"
   paid_claim_two="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-after-call-two"))' "${movers_paid}")"
   paid_claim_three="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-after-call-three"))' "${movers_paid}")"
@@ -1306,6 +1409,9 @@ print("yes" if "data-category-tabs" in header or "data-column-index-after" in he
     || fail "GET / occupied masthead must not hang the four-tab column index"
   if grep -qE 'claim-first-click|Then pick the column' "${occupied_home}"; then
     fail "GET / occupied paper must not use the empty-paper first-click chrome"
+  fi
+  if grep -qE 'data-later-write|Then the listing name|data-empty-claim-first|data-first-click="claim"' "${occupied_home}"; then
+    fail "GET / occupied paper must not use the empty-paper listing-name later write"
   fi
   if grep -q 'class="bid later-fact"' "${occupied_home}"; then
     fail "GET / occupied paper must not stamp later-fact on the same \$bid span"

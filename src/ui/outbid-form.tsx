@@ -15,6 +15,7 @@ type OutbidFormProps = {
   category?: CategorySlug;
   lockCity?: boolean;
   lockCategory?: boolean;
+  emptyPaper?: boolean;
 };
 
 function clampAmount(value: number): number {
@@ -27,6 +28,7 @@ export function OutbidForm({
   category,
   lockCity = false,
   lockCategory = false,
+  emptyPaper = false,
 }: OutbidFormProps) {
   const defaultCity = city ?? CITIES[0]?.slug ?? "london";
   const defaultCategory = category ?? CATEGORIES[0]?.slug ?? "movers";
@@ -48,8 +50,97 @@ export function OutbidForm({
     setAmount((current) => clampAmount(current + delta));
   }
 
+  const identityFields = (
+    <>
+      <label>
+        Business
+        <input
+          name="business"
+          maxLength={80}
+          required
+          autoComplete="organization"
+          placeholder="Business name"
+        />
+      </label>
+      {lockCity ? (
+        <input type="hidden" name="city" value={defaultCity} />
+      ) : (
+        <label>
+          City
+          <select
+            name="city"
+            value={selectedCity}
+            onChange={(event) => setSelectedCity(event.target.value)}
+          >
+            {cityOptions.map((item) => (
+              <option key={item.slug} value={item.slug}>
+                {item.display}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {lockCategory ? (
+        <input type="hidden" name="category" value={defaultCategory} />
+      ) : (
+        <label>
+          Category
+          <select
+            name="category"
+            value={selectedCategory}
+            onChange={(event) =>
+              setSelectedCategory(event.target.value as CategorySlug)
+            }
+          >
+            {categoryOptions.map((item) => (
+              <option key={item.slug} value={item.slug}>
+                {item.display}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <label>
+        Site URL
+        <input
+          name="siteUrl"
+          type="url"
+          placeholder="https://"
+          required
+          autoComplete="url"
+          spellCheck={false}
+        />
+      </label>
+      {licenseNeeded ? (
+        <label>
+          License id
+          <input
+            name="licenseId"
+            minLength={2}
+            maxLength={64}
+            required
+            autoComplete="off"
+          />
+          <span className="field-hint">{licenseHint}</span>
+        </label>
+      ) : null}
+    </>
+  );
+
+  const outbid = (
+    <button type="submit" className="outbid">
+      Outbid
+    </button>
+  );
+
   return (
-    <section className="claim" id="claim">
+    <section
+      className={emptyPaper ? "claim empty-claim-first" : "claim"}
+      id="claim"
+      {...(emptyPaper
+        ? { "data-empty-claim-first": "", "aria-label": "Claim #1" }
+        : {})}
+    >
       <form
         method="post"
         action="/api/checkout"
@@ -57,7 +148,11 @@ export function OutbidForm({
         data-city={lockCity ? defaultCity : selectedCity}
         data-category={activeCategory}
       >
-        <h2>
+        <h2
+          {...(emptyPaper
+            ? { "data-empty-claim": "", "data-first-click": "claim" }
+            : {})}
+        >
           <span>Claim #1 for</span>
           <span className="amount-stepper">
             <button
@@ -96,85 +191,24 @@ export function OutbidForm({
           New spots start at ${MIN_BID_USD}. Paying less than #1 still lists at
           the rank that bid can take. Rank is the bid.
         </p>
-        <div className="fields want-ad-fields">
-          <label>
-            Business
-            <input
-              name="business"
-              maxLength={80}
-              required
-              autoComplete="organization"
-              placeholder="Business name"
-            />
-          </label>
-          {lockCity ? (
-            <input type="hidden" name="city" value={defaultCity} />
-          ) : (
-            <label>
-              City
-              <select
-                name="city"
-                value={selectedCity}
-                onChange={(event) => setSelectedCity(event.target.value)}
-              >
-                {cityOptions.map((item) => (
-                  <option key={item.slug} value={item.slug}>
-                    {item.display}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {lockCategory ? (
-            <input type="hidden" name="category" value={defaultCategory} />
-          ) : (
-            <label>
-              Category
-              <select
-                name="category"
-                value={selectedCategory}
-                onChange={(event) =>
-                  setSelectedCategory(event.target.value as CategorySlug)
-                }
-              >
-                {categoryOptions.map((item) => (
-                  <option key={item.slug} value={item.slug}>
-                    {item.display}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          <label>
-            Site URL
-            <input
-              name="siteUrl"
-              type="url"
-              placeholder="https://"
-              required
-              autoComplete="url"
-              spellCheck={false}
-            />
-          </label>
-          {licenseNeeded ? (
-            <label>
-              License id
-              <input
-                name="licenseId"
-                minLength={2}
-                maxLength={64}
-                required
-                autoComplete="off"
-              />
-              <span className="field-hint">{licenseHint}</span>
-            </label>
-          ) : null}
-          <div className="bid-row">
-            <button type="submit" className="outbid">
-              Outbid
-            </button>
+        {emptyPaper ? (
+          <>
+            <div className="bid-row">{outbid}</div>
+            <div
+              className="listing-identity"
+              data-listing-identity=""
+              data-later-write=""
+            >
+              <p className="later-write-label">Then the listing name</p>
+              <div className="fields want-ad-fields">{identityFields}</div>
+            </div>
+          </>
+        ) : (
+          <div className="fields want-ad-fields">
+            {identityFields}
+            <div className="bid-row">{outbid}</div>
           </div>
-        </div>
+        )}
       </form>
     </section>
   );

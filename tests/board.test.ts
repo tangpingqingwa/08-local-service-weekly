@@ -286,9 +286,19 @@ test("four empty lanes stay honest after Claim #1 is the first click", () => {
   assert.match(emptyLane, />Outbid</);
   assert.match(emptyLane, /Claim #1 for/);
   assert.match(emptyLane, /data-bid-form/);
+  assert.match(emptyLane, /class="claim empty-claim-first"/);
+  assert.match(emptyLane, /data-empty-claim-first=""/);
+  assert.match(emptyLane, /data-first-click="claim"/);
+  assert.match(emptyLane, /data-later-write=""/);
+  assert.match(emptyLane, /Then the listing name/);
   const honestAt = emptyLane.indexOf('data-empty-honest=""');
   const formAt = emptyLane.indexOf("data-bid-form");
+  const emptyOutbid = emptyLane.indexOf(">Outbid<");
+  const emptyLater = emptyLane.indexOf("Then the listing name");
+  const emptyBusiness = emptyLane.indexOf('name="business"');
   assert.ok(honestAt >= 0 && formAt > honestAt);
+  assert.ok(emptyOutbid > formAt && emptyLater > emptyOutbid);
+  assert.ok(emptyBusiness > emptyLater);
   assert.doesNotMatch(emptyLane, /Call this #1|Call #2|data-call-later|data-call-later-quiet|data-call-ad|data-prize/);
   assert.doesNotMatch(emptyLane, /data-later-fact|later-facts|later-fact/);
   assert.doesNotMatch(emptyLane, /data-claim-after-call|after Call this #1|after the claim hop/);
@@ -399,6 +409,10 @@ test("lane board empty state has no cards", () => {
   assert.match(html, /This lane is empty/);
   assert.match(html, /No stars\. No map\./);
   assert.match(html, />Outbid</);
+  assert.match(html, /data-later-write=""/);
+  assert.match(html, /Then the listing name/);
+  assert.ok(html.indexOf(">Outbid<") < html.indexOf("Then the listing name"));
+  assert.ok(html.indexOf("Then the listing name") < html.indexOf('name="business"'));
   assert.doesNotMatch(html, /data-listing-card/);
   assert.doesNotMatch(html, /data-prize/);
   assert.doesNotMatch(html, /data-later-fact|later-facts|later-fact/);
@@ -3613,6 +3627,114 @@ test("empty paper stays Claim #1 — later-facts / Call this #1 cannot leak", ()
   assert.doesNotMatch(occupied, /data-call-after-claim-six|data-claim-after-call-six/);
 });
 
+test("empty paper has one first click: Claim #1, then the listing name", () => {
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+  assert.match(
+    css,
+    /\.paper-empty\[data-paper-empty\] \.claim\.empty-claim-first\[data-empty-claim-first\] \.listing-identity\[data-later-write\]/,
+  );
+  assert.match(
+    css,
+    /\.paper-empty\[data-paper-empty\] \.claim\.empty-claim-first\[data-empty-claim-first\] \.later-write-label/,
+  );
+  assert.match(css, /Empty paper: listing name is a later write after Claim #1 \/ Outbid/);
+  const laterCss = (
+    css.split("Empty paper: listing name is a later write after Claim #1 / Outbid", 2)[1] ?? ""
+  ).split(".paper-occupied[data-paper-occupied] .claim-after-call-line")[0] ?? "";
+  assert.match(laterCss, /border-top:\s*1px dashed var\(--rule-soft\)/);
+  assert.match(laterCss, /color:\s*var\(--muted\)/);
+  assert.doesNotMatch(laterCss, /var\(--accent\)/);
+  assert.doesNotMatch(css, /data-claim-after-empty|data-empty-after-claim|listing-after-claim-N/);
+
+  const london = getCity("london");
+  const movers = getCategory("movers");
+  assert.ok(london && movers);
+
+  const emptyLane = renderToStaticMarkup(
+    createElement(LaneBoard, {
+      city: london,
+      category: movers,
+      listings: [],
+      showForm: true,
+    }),
+  );
+  const claimAt = emptyLane.indexOf('id="claim"');
+  const firstClickAt = emptyLane.indexOf('data-first-click="claim"');
+  const claimCopyAt = emptyLane.indexOf("Claim #1 for");
+  const outbidAt = emptyLane.indexOf(">Outbid<");
+  const laterWriteAt = emptyLane.indexOf('data-later-write=""');
+  const laterLabelAt = emptyLane.indexOf("Then the listing name");
+  const businessAt = emptyLane.indexOf('name="business"');
+  const siteAt = emptyLane.indexOf('name="siteUrl"');
+  assert.match(emptyLane, /class="claim empty-claim-first"/);
+  assert.match(emptyLane, /data-empty-claim-first=""/);
+  assert.match(emptyLane, /data-first-click="claim"/);
+  assert.match(emptyLane, /aria-label="Claim #1"/);
+  assert.match(emptyLane, /data-listing-identity=""/);
+  assert.match(emptyLane, /data-later-write=""/);
+  assert.match(emptyLane, /Then the listing name/);
+  assert.match(emptyLane, /name="business"/);
+  assert.match(emptyLane, /name="siteUrl"/);
+  assert.match(emptyLane, />Outbid</);
+  assert.match(emptyLane, /data-empty-honest=""/);
+  assert.match(emptyLane, /No #1/);
+  assert.match(emptyLane, /No stars\. No map\./);
+  assert.doesNotMatch(emptyLane, /data-claim-after-empty|data-empty-after-claim/);
+  assert.doesNotMatch(emptyLane, /Call this #1|data-call-this-one|data-prize/);
+  assert.doesNotMatch(emptyLane, /data-category-tabs|data-column-index-after/);
+  assert.equal((emptyLane.match(/data-first-click="claim"/g) ?? []).length, 1);
+  assert.equal((emptyLane.match(/data-later-write=""/g) ?? []).length, 1);
+  assert.equal((emptyLane.match(/data-listing-identity=""/g) ?? []).length, 1);
+  assert.ok(claimAt >= 0 && firstClickAt > claimAt);
+  assert.ok(claimCopyAt > firstClickAt && outbidAt > claimCopyAt);
+  assert.ok(laterWriteAt > outbidAt && laterLabelAt > laterWriteAt);
+  assert.ok(businessAt > laterLabelAt && siteAt > businessAt);
+
+  const occupiedLane = renderToStaticMarkup(
+    createElement(LaneBoard, {
+      city: london,
+      category: movers,
+      listings: [
+        ranked({
+          id: "lst_movers",
+          business: "North London Movers",
+          bidUsd: 20,
+          siteHost: "north.example",
+        }),
+      ],
+      showForm: true,
+    }),
+  );
+  const occupiedForm = occupiedLane.slice(occupiedLane.indexOf("data-bid-form"));
+  const occupiedBusiness = occupiedForm.indexOf('name="business"');
+  const occupiedOutbid = occupiedForm.indexOf(">Outbid<");
+  assert.match(occupiedLane, /Call this #1/);
+  assert.match(occupiedLane, /data-call-this-one=""/);
+  assert.match(occupiedLane, /data-prize=""/);
+  assert.match(occupiedForm, /name="business"/);
+  assert.match(occupiedForm, />Outbid</);
+  assert.doesNotMatch(occupiedLane, /data-empty-claim-first|data-first-click="claim"|Then the listing name|data-later-write/);
+  assert.ok(occupiedBusiness >= 0 && occupiedOutbid > occupiedBusiness);
+
+  const emptyHub = renderToStaticMarkup(
+    createElement(CityHub, {
+      city: london,
+      weekId: currentWeekId(),
+      lanes: {
+        movers: [],
+        dentists: [],
+        immigration_lawyers: [],
+        tutors: [],
+      },
+    }),
+  );
+  assert.match(emptyHub, /claim-first-click/);
+  assert.match(emptyHub, /Then pick the column/);
+  assert.doesNotMatch(emptyHub, /name="business"/);
+  assert.doesNotMatch(emptyHub, /data-later-write|Then the listing name|data-empty-claim-first/);
+  assert.doesNotMatch(emptyHub, /Call this #1|data-prize|data-category-tabs/);
+});
+
 test("empty paper has one first click: Claim #1, then a quieter column pick", () => {
   const html = renderToStaticMarkup(
     createElement(ClaimColumn, { city: "london", emptyPaper: true }),
@@ -3662,6 +3784,27 @@ test("Outbid form chrome has business, site, amount, and license when required",
   assert.match(movers, /name="city"/);
   assert.match(movers, /name="category"/);
   assert.doesNotMatch(movers, /name="licenseId"/);
+  assert.doesNotMatch(movers, /data-later-write|Then the listing name|data-empty-claim-first/);
+  assert.ok(movers.indexOf('name="business"') < movers.indexOf(">Outbid<"));
+
+  const emptyMovers = renderToStaticMarkup(
+    createElement(OutbidForm, {
+      city: "london",
+      category: "movers",
+      lockCity: true,
+      lockCategory: true,
+      emptyPaper: true,
+    }),
+  );
+  assert.match(emptyMovers, /class="claim empty-claim-first"/);
+  assert.match(emptyMovers, /data-empty-claim-first=""/);
+  assert.match(emptyMovers, /data-first-click="claim"/);
+  assert.match(emptyMovers, /Then the listing name/);
+  assert.match(emptyMovers, /data-later-write=""/);
+  assert.match(emptyMovers, />Outbid</);
+  assert.match(emptyMovers, /name="business"/);
+  assert.ok(emptyMovers.indexOf(">Outbid<") < emptyMovers.indexOf("Then the listing name"));
+  assert.ok(emptyMovers.indexOf("Then the listing name") < emptyMovers.indexOf('name="business"'));
 
   const dentists = renderToStaticMarkup(
     createElement(OutbidForm, {
@@ -3742,6 +3885,11 @@ test("city and lane pages 404 unknown slugs", async () => {
   assert.match(moversHtml, /No stars\. No map\./);
   assert.match(moversHtml, />Outbid</);
   assert.match(moversHtml, /<h1 class="edition-city">London<\/h1>/);
+  assert.match(moversHtml, /class="claim empty-claim-first"/);
+  assert.match(moversHtml, /data-later-write=""/);
+  assert.match(moversHtml, /Then the listing name/);
+  assert.ok(moversHtml.indexOf(">Outbid<") < moversHtml.indexOf("Then the listing name"));
+  assert.ok(moversHtml.indexOf("Then the listing name") < moversHtml.indexOf('name="business"'));
   assert.doesNotMatch(moversHtml, /data-category-tabs|data-column-index-after/);
 });
 

@@ -54,11 +54,12 @@ export function LaneBoard({
           {lead ? (
             <p className="claim-after-call-line">
               <a
-                className="outbid claim-after-call claim-after-call-one claim-after-call-two"
+                className="outbid claim-after-call claim-after-call-one claim-after-call-two claim-after-call-three"
                 href={`/c/${city.slug}/${category.slug}#claim`}
                 data-claim-after-call=""
                 data-claim-after-call-one=""
                 data-claim-after-call-two=""
+                data-claim-after-call-three=""
                 data-claim-job={category.slug}
               >
                 {`Outbid my ${category.display.toLowerCase()} column`}

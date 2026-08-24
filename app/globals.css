@@ -374,6 +374,20 @@ a:hover {
   letter-spacing: 0.05em;
 }
 
+.claim-after-call-three {
+  display: inline-block;
+  text-decoration: none;
+  padding: 0.4rem 0.85rem;
+  vertical-align: middle;
+}
+
+.claim-after-call.claim-after-call-three,
+.claim-after-call[data-claim-after-call-three] {
+  padding: 0.95rem 1.8rem;
+  font-size: 1.32rem;
+  letter-spacing: 0.07em;
+}
+
 .call-after-claim-line {
   margin: 0.65rem 0 0;
   color: var(--muted);

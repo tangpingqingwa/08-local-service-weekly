@@ -78,12 +78,11 @@ export function LaneBoard({
             </p>
           ) : null}
           {lastCall ? (
-            <p className="call-after-claim-line">
+            <p className="later-call call-after-claim-line" data-later-call="">
               <a
-                className="outbid call-after-claim"
+                className="host call-later call-after-claim"
                 href={`/go/${lastCall.id}`}
                 data-call-after-claim=""
-                data-call-later-quiet=""
                 aria-label={`Call #${lastCall.rank} after the claim hop at ${lastCall.siteHost}`}
               >
                 {`Call #${lastCall.rank}`}

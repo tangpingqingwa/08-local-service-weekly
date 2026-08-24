@@ -32,10 +32,11 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
           <h3 className="business" data-prize="">
             {listing.business}
           </h3>
-        ) : null}
-        <div className="card-top">
-          {later ? <h3 className="business">{listing.business}</h3> : null}
-          {lead ? (
+        ) : (
+          <h3 className="business">{listing.business}</h3>
+        )}
+        {lead ? (
+          <div className="card-top">
             <a
               className="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three call-after-claim-four call-after-claim-five"
               href={`/go/${listing.id}`}
@@ -49,31 +50,29 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
             >
               Call this #1
             </a>
-          ) : (
-            <a
-              className="host call-later"
-              href={`/go/${listing.id}`}
-              data-call-later=""
-              data-call-later-quiet=""
-              aria-label={`Call #${listing.rank} at ${listing.siteHost}`}
-            >
-              Call #{listing.rank}
-            </a>
-          )}
-        </div>
+          </div>
+        ) : null}
         <p className="meta">
           <span data-category="">{category}</span>
           <span aria-hidden="true"> · </span>
           <span data-city="">{city}</span>
-          {lead ? (
-            <>
-              <span aria-hidden="true"> · </span>
-              <span className="host" data-host="">
-                {listing.siteHost}
-              </span>
-            </>
-          ) : null}
+          <span aria-hidden="true"> · </span>
+          <span className="host" data-host="">
+            {listing.siteHost}
+          </span>
         </p>
+        {later ? (
+          <p className="later-call" data-later-call="">
+            <a
+              className="host call-later"
+              href={`/go/${listing.id}`}
+              data-call-later=""
+              aria-label={`Call #${listing.rank} at ${listing.siteHost}`}
+            >
+              Call #{listing.rank}
+            </a>
+          </p>
+        ) : null}
         {lead ? (
           <p className="later-facts" data-later-fact="">
             <span className="bid" data-bid="">
@@ -88,10 +87,6 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
           <p className="meta">
             <span className="bid" data-bid="">
               {formatUsd(listing.bidUsd)}
-            </span>
-            <span aria-hidden="true"> · </span>
-            <span className="host" data-host="">
-              {listing.siteHost}
             </span>
             <span aria-hidden="true"> · </span>
             <span className="clicks" data-clicks="">

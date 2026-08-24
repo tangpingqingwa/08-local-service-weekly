@@ -133,7 +133,8 @@ a:hover {
 /* Empty paper stays Claim #1. Occupied later-facts / Call this #1 stay off this week. */
 .paper-empty[data-paper-empty] [data-call-this-one],
 .paper-empty[data-paper-empty] [data-call-later],
-.paper-empty[data-paper-empty] [data-call-later-quiet],
+.paper-empty[data-paper-empty] [data-later-call],
+.paper-empty[data-paper-empty] .later-call,
 .paper-empty[data-paper-empty] [data-call-ad],
 .paper-empty[data-paper-empty] [data-prize],
 .paper-empty[data-paper-empty] [data-later-fact],
@@ -282,7 +283,8 @@ a:hover {
 /* Empty lanes stay blank after Claim #1 is the first click. Occupied Call hops stay off this column. */
 .paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-call-this-one],
 .paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-call-later],
-.paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-call-later-quiet],
+.paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-later-call],
+.paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] .later-call,
 .paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-call-ad],
 .paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-prize],
 .paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-later-fact],
@@ -292,7 +294,8 @@ a:hover {
 .paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-call-after-claim],
 .empty-lane[data-empty-honest] [data-call-this-one],
 .empty-lane[data-empty-honest] [data-call-later],
-.empty-lane[data-empty-honest] [data-call-later-quiet],
+.empty-lane[data-empty-honest] [data-later-call],
+.empty-lane[data-empty-honest] .later-call,
 .empty-lane[data-empty-honest] [data-call-ad],
 .empty-lane[data-empty-honest] [data-prize],
 .empty-lane[data-empty-honest] [data-later-fact],
@@ -581,41 +584,41 @@ a:hover {
   letter-spacing: 0.11em;
 }
 
-.paper-occupied[data-paper-occupied] .call-after-claim-line {
-  margin: 0.65rem 0 0;
-  color: var(--muted);
-  font-size: 0.86rem;
-  line-height: 1.45;
-}
-
-.paper-occupied[data-paper-occupied] .call-after-claim {
-  display: inline-block;
-  text-decoration: none;
-  padding: 0.4rem 0.85rem;
-  vertical-align: middle;
-}
-
-.paper-occupied[data-paper-occupied] .call-later[data-call-later-quiet] {
+.paper-occupied[data-paper-occupied] .later-call[data-later-call] {
+  margin: 0.28rem 0 0;
   color: var(--muted);
   font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+}
+
+.paper-occupied[data-paper-occupied] .later-call[data-later-call] .call-later {
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
   text-decoration: none;
   border-bottom: 1px dotted currentColor;
 }
 
-.paper-occupied[data-paper-occupied] .call-after-claim[data-call-later-quiet] {
+.paper-occupied[data-paper-occupied] .later-call.call-after-claim-line[data-later-call] {
+  margin: 0.65rem 0 0;
+}
+
+.paper-occupied[data-paper-occupied] .later-call[data-later-call] .call-after-claim {
+  display: inline;
   background: transparent;
-  color: var(--muted);
+  color: inherit;
   border: 0;
-  padding: 0.15rem 0;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
   vertical-align: baseline;
 }
 
-.paper-occupied[data-paper-occupied] .call-after-claim[data-call-later-quiet]:hover {
+.paper-occupied[data-paper-occupied] .later-call[data-later-call] .call-after-claim:hover {
   background: transparent;
   color: var(--ink);
 }

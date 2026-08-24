@@ -67,7 +67,11 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
           <span data-city="">{city}</span>
         </p>
         <p className="meta">
-          <span className="bid" data-bid="">
+          <span
+            className={lead ? "bid later-fact" : "bid"}
+            data-bid=""
+            {...(lead ? { "data-later-fact": "" } : {})}
+          >
             {formatUsd(listing.bidUsd)}
           </span>
           <span aria-hidden="true"> · </span>

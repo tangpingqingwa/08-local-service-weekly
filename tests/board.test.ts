@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { after, test } from "node:test";
 import React, { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -254,6 +256,7 @@ test("empty London hub is empty: four lanes, Outbid, no invented cards or stars"
   assert.doesNotMatch(html, /North London Movers|placeholder provider/i);
   assert.doesNotMatch(html, /top rated in London|google map|★/i);
   assert.doesNotMatch(html, /data-prize/);
+  assert.doesNotMatch(html, /data-later-fact|later-fact/);
 });
 
 test("four empty lanes stay honest after Claim #1 is the first click", () => {
@@ -280,6 +283,7 @@ test("four empty lanes stay honest after Claim #1 is the first click", () => {
   const formAt = emptyLane.indexOf("data-bid-form");
   assert.ok(honestAt >= 0 && formAt > honestAt);
   assert.doesNotMatch(emptyLane, /Call this #1|Call #2|data-call-later|data-call-later-quiet|data-call-ad|data-prize/);
+  assert.doesNotMatch(emptyLane, /data-later-fact|later-fact/);
   assert.doesNotMatch(emptyLane, /data-claim-after-call|after Call this #1|after the claim hop/);
   assert.doesNotMatch(emptyLane, /★|⭐|review count|google map|map pin|leaflet/i);
 
@@ -304,6 +308,7 @@ test("four empty lanes stay honest after Claim #1 is the first click", () => {
   const firstClick = emptyHub.indexOf("claim-first-click");
   assert.ok(firstHonest >= 0 && firstClick > firstHonest);
   assert.doesNotMatch(emptyHub, /Call this #1|data-call-this-one|data-prize|data-listing-card/);
+  assert.doesNotMatch(emptyHub, /data-later-fact|later-fact/);
   assert.doesNotMatch(emptyHub, /★|⭐|google map|map pin/i);
 
   const occupiedHub = renderToStaticMarkup(
@@ -335,6 +340,9 @@ test("four empty lanes stay honest after Claim #1 is the first click", () => {
   assert.match(occupiedHub, /Call this #1/);
   assert.match(occupiedHub, /Call #2/);
   assert.match(occupiedHub, /data-prize=""/);
+  assert.match(occupiedHub, /data-later-fact=""/);
+  assert.match(occupiedHub, /class="bid later-fact"/);
+  assert.equal((occupiedHub.match(/data-later-fact=""/g) ?? []).length, 1);
   assert.equal((occupiedHub.match(/data-empty-honest=""/g) ?? []).length, 3);
   assert.equal((occupiedHub.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((occupiedHub.match(/data-call-later=""/g) ?? []).length, 1);
@@ -369,6 +377,7 @@ test("lane board empty state has no cards", () => {
   assert.match(html, />Outbid</);
   assert.doesNotMatch(html, /data-listing-card/);
   assert.doesNotMatch(html, /data-prize/);
+  assert.doesNotMatch(html, /data-later-fact|later-fact/);
   assert.doesNotMatch(html, /Call this #1|Call #2|data-call-later|data-call-later-quiet|data-call-ad/);
   assert.doesNotMatch(html, /data-claim-after-call|after Call #|after Call this #1/);
   assert.doesNotMatch(html, /data-claim-after-call-one/);
@@ -484,6 +493,13 @@ test("occupied #1 names the business as the prize before $bid", () => {
   assert.ok(callAt > nameAt && bidAt > callAt && clicksAt > bidAt);
   assert.match(html, /data-bid=""/);
   assert.match(html, /data-clicks=""/);
+  assert.match(html, /class="bid later-fact"/);
+  assert.match(html, /data-later-fact=""/);
+  const laterFactAt = html.indexOf('data-later-fact=""');
+  const bidClassAt = html.indexOf('class="bid later-fact"');
+  assert.ok(laterFactAt > callAt && bidClassAt >= 0);
+  assert.ok(bidAt > laterFactAt && clicksAt > bidAt);
+  assert.equal((html.match(/data-later-fact=""/g) ?? []).length, 1);
   assert.doesNotMatch(html, /★|⭐|review count|google map|map pin/i);
   assert.doesNotMatch(html, /data-call-after-claim-six|data-claim-after-call-six/);
 
@@ -503,12 +519,204 @@ test("occupied #1 names the business as the prize before $bid", () => {
   assert.match(later, /Call #2/);
   assert.match(later, /class="host call-later"/);
   assert.doesNotMatch(later, /data-prize/);
+  assert.doesNotMatch(later, /data-later-fact|later-fact/);
   assert.doesNotMatch(later, /Call this #1|data-call-this-one/);
   assert.match(later, /data-call-later-quiet=""/);
   const laterName = later.indexOf("South London Movers");
   const laterCall = later.indexOf("Call #2");
   const laterBid = later.indexOf("$15");
   assert.ok(laterName >= 0 && laterCall > laterName && laterBid > laterCall);
+});
+
+test("occupied #1 $bid stays a later fact and does not shout beside the listing name", () => {
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+  const prizeSize = css.match(
+    /\.card\[data-call-ad="lead"\] \.business\[data-prize\]\s*\{[^}]*font-size:\s*([\d.]+)rem/,
+  );
+  const laterFact = css.match(
+    /\.card\[data-call-ad="lead"\] \.bid\.later-fact\[data-later-fact\]\s*\{([^}]*)\}/,
+  );
+  assert.ok(prizeSize);
+  assert.ok(laterFact);
+  const bidSize = laterFact[1].match(/font-size:\s*([\d.]+)rem/);
+  assert.ok(bidSize);
+  assert.ok(Number(prizeSize[1]) > Number(bidSize[1]));
+  assert.match(laterFact[1], /color:\s*var\(--muted\)/);
+  assert.match(laterFact[1], /font-weight:\s*500/);
+  assert.doesNotMatch(laterFact[1], /color:\s*var\(--accent\)/);
+  assert.match(css, /empty-lane\[data-empty-honest\] \[data-later-fact\]/);
+  assert.match(css, /empty-lane\[data-empty-honest\] \.later-fact/);
+
+  const london = getCity("london");
+  const movers = getCategory("movers");
+  assert.ok(london && movers);
+
+  const empty = renderToStaticMarkup(
+    createElement(LaneBoard, {
+      city: london,
+      category: movers,
+      listings: [],
+      showForm: true,
+    }),
+  );
+  assert.match(empty, /data-empty-honest=""/);
+  assert.match(empty, /No #1/);
+  assert.match(empty, /No stars\. No map\./);
+  assert.doesNotMatch(empty, /data-later-fact|later-fact/);
+  assert.doesNotMatch(empty, /data-prize|Call this #1|data-call-this-one/);
+  assert.doesNotMatch(empty, /data-call-after-claim-six|data-claim-after-call-six/);
+
+  const onlyCard = renderToStaticMarkup(
+    createElement(ListingCard, {
+      listing: ranked({
+        id: "lst_movers",
+        business: "North London Movers",
+        bidUsd: 20,
+        clicks: 4,
+        siteHost: "north.example",
+      }),
+    }),
+  );
+  const prizeAt = onlyCard.indexOf('data-prize=""');
+  const nameAt = onlyCard.indexOf("North London Movers");
+  const callAt = onlyCard.indexOf("Call this #1");
+  const laterFactAt = onlyCard.indexOf('data-later-fact=""');
+  const bidClassAt = onlyCard.indexOf('class="bid later-fact"');
+  const bidAt = onlyCard.indexOf("$20");
+  const clicksAt = onlyCard.indexOf("4 clicks");
+  assert.ok(prizeAt >= 0 && nameAt >= 0 && callAt > nameAt);
+  assert.ok(laterFactAt > callAt && bidClassAt >= 0);
+  assert.ok(bidAt > laterFactAt && clicksAt > bidAt);
+  assert.match(onlyCard, /<h3 class="business" data-prize="">North London Movers<\/h3>/);
+  assert.match(onlyCard, /class="bid later-fact"/);
+  assert.match(onlyCard, /data-later-fact=""/);
+  assert.match(onlyCard, /data-call-this-one=""/);
+  assert.match(onlyCard, /Call this #1/);
+  assert.equal((onlyCard.match(/data-later-fact=""/g) ?? []).length, 1);
+  assert.equal((onlyCard.match(/class="bid later-fact"/g) ?? []).length, 1);
+  assert.doesNotMatch(onlyCard, /data-call-later-quiet|Call #2/);
+  assert.doesNotMatch(onlyCard, /data-call-after-claim-six|data-claim-after-call-six/);
+
+  const laterCard = renderToStaticMarkup(
+    createElement(ListingCard, {
+      listing: ranked({
+        id: "lst_south",
+        rank: 2,
+        business: "South London Movers",
+        bidUsd: 15,
+        clicks: 1,
+        siteHost: "south.example",
+      }),
+    }),
+  );
+  assert.match(laterCard, /class="bid"/);
+  assert.match(laterCard, /Call #2/);
+  assert.match(laterCard, /data-call-later-quiet=""/);
+  assert.doesNotMatch(laterCard, /data-later-fact|later-fact/);
+  assert.doesNotMatch(laterCard, /data-prize|Call this #1|data-call-this-one/);
+
+  const occupied = renderToStaticMarkup(
+    createElement(LaneBoard, {
+      city: london,
+      category: movers,
+      listings: [
+        ranked({
+          id: "lst_movers",
+          business: "North London Movers",
+          bidUsd: 20,
+          clicks: 4,
+          siteHost: "north.example",
+        }),
+        ranked({
+          id: "lst_south",
+          rank: 2,
+          business: "South London Movers",
+          bidUsd: 15,
+          clicks: 1,
+          siteHost: "south.example",
+        }),
+      ],
+      showForm: true,
+    }),
+  );
+  const leadStart = occupied.indexOf('data-rank="1"');
+  const laterStart = occupied.indexOf('data-rank="2"');
+  const laterEnd = occupied.indexOf("</article>", laterStart);
+  const lead = occupied.slice(leadStart, laterStart);
+  const later = occupied.slice(laterStart, laterEnd === -1 ? undefined : laterEnd);
+  assert.ok(leadStart >= 0 && laterStart > leadStart);
+  assert.match(lead, /data-prize=""/);
+  assert.match(lead, /class="bid later-fact"/);
+  assert.match(lead, /data-later-fact=""/);
+  assert.match(lead, /Call this #1/);
+  assert.match(later, /Call #2/);
+  assert.match(later, /class="bid"/);
+  assert.doesNotMatch(later, /data-later-fact|later-fact|data-prize/);
+  const occupiedPrize = occupied.indexOf('data-prize=""');
+  const occupiedName = occupied.indexOf("North London Movers");
+  const occupiedCall = occupied.indexOf("Call this #1");
+  const occupiedLaterFact = occupied.indexOf('data-later-fact=""');
+  const occupiedBidClass = occupied.indexOf('class="bid later-fact"');
+  const occupiedBid = occupied.indexOf("$20");
+  const occupiedLaterCall = occupied.indexOf("Call #2");
+  const occupiedForm = occupied.indexOf("data-bid-form");
+  assert.ok(occupiedPrize >= 0 && occupiedName >= 0 && occupiedCall > occupiedName);
+  assert.ok(occupiedLaterFact > occupiedCall && occupiedBidClass >= 0);
+  assert.ok(occupiedBid > occupiedLaterFact && occupiedLaterCall > occupiedBid);
+  assert.ok(occupiedForm > occupiedLaterCall);
+  assert.equal((occupied.match(/data-later-fact=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/class="bid later-fact"/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-prize=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-call-this-one=""/g) ?? []).length, 1);
+  assert.match(occupied, /after Call this #1/);
+  assert.doesNotMatch(occupied, /data-empty-honest|No #1/);
+  assert.doesNotMatch(occupied, /data-call-after-claim-six|data-claim-after-call-six/);
+  assert.doesNotMatch(occupied, /★|⭐|review count|google map|map pin/i);
+
+  const hub = renderToStaticMarkup(
+    createElement(CityHub, {
+      city: london,
+      weekId: currentWeekId(),
+      lanes: {
+        movers: [
+          ranked({
+            id: "lst_movers",
+            business: "North London Movers",
+            bidUsd: 20,
+            siteHost: "north.example",
+          }),
+          ranked({
+            id: "lst_south",
+            rank: 2,
+            business: "South London Movers",
+            bidUsd: 15,
+            siteHost: "south.example",
+          }),
+        ],
+        dentists: [],
+        immigration_lawyers: [],
+        tutors: [],
+      },
+    }),
+  );
+  assert.match(hub, /data-prize=""/);
+  assert.match(hub, /class="bid later-fact"/);
+  assert.match(hub, /data-later-fact=""/);
+  assert.match(hub, /Call this #1/);
+  assert.match(hub, /Call #2/);
+  assert.equal((hub.match(/data-later-fact=""/g) ?? []).length, 1);
+  assert.equal((hub.match(/class="bid later-fact"/g) ?? []).length, 1);
+  assert.equal((hub.match(/data-prize=""/g) ?? []).length, 1);
+  assert.equal((hub.match(/data-empty-honest=""/g) ?? []).length, 3);
+  assert.match(hub, /No #1/);
+  const moversLane = hub.match(
+    /<section class="lane classified-column"[^>]*data-category="movers"[\s\S]*?<\/section>/,
+  );
+  assert.ok(moversLane);
+  assert.match(moversLane[0], /data-later-fact=""/);
+  assert.doesNotMatch(moversLane[0], /data-empty-honest|No #1/);
+  assert.doesNotMatch(hub, /claim-first-click|Then pick the column/);
+  assert.doesNotMatch(hub, /★|⭐|review count|google map|map pin/i);
 });
 
 test("occupied later ranks stamp Call #N ahead of $bid, not another Call this #1", () => {
@@ -570,7 +778,9 @@ test("occupied later ranks stamp Call #N ahead of $bid, not another Call this #1
   assert.ok(thirdCall >= 0 && thirdBid > thirdCall);
   assert.doesNotMatch(third, /Call this #1|Call #2|data-call-this-one/);
   assert.doesNotMatch(later, /data-prize/);
+  assert.doesNotMatch(later, /data-later-fact|later-fact/);
   assert.doesNotMatch(third, /data-prize/);
+  assert.doesNotMatch(third, /data-later-fact|later-fact/);
 });
 
 test("occupied hub makes calling the paid #1 the neighbor move", () => {
@@ -617,8 +827,14 @@ test("occupied hub makes calling the paid #1 the neighbor move", () => {
   const prizeAt = html.indexOf('data-prize=""');
   const nameAt = html.indexOf("North London Movers");
   const bidAt = html.indexOf("$20");
+  const laterFactAt = html.indexOf('data-later-fact=""');
+  const bidClassAt = html.indexOf('class="bid later-fact"');
   assert.ok(prizeAt >= 0 && nameAt >= 0 && prizeAt < bidAt && nameAt < bidAt);
+  assert.ok(laterFactAt > prizeAt && bidClassAt >= 0 && bidAt > laterFactAt);
+  assert.match(html, /class="bid later-fact"/);
+  assert.match(html, /data-later-fact=""/);
   assert.equal((html.match(/data-prize=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-later-fact=""/g) ?? []).length, 1);
   const emptyLanes = html.match(/data-empty-lane="true"/g) ?? [];
   assert.equal(emptyLanes.length, 3);
   const honestLanes = html.match(/data-empty-honest=""/g) ?? [];
@@ -725,7 +941,10 @@ test("occupied hub later ranks stamp Call #N; empty lanes stay honest", () => {
   assert.ok(laterStart >= 0 && laterCall > laterStart && laterBid > laterCall);
   assert.equal(html.slice(laterStart, laterStart + 900).includes("Call this #1"), false);
   assert.equal(html.slice(laterStart, laterStart + 900).includes("data-prize"), false);
+  assert.equal(html.slice(laterStart, laterStart + 900).includes("data-later-fact"), false);
   assert.equal((html.match(/data-prize=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-later-fact=""/g) ?? []).length, 1);
+  assert.match(html, /class="bid later-fact"/);
   const emptyLanes = html.match(/data-empty-lane="true"/g) ?? [];
   assert.equal(emptyLanes.length, 3);
   const honestLanes = html.match(/data-empty-honest=""/g) ?? [];
@@ -1169,6 +1388,7 @@ test("occupied #1 concentrates Call this #1; later stack does not add another #1
   assert.match(later, /data-call-later-quiet=""/);
   assert.match(later, /Call #2/);
   assert.doesNotMatch(later, /data-prize/);
+  assert.doesNotMatch(later, /data-later-fact|later-fact/);
   assert.doesNotMatch(later, /Call this #1|data-call-this-one|outbid call-this-one|data-call-after-claim-one|data-call-after-claim-two|data-call-after-claim-three|data-call-after-claim-four|data-call-after-claim-five/);
   assert.doesNotMatch(later, /data-claim-after-call-three|claim-after-call-three|Outbid my movers column/);
   assert.doesNotMatch(later, /data-claim-after-call-four|claim-after-call-four/);
@@ -1217,6 +1437,7 @@ test("occupied later Call #N stays quieter than Call this #1", () => {
   assert.match(empty, /No #1/);
   assert.doesNotMatch(empty, /data-call-later-quiet|data-call-later|Call #2/);
   assert.doesNotMatch(empty, /Call this #1|data-call-this-one|data-prize/);
+  assert.doesNotMatch(empty, /data-later-fact|later-fact/);
   assert.doesNotMatch(empty, /data-call-after-claim-six|data-claim-after-call-six/);
 
   const onlyOne = renderToStaticMarkup(
@@ -1238,6 +1459,8 @@ test("occupied later Call #N stays quieter than Call this #1", () => {
   assert.match(onlyOne, /data-call-this-one=""/);
   assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three call-after-claim-four call-after-claim-five"/);
   assert.match(onlyOne, /data-prize=""/);
+  assert.match(onlyOne, /class="bid later-fact"/);
+  assert.match(onlyOne, /data-later-fact=""/);
   assert.doesNotMatch(onlyOne, /data-call-later-quiet|data-call-later|Call #2/);
   assert.doesNotMatch(onlyOne, /data-call-after-claim=""|after the claim hop/);
   assert.doesNotMatch(onlyOne, /data-empty-honest|No #1/);
@@ -1265,6 +1488,7 @@ test("occupied later Call #N stays quieter than Call this #1", () => {
   assert.match(laterCard, /class="host call-later"/);
   assert.match(laterCard, /data-call-ad="later"/);
   assert.doesNotMatch(laterCard, /Call this #1|data-call-this-one|data-prize|class="outbid"/);
+  assert.doesNotMatch(laterCard, /data-later-fact|later-fact/);
   assert.doesNotMatch(laterCard, /data-call-after-claim-six|data-claim-after-call-six/);
 
   const occupied = renderToStaticMarkup(

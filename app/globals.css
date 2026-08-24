@@ -259,6 +259,8 @@ a:hover {
 .empty-lane[data-empty-honest] [data-call-later-quiet],
 .empty-lane[data-empty-honest] [data-call-ad],
 .empty-lane[data-empty-honest] [data-prize],
+.empty-lane[data-empty-honest] [data-later-fact],
+.empty-lane[data-empty-honest] .later-fact,
 .empty-lane[data-empty-honest] [data-listing-card],
 .empty-lane[data-empty-honest] [data-claim-after-call],
 .empty-lane[data-empty-honest] [data-call-after-claim] {
@@ -327,6 +329,13 @@ a:hover {
 .card[data-call-ad="lead"] .bid,
 .card[data-call-ad="lead"] .clicks {
   font-weight: 400;
+}
+
+/* Occupied #1 only: $bid stays a later fact. Do not shout beside the listing name. */
+.card[data-call-ad="lead"] .bid.later-fact[data-later-fact] {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
 }
 
 .meta {

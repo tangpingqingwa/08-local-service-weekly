@@ -173,6 +173,11 @@ Each heading is one fleet unit. Do not start the next PR in the same change.
 - **Dependencies:** PR 42
 - **Acceptance:** Occupied London `/` with one paid movers lane + three empty lanes wraps paid columns `lane-occupied` (`data-lane-occupied`) and empty columns `lane-empty` (`data-lane-empty`). Later-call CSS is scoped to `.lane-occupied` so later Call cannot leak onto No #1. Occupied #1 name stays the prize. Call this #1 stays the first occupied click. Later Call stays after identity. Empty lanes stay No #1 / no stars / no map / no Call hop. Column tabs stay after the listing. Rank stays the bid. Do not add another named hop. Do not stamp `call-after-claim-N`. Do not recolor. Do not rebuild the classified paper. Do not re-ship later-call grouping or empty later-write. Stamp-only = REJECT.
 
+### PR 44: first-time neighbor — unpaid stays off the classified paper
+- **Files:** `src/board.ts`, `src/ui/listing-card.tsx`, `src/ui/lane-board.tsx`, `src/ui/city-hub.tsx`, `src/ui/outbid-form.tsx`, `src/ui/claim-column.tsx`, `app/globals.css`, `tests/board.test.ts`, `scripts/test.sh`, `BUILD.md`
+- **Dependencies:** PR 43
+- **Acceptance:** Unpaid or abandoned listing stays off the board. Empty leftover London `/` stays No #1 / no stars / no map / no Call this #1. Occupied #1 name stays the prize only after Polar reports paid. Call this #1 stays the first occupied click. Rank stays the bid. Column tabs stay after the listing. Empty lanes stay No #1. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Do not re-ship empty-lane isolation or later-call grouping. Stamp-only = REJECT.
+
 ---
 
 ## 6. Live-smoke (operator)

@@ -189,7 +189,8 @@ export function OutbidForm({
         </h2>
         <p className="claim-note">
           New spots start at ${MIN_BID_USD}. Paying less than #1 still lists at
-          the rank that bid can take. Rank is the bid.
+          the rank that bid can take. Rank is the bid. Unpaid checkout stays off
+          the board until Polar reports paid. An abandoned listing is not #1.
         </p>
         {emptyPaper ? (
           <>

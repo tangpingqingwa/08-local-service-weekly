@@ -41,8 +41,28 @@ export function siteHost(siteUrl: string): string {
   }
 }
 
+/**
+ * Polar (or the fixture) has reported paid. Unpaid / abandoned checkout
+ * never ranks and must not paint Call this #1.
+ */
+export function isPolarPaidListing(
+  listing: Pick<Listing, "createdAt">,
+): boolean {
+  const paidAt = listing.createdAt?.trim() ?? "";
+  if (!paidAt) return false;
+  const ms = Date.parse(paidAt);
+  return Number.isFinite(ms) && ms > 0;
+}
+
+/** Paid rows only. Unpaid or abandoned checkouts never take a rank. */
+export function paidListings<T extends Pick<Listing, "createdAt">>(
+  listings: readonly T[],
+): T[] {
+  return listings.filter(isPolarPaidListing);
+}
+
 export function rankLane(listings: readonly Listing[]): RankedListing[] {
-  return listings
+  return paidListings(listings)
     .filter((listing) => !listing.hidden)
     .slice()
     .sort((a, b) => {
@@ -59,8 +79,9 @@ export function rankLane(listings: readonly Listing[]): RankedListing[] {
 }
 
 /**
- * Visible listings in one (city, category, weekId) lane.
+ * Visible Polar-paid listings in one (city, category, weekId) lane.
  * Ranker stays keyed by city; weeks never mix. Clicks stay at the stored integer.
+ * Unpaid checkout drafts never appear.
  */
 export function listLane(
   city: string,

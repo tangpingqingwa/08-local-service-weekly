@@ -1,4 +1,4 @@
-import type { RankedListing } from "../board";
+import { isPolarPaidListing, type RankedListing } from "../board";
 import { getCategory } from "../categories";
 import { getCity } from "../cities";
 
@@ -11,6 +11,7 @@ export function formatClicks(clicks: number): string {
 }
 
 export function ListingCard({ listing }: { listing: RankedListing }) {
+  if (!isPolarPaidListing(listing)) return null;
   const city = getCity(listing.city)?.display ?? listing.city;
   const category = getCategory(listing.category)?.display ?? listing.category;
   const lead = listing.rank === 1;
@@ -23,6 +24,7 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
       data-classified-ad=""
       data-rank={listing.rank}
       data-listing-id={listing.id}
+      data-polar-paid=""
       {...(lead ? { "data-call-ad": "lead" } : {})}
       {...(later ? { "data-call-ad": "later" } : {})}
     >

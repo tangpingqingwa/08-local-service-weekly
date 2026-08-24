@@ -256,6 +256,7 @@ a:hover {
 /* Empty lanes stay blank after Claim #1 is the first click. Occupied Call hops stay off this column. */
 .empty-lane[data-empty-honest] [data-call-this-one],
 .empty-lane[data-empty-honest] [data-call-later],
+.empty-lane[data-empty-honest] [data-call-later-quiet],
 .empty-lane[data-empty-honest] [data-call-ad],
 .empty-lane[data-empty-honest] [data-prize],
 .empty-lane[data-empty-honest] [data-listing-card],
@@ -496,6 +497,31 @@ a:hover {
   text-decoration: none;
   padding: 0.4rem 0.85rem;
   vertical-align: middle;
+}
+
+.call-later[data-call-later-quiet] {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+}
+
+.call-after-claim[data-call-later-quiet] {
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  padding: 0.15rem 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  vertical-align: baseline;
+}
+
+.call-after-claim[data-call-later-quiet]:hover {
+  background: transparent;
+  color: var(--ink);
 }
 
 .card[data-call-ad="lead"] .card-top {

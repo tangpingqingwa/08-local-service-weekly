@@ -227,6 +227,7 @@ test("empty London hub is empty: four lanes, Outbid, no invented cards or stars"
   assert.doesNotMatch(html, /data-call-after-claim=""|after the claim hop/);
   assert.doesNotMatch(html, /data-call-after-claim-one/);
   assert.doesNotMatch(html, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(html, /data-call-after-claim-three|call-after-claim-three/);
   assert.doesNotMatch(html, /★|⭐|&star;|rated\s+\d|review count|top rated/i);
   assert.doesNotMatch(html, /North London Movers|placeholder provider/i);
   assert.doesNotMatch(html, /top rated in London|google map|★/i);
@@ -256,6 +257,7 @@ test("lane board empty state has no cards", () => {
   assert.doesNotMatch(html, /data-call-after-claim=""|after the claim hop/);
   assert.doesNotMatch(html, /data-call-after-claim-one/);
   assert.doesNotMatch(html, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(html, /data-call-after-claim-three|call-after-claim-three/);
 });
 
 test("rank card shows $bid, public clicks placeholder 0, and host", () => {
@@ -277,13 +279,18 @@ test("rank card shows $bid, public clicks placeholder 0, and host", () => {
   assert.match(html, /data-call-this-one=""/);
   assert.match(html, /data-call-after-claim-one=""/);
   assert.match(html, /data-call-after-claim-two=""/);
-  assert.match(html, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(html, /data-call-after-claim-three=""/);
+  assert.match(html, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.match(html, /Call this #1/);
   assert.equal((html.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.ok(
     Math.abs(html.indexOf('data-call-after-claim-two=""') - html.indexOf('data-call-after-claim-one=""')) < 80,
+  );
+  assert.ok(
+    Math.abs(html.indexOf('data-call-after-claim-three=""') - html.indexOf('data-call-after-claim-two=""')) < 80,
   );
   assert.match(html, /#1/);
   assert.match(html, /North London Movers/);
@@ -348,6 +355,7 @@ test("occupied later ranks stamp Call #N ahead of $bid, not another Call this #1
   assert.doesNotMatch(later, /data-call-after-claim=""|after the claim hop/);
   assert.doesNotMatch(later, /data-call-after-claim-one|call-after-claim-one/);
   assert.doesNotMatch(later, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(later, /data-call-after-claim-three|call-after-claim-three/);
   assert.doesNotMatch(later, /data-claim-after-call-two|claim-after-call-two/);
   assert.doesNotMatch(later, /data-claim-after-call-three|claim-after-call-three/);
 
@@ -399,12 +407,14 @@ test("occupied hub makes calling the paid #1 the neighbor move", () => {
   assert.match(html, /data-call-this-one=""/);
   assert.match(html, /data-call-after-claim-one=""/);
   assert.match(html, /data-call-after-claim-two=""/);
-  assert.match(html, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(html, /data-call-after-claim-three=""/);
+  assert.match(html, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.match(html, /Call this #1/);
   assert.match(html, /href="\/go\/lst_movers"/);
   assert.equal((html.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.match(html, /North London Movers/);
   assert.match(html, /\$20/);
   const emptyLanes = html.match(/data-empty-lane="true"/g) ?? [];
@@ -476,10 +486,11 @@ test("occupied hub later ranks stamp Call #N; empty lanes stay honest", () => {
   );
   assert.match(html, /data-call-ad="lead"/);
   assert.match(html, /Call this #1/);
-  assert.match(html, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(html, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.equal((html.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.match(html, /data-call-ad="later"/);
   assert.match(html, /data-call-later=""/);
   assert.match(html, /Call #2/);
@@ -545,6 +556,7 @@ test("occupied lane claims after Call #N; empty and #1-only stay honest", () => 
   assert.doesNotMatch(empty, /data-call-after-claim=""|after the claim hop/);
   assert.doesNotMatch(empty, /data-call-after-claim-one/);
   assert.doesNotMatch(empty, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(empty, /data-call-after-claim-three|call-after-claim-three/);
   assert.doesNotMatch(empty, /Call this #1|Call #2|data-call-later/);
 
   const onlyOne = renderToStaticMarkup(
@@ -565,10 +577,12 @@ test("occupied lane claims after Call #N; empty and #1-only stay honest", () => 
   assert.match(onlyOne, /data-call-this-one=""/);
   assert.match(onlyOne, /data-call-after-claim-one=""/);
   assert.match(onlyOne, /data-call-after-claim-two=""/);
-  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(onlyOne, /data-call-after-claim-three=""/);
+  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.equal((onlyOne.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((onlyOne.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((onlyOne.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((onlyOne.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.match(onlyOne, /data-claim-after-call=""/);
   assert.match(onlyOne, /data-claim-after-call-one=""/);
   assert.match(onlyOne, /data-claim-after-call-two=""/);
@@ -582,6 +596,7 @@ test("occupied lane claims after Call #N; empty and #1-only stay honest", () => 
   const onlyClaimThree = onlyOne.indexOf('data-claim-after-call-three=""');
   const onlyStamp = onlyOne.indexOf('data-call-after-claim-one=""');
   const onlyCallTwo = onlyOne.indexOf('data-call-after-claim-two=""');
+  const onlyCallThree = onlyOne.indexOf('data-call-after-claim-three=""');
   assert.ok(onlyCall >= 0 && onlyClaim > onlyCall);
   assert.ok(onlyClaimTwo > onlyCall);
   assert.ok(onlyClaimThree > onlyCall);
@@ -589,6 +604,7 @@ test("occupied lane claims after Call #N; empty and #1-only stay honest", () => 
   assert.ok(Math.abs(onlyClaimThree - onlyClaimTwo) < 80);
   assert.ok(onlyStamp >= 0 && Math.abs(onlyStamp - onlyOne.indexOf('data-call-this-one=""')) < 80);
   assert.ok(onlyCallTwo >= 0 && Math.abs(onlyCallTwo - onlyStamp) < 80);
+  assert.ok(onlyCallThree >= 0 && Math.abs(onlyCallThree - onlyCallTwo) < 80);
   assert.doesNotMatch(onlyOne, /Call #2|data-call-later|data-call-ad="later"/);
   assert.doesNotMatch(onlyOne, /after Call #2/);
   assert.doesNotMatch(onlyOne, /data-call-after-claim=""|after the claim hop/);
@@ -616,10 +632,11 @@ test("occupied lane claims after Call #N; empty and #1-only stay honest", () => 
     }),
   );
   assert.match(occupied, /Call this #1/);
-  assert.match(occupied, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(occupied, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.equal((occupied.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.match(occupied, /Call #2/);
   assert.match(occupied, /data-call-later=""/);
   assert.match(occupied, /data-claim-after-call=""/);
@@ -676,6 +693,7 @@ test("occupied lane calls after the claim hop; empty and #1-only stay honest", (
   assert.doesNotMatch(empty, /data-call-after-claim=""|after the claim hop/);
   assert.doesNotMatch(empty, /data-call-after-claim-one/);
   assert.doesNotMatch(empty, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(empty, /data-call-after-claim-three|call-after-claim-three/);
   assert.doesNotMatch(empty, /data-claim-after-call|after Call #|after Call this #1/);
   assert.doesNotMatch(empty, /data-claim-after-call-two|claim-after-call-two/);
   assert.doesNotMatch(empty, /data-claim-after-call-three|claim-after-call-three/);
@@ -695,12 +713,14 @@ test("occupied lane calls after the claim hop; empty and #1-only stay honest", (
     }),
   );
   assert.match(onlyOne, /Call this #1/);
-  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.match(onlyOne, /data-call-after-claim-one=""/);
   assert.match(onlyOne, /data-call-after-claim-two=""/);
+  assert.match(onlyOne, /data-call-after-claim-three=""/);
   assert.equal((onlyOne.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((onlyOne.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((onlyOne.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((onlyOne.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.match(onlyOne, /data-claim-after-call=""/);
   assert.match(onlyOne, /data-claim-after-call-two=""/);
   assert.match(onlyOne, /data-claim-after-call-three=""/);
@@ -731,10 +751,11 @@ test("occupied lane calls after the claim hop; empty and #1-only stay honest", (
     }),
   );
   assert.match(occupied, /Call this #1/);
-  assert.match(occupied, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(occupied, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.equal((occupied.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.match(occupied, /Call #2/);
   assert.match(occupied, /data-claim-after-call=""/);
   assert.match(occupied, /data-claim-after-call-two=""/);
@@ -771,6 +792,7 @@ test("occupied #1 concentrates Call this #1; later stack does not add another #1
   assert.doesNotMatch(empty, /data-call-this-one|class="outbid call-this-one"/);
   assert.doesNotMatch(empty, /data-call-after-claim-one|call-after-claim-one/);
   assert.doesNotMatch(empty, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(empty, /data-call-after-claim-three|call-after-claim-three/);
   assert.doesNotMatch(empty, /Call this #1|Call #2|data-call-later/);
   assert.doesNotMatch(empty, /data-claim-after-call-one|after Call this #1/);
   assert.doesNotMatch(empty, /data-claim-after-call-two|claim-after-call-two/);
@@ -791,14 +813,16 @@ test("occupied #1 concentrates Call this #1; later stack does not add another #1
       showForm: true,
     }),
   );
-  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.match(onlyOne, /data-call-this-one=""/);
   assert.match(onlyOne, /data-call-after-claim-one=""/);
   assert.match(onlyOne, /data-call-after-claim-two=""/);
+  assert.match(onlyOne, /data-call-after-claim-three=""/);
   assert.match(onlyOne, /href="\/go\/lst_movers"/);
   assert.equal((onlyOne.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((onlyOne.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((onlyOne.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((onlyOne.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.match(onlyOne, /data-claim-after-call=""/);
   assert.match(onlyOne, /data-claim-after-call-one=""/);
   assert.match(onlyOne, /data-claim-after-call-two=""/);
@@ -833,22 +857,24 @@ test("occupied #1 concentrates Call this #1; later stack does not add another #1
   const lead = occupied.slice(leadStart, laterStart);
   const later = occupied.slice(laterStart, laterEnd === -1 ? undefined : laterEnd);
   assert.ok(leadStart >= 0 && laterStart > leadStart);
-  assert.match(lead, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(lead, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.match(lead, /data-call-this-one=""/);
   assert.match(lead, /data-call-after-claim-one=""/);
   assert.match(lead, /data-call-after-claim-two=""/);
+  assert.match(lead, /data-call-after-claim-three=""/);
   assert.match(lead, /Call this #1/);
   assert.match(lead, /href="\/go\/lst_movers"/);
   assert.doesNotMatch(lead, /data-call-later|data-call-after-claim=""/);
   assert.match(later, /class="host call-later"/);
   assert.match(later, /Call #2/);
-  assert.doesNotMatch(later, /Call this #1|data-call-this-one|outbid call-this-one|data-call-after-claim-one|data-call-after-claim-two/);
+  assert.doesNotMatch(later, /Call this #1|data-call-this-one|outbid call-this-one|data-call-after-claim-one|data-call-after-claim-two|data-call-after-claim-three/);
   assert.doesNotMatch(later, /data-claim-after-call-three|claim-after-call-three|Outbid my movers column/);
   assert.match(occupied, /data-call-after-claim=""/);
   assert.match(occupied, /class="outbid call-after-claim"/);
   assert.equal((occupied.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/class="outbid call-this-one/g) ?? []).length, 1);
   const oneAt = occupied.indexOf('data-call-this-one=""');
   const laterCallAt = occupied.indexOf('data-call-later=""');
@@ -886,6 +912,7 @@ test("occupied column concentrates Outbid my column after Call this #1", () => {
   assert.doesNotMatch(empty, /data-claim-after-call|Call this #1/);
   assert.doesNotMatch(empty, /data-call-after-claim-one|call-after-claim-one/);
   assert.doesNotMatch(empty, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(empty, /data-call-after-claim-three|call-after-claim-three/);
 
   const onlyOne = renderToStaticMarkup(
     createElement(LaneBoard, {
@@ -902,7 +929,7 @@ test("occupied column concentrates Outbid my column after Call this #1", () => {
       showForm: true,
     }),
   );
-  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.match(onlyOne, /class="outbid claim-after-call claim-after-call-one claim-after-call-two claim-after-call-three"/);
   assert.match(onlyOne, /data-claim-after-call=""/);
   assert.match(onlyOne, /data-claim-after-call-one=""/);
@@ -910,6 +937,7 @@ test("occupied column concentrates Outbid my column after Call this #1", () => {
   assert.match(onlyOne, /data-claim-after-call-three=""/);
   assert.match(onlyOne, /data-call-after-claim-one=""/);
   assert.match(onlyOne, /data-call-after-claim-two=""/);
+  assert.match(onlyOne, /data-call-after-claim-three=""/);
   assert.match(onlyOne, /Outbid my movers column/);
   assert.match(onlyOne, /after Call this #1/);
   assert.match(onlyOne, /href="\/c\/london\/movers#claim"/);
@@ -919,6 +947,7 @@ test("occupied column concentrates Outbid my column after Call this #1", () => {
   assert.equal((onlyOne.match(/data-claim-after-call-three=""/g) ?? []).length, 1);
   assert.equal((onlyOne.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((onlyOne.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((onlyOne.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   const onlyCall = onlyOne.indexOf("Call this #1");
   const onlyClaim = onlyOne.indexOf('data-claim-after-call-one=""');
   const onlyClaimTwo = onlyOne.indexOf('data-claim-after-call-two=""');
@@ -926,6 +955,7 @@ test("occupied column concentrates Outbid my column after Call this #1", () => {
   const onlyForm = onlyOne.indexOf("data-bid-form");
   const onlyStamp = onlyOne.indexOf('data-call-after-claim-one=""');
   const onlyCallTwo = onlyOne.indexOf('data-call-after-claim-two=""');
+  const onlyCallThree = onlyOne.indexOf('data-call-after-claim-three=""');
   assert.ok(onlyCall >= 0 && onlyClaim > onlyCall);
   assert.ok(onlyClaimTwo > onlyCall);
   assert.ok(onlyClaimThree > onlyCall);
@@ -933,6 +963,7 @@ test("occupied column concentrates Outbid my column after Call this #1", () => {
   assert.ok(Math.abs(onlyClaimThree - onlyClaimTwo) < 80);
   assert.ok(onlyStamp >= 0 && onlyClaim > onlyStamp);
   assert.ok(onlyCallTwo >= 0 && Math.abs(onlyCallTwo - onlyStamp) < 80);
+  assert.ok(onlyCallThree >= 0 && Math.abs(onlyCallThree - onlyCallTwo) < 80);
   assert.ok(onlyForm > onlyClaim);
   assert.doesNotMatch(onlyOne, /after Call #2|data-call-after-claim=""/);
 
@@ -966,12 +997,14 @@ test("occupied column concentrates Outbid my column after Call this #1", () => {
   assert.match(occupied, /href="\/c\/london\/movers#claim"/);
   assert.match(occupied, /data-call-after-claim-one=""/);
   assert.match(occupied, /data-call-after-claim-two=""/);
+  assert.match(occupied, /data-call-after-claim-three=""/);
   assert.equal((occupied.match(/data-claim-after-call=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-claim-after-call-one=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-claim-after-call-two=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-claim-after-call-three=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   const callOne = occupied.indexOf("Call this #1");
   const claimOne = occupied.indexOf('data-claim-after-call-one=""');
   const claimTwo = occupied.indexOf('data-claim-after-call-two=""');
@@ -981,6 +1014,7 @@ test("occupied column concentrates Outbid my column after Call this #1", () => {
   const formAt = occupied.indexOf("data-bid-form");
   const stamp = occupied.indexOf('data-call-after-claim-one=""');
   const callTwoStamp = occupied.indexOf('data-call-after-claim-two=""');
+  const callThreeStamp = occupied.indexOf('data-call-after-claim-three=""');
   assert.ok(callOne >= 0 && claimOne > callOne);
   assert.ok(claimTwo > callOne);
   assert.ok(claimThree > callOne);
@@ -988,6 +1022,7 @@ test("occupied column concentrates Outbid my column after Call this #1", () => {
   assert.ok(Math.abs(claimThree - claimTwo) < 80);
   assert.ok(stamp >= 0 && claimOne > stamp);
   assert.ok(callTwoStamp >= 0 && Math.abs(callTwoStamp - stamp) < 80);
+  assert.ok(callThreeStamp >= 0 && Math.abs(callThreeStamp - callTwoStamp) < 80);
   assert.ok(laterCall >= 0 && claimOne > laterCall);
   assert.ok(callAfter > claimOne);
   assert.ok(formAt > callAfter);
@@ -1014,6 +1049,7 @@ test("occupied column concentrates Outbid my column after Call this #1 is re-con
   assert.doesNotMatch(empty, /data-claim-after-call-one|after Call this #1/);
   assert.doesNotMatch(empty, /data-call-after-claim-one|call-after-claim-one/);
   assert.doesNotMatch(empty, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(empty, /data-call-after-claim-three|call-after-claim-three/);
   assert.doesNotMatch(empty, /Call this #1|Call #2|data-call-later/);
 
   const laterCard = renderToStaticMarkup(
@@ -1033,6 +1069,7 @@ test("occupied column concentrates Outbid my column after Call this #1 is re-con
   assert.doesNotMatch(laterCard, /data-claim-after-call-one|Outbid my movers column/);
   assert.doesNotMatch(laterCard, /Call this #1|data-call-this-one/);
   assert.doesNotMatch(laterCard, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(laterCard, /data-call-after-claim-three|call-after-claim-three/);
 
   const onlyOne = renderToStaticMarkup(
     createElement(LaneBoard, {
@@ -1052,6 +1089,7 @@ test("occupied column concentrates Outbid my column after Call this #1 is re-con
   const onlyCall = onlyOne.indexOf("Call this #1");
   const onlyStamp = onlyOne.indexOf('data-call-after-claim-one=""');
   const onlyCallTwo = onlyOne.indexOf('data-call-after-claim-two=""');
+  const onlyCallThree = onlyOne.indexOf('data-call-after-claim-three=""');
   const onlyClaim = onlyOne.indexOf('data-claim-after-call-two=""');
   const onlyClaimThree = onlyOne.indexOf('data-claim-after-call-three=""');
   const onlyForm = onlyOne.indexOf("data-bid-form");
@@ -1063,9 +1101,10 @@ test("occupied column concentrates Outbid my column after Call this #1 is re-con
   assert.match(onlyOne, /Outbid my movers column/);
   assert.match(onlyOne, /after Call this #1/);
   assert.match(onlyOne, /href="\/c\/london\/movers#claim"/);
-  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.ok(onlyCall >= 0 && onlyStamp >= 0 && onlyClaim > onlyStamp);
   assert.ok(onlyCallTwo >= 0 && Math.abs(onlyCallTwo - onlyStamp) < 80);
+  assert.ok(onlyCallThree >= 0 && Math.abs(onlyCallThree - onlyCallTwo) < 80);
   assert.ok(onlyClaim > onlyCall && onlyForm > onlyClaim);
   assert.ok(onlyClaimThree > onlyClaim);
   assert.ok(Math.abs(onlyClaim - onlyOne.indexOf('data-claim-after-call-one=""')) < 80);
@@ -1077,6 +1116,7 @@ test("occupied column concentrates Outbid my column after Call this #1 is re-con
   assert.equal((onlyOne.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((onlyOne.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((onlyOne.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((onlyOne.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.doesNotMatch(onlyOne, /after Call #2|data-call-after-claim=""/);
 
   const occupied = renderToStaticMarkup(
@@ -1107,6 +1147,7 @@ test("occupied column concentrates Outbid my column after Call this #1 is re-con
   const later = occupied.slice(laterStart, laterEnd === -1 ? undefined : laterEnd);
   const stamp = occupied.indexOf('data-call-after-claim-one=""');
   const callTwoStamp = occupied.indexOf('data-call-after-claim-two=""');
+  const callThreeStamp = occupied.indexOf('data-call-after-claim-three=""');
   const claimTwo = occupied.indexOf('data-claim-after-call-two=""');
   const claimThree = occupied.indexOf('data-claim-after-call-three=""');
   const claimOne = occupied.indexOf('data-claim-after-call-one=""');
@@ -1122,8 +1163,10 @@ test("occupied column concentrates Outbid my column after Call this #1 is re-con
   assert.doesNotMatch(later, /data-claim-after-call-two|claim-after-call-two|Outbid my movers column/);
   assert.doesNotMatch(later, /data-claim-after-call-three|claim-after-call-three/);
   assert.doesNotMatch(later, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(later, /data-call-after-claim-three|call-after-claim-three/);
   assert.ok(stamp >= 0 && claimTwo > stamp);
   assert.ok(callTwoStamp >= 0 && Math.abs(callTwoStamp - stamp) < 80);
+  assert.ok(callThreeStamp >= 0 && Math.abs(callThreeStamp - callTwoStamp) < 80);
   assert.ok(claimOne >= 0 && Math.abs(claimTwo - claimOne) < 80);
   assert.ok(claimThree > claimTwo);
   assert.ok(Math.abs(claimThree - claimTwo) < 80);
@@ -1136,6 +1179,7 @@ test("occupied column concentrates Outbid my column after Call this #1 is re-con
   assert.equal((occupied.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim=""/g) ?? []).length, 1);
   assert.doesNotMatch(occupied, /after Call #2/);
   assert.doesNotMatch(occupied, /★|⭐|review count|google map|map pin/i);
@@ -1160,6 +1204,7 @@ test("occupied column concentrates Outbid my column after Call this #1 is re-con
   assert.doesNotMatch(empty, /data-claim-after-call-one|after Call this #1/);
   assert.doesNotMatch(empty, /data-call-after-claim-one|call-after-claim-one/);
   assert.doesNotMatch(empty, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(empty, /data-call-after-claim-three|call-after-claim-three/);
   assert.doesNotMatch(empty, /Call this #1|Call #2|data-call-later/);
 
   const laterCard = renderToStaticMarkup(
@@ -1179,6 +1224,7 @@ test("occupied column concentrates Outbid my column after Call this #1 is re-con
   assert.doesNotMatch(laterCard, /data-claim-after-call-one|Outbid my movers column/);
   assert.doesNotMatch(laterCard, /Call this #1|data-call-this-one/);
   assert.doesNotMatch(laterCard, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(laterCard, /data-call-after-claim-three|call-after-claim-three/);
 
   const onlyOne = renderToStaticMarkup(
     createElement(LaneBoard, {
@@ -1198,6 +1244,7 @@ test("occupied column concentrates Outbid my column after Call this #1 is re-con
   const onlyCall = onlyOne.indexOf("Call this #1");
   const onlyStamp = onlyOne.indexOf('data-call-after-claim-one=""');
   const onlyCallTwo = onlyOne.indexOf('data-call-after-claim-two=""');
+  const onlyCallThree = onlyOne.indexOf('data-call-after-claim-three=""');
   const onlyClaimTwo = onlyOne.indexOf('data-claim-after-call-two=""');
   const onlyClaimThree = onlyOne.indexOf('data-claim-after-call-three=""');
   const onlyForm = onlyOne.indexOf("data-bid-form");
@@ -1209,9 +1256,10 @@ test("occupied column concentrates Outbid my column after Call this #1 is re-con
   assert.match(onlyOne, /Outbid my movers column/);
   assert.match(onlyOne, /after Call this #1/);
   assert.match(onlyOne, /href="\/c\/london\/movers#claim"/);
-  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.ok(onlyCall >= 0 && onlyStamp >= 0 && onlyClaimThree > onlyCallTwo);
   assert.ok(onlyCallTwo >= 0 && Math.abs(onlyCallTwo - onlyStamp) < 80);
+  assert.ok(onlyCallThree >= 0 && Math.abs(onlyCallThree - onlyCallTwo) < 80);
   assert.ok(onlyClaimThree > onlyCall && onlyForm > onlyClaimThree);
   assert.ok(Math.abs(onlyClaimThree - onlyClaimTwo) < 80);
   assert.ok(Math.abs(onlyClaimTwo - onlyOne.indexOf('data-claim-after-call-one=""')) < 80);
@@ -1222,6 +1270,7 @@ test("occupied column concentrates Outbid my column after Call this #1 is re-con
   assert.equal((onlyOne.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((onlyOne.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((onlyOne.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((onlyOne.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.doesNotMatch(onlyOne, /after Call #2|data-call-after-claim=""/);
 
   const occupied = renderToStaticMarkup(
@@ -1252,6 +1301,7 @@ test("occupied column concentrates Outbid my column after Call this #1 is re-con
   const later = occupied.slice(laterStart, laterEnd === -1 ? undefined : laterEnd);
   const stamp = occupied.indexOf('data-call-after-claim-one=""');
   const callTwoStamp = occupied.indexOf('data-call-after-claim-two=""');
+  const callThreeStamp = occupied.indexOf('data-call-after-claim-three=""');
   const claimTwo = occupied.indexOf('data-claim-after-call-two=""');
   const claimThree = occupied.indexOf('data-claim-after-call-three=""');
   const claimOne = occupied.indexOf('data-claim-after-call-one=""');
@@ -1266,8 +1316,10 @@ test("occupied column concentrates Outbid my column after Call this #1 is re-con
   assert.doesNotMatch(later, /data-claim-after-call-three|claim-after-call-three|Outbid my movers column/);
   assert.doesNotMatch(later, /data-claim-after-call-two|claim-after-call-two/);
   assert.doesNotMatch(later, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(later, /data-call-after-claim-three|call-after-claim-three/);
   assert.ok(stamp >= 0 && claimThree > stamp);
   assert.ok(callTwoStamp >= 0 && Math.abs(callTwoStamp - stamp) < 80);
+  assert.ok(callThreeStamp >= 0 && Math.abs(callThreeStamp - callTwoStamp) < 80);
   assert.ok(claimOne >= 0 && Math.abs(claimThree - claimTwo) < 80);
   assert.ok(Math.abs(claimTwo - claimOne) < 80);
   assert.ok(laterCall >= 0 && claimThree > laterCall);
@@ -1279,6 +1331,7 @@ test("occupied column concentrates Outbid my column after Call this #1 is re-con
   assert.equal((occupied.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim=""/g) ?? []).length, 1);
   assert.doesNotMatch(occupied, /after Call #2/);
   assert.doesNotMatch(occupied, /★|⭐|review count|google map|map pin/i);
@@ -1300,6 +1353,7 @@ test("occupied column concentrates Call this #1 after Outbid my column", () => {
   assert.match(empty, /data-empty-lane="true"/);
   assert.doesNotMatch(empty, /data-call-after-claim-one|call-after-claim-one/);
   assert.doesNotMatch(empty, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(empty, /data-call-after-claim-three|call-after-claim-three/);
   assert.doesNotMatch(empty, /data-call-this-one|Call this #1/);
   assert.doesNotMatch(empty, /data-claim-after-call-one|after Call this #1/);
   assert.doesNotMatch(empty, /data-claim-after-call-two|claim-after-call-two/);
@@ -1318,16 +1372,19 @@ test("occupied column concentrates Call this #1 after Outbid my column", () => {
   const onlyCardCall = onlyCard.indexOf('data-call-this-one=""');
   const onlyCardStamp = onlyCard.indexOf('data-call-after-claim-one=""');
   const onlyCardTwo = onlyCard.indexOf('data-call-after-claim-two=""');
+  const onlyCardThree = onlyCard.indexOf('data-call-after-claim-three=""');
   const onlyCardBid = onlyCard.indexOf("$20");
-  assert.match(onlyCard, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(onlyCard, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.match(onlyCard, /href="\/go\/lst_movers"/);
-  assert.ok(onlyCardCall >= 0 && onlyCardStamp >= 0 && onlyCardTwo >= 0);
+  assert.ok(onlyCardCall >= 0 && onlyCardStamp >= 0 && onlyCardTwo >= 0 && onlyCardThree >= 0);
   assert.ok(Math.abs(onlyCardStamp - onlyCardCall) < 80);
   assert.ok(Math.abs(onlyCardTwo - onlyCardStamp) < 80);
+  assert.ok(Math.abs(onlyCardThree - onlyCardTwo) < 80);
   assert.ok(onlyCardBid > onlyCardCall);
   assert.equal((onlyCard.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((onlyCard.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((onlyCard.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((onlyCard.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.doesNotMatch(onlyCard, /data-call-after-claim=""/);
   assert.doesNotMatch(onlyCard, /data-call-later|Call #2/);
 
@@ -1345,6 +1402,7 @@ test("occupied column concentrates Call this #1 after Outbid my column", () => {
   assert.match(laterCard, /Call #2/);
   assert.doesNotMatch(laterCard, /data-call-after-claim-one|call-after-claim-one/);
   assert.doesNotMatch(laterCard, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(laterCard, /data-call-after-claim-three|call-after-claim-three/);
   assert.doesNotMatch(laterCard, /Call this #1|data-call-this-one/);
 
   const onlyOne = renderToStaticMarkup(
@@ -1365,17 +1423,20 @@ test("occupied column concentrates Call this #1 after Outbid my column", () => {
   const onlyStamp = onlyOne.indexOf('data-call-after-claim-one=""');
   const onlyCall = onlyOne.indexOf('data-call-this-one=""');
   const onlyCallTwo = onlyOne.indexOf('data-call-after-claim-two=""');
+  const onlyCallThree = onlyOne.indexOf('data-call-after-claim-three=""');
   const onlyClaim = onlyOne.indexOf('data-claim-after-call-one=""');
   const onlyForm = onlyOne.indexOf("data-bid-form");
-  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.match(onlyOne, /href="\/go\/lst_movers"/);
-  assert.ok(onlyCall >= 0 && onlyStamp >= 0 && onlyCallTwo >= 0);
+  assert.ok(onlyCall >= 0 && onlyStamp >= 0 && onlyCallTwo >= 0 && onlyCallThree >= 0);
   assert.ok(Math.abs(onlyStamp - onlyCall) < 80);
   assert.ok(Math.abs(onlyCallTwo - onlyStamp) < 80);
+  assert.ok(Math.abs(onlyCallThree - onlyCallTwo) < 80);
   assert.ok(onlyClaim > onlyStamp && onlyForm > onlyClaim);
   assert.equal((onlyOne.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((onlyOne.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((onlyOne.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((onlyOne.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.doesNotMatch(onlyOne, /data-call-after-claim=""|after the claim hop/);
   assert.doesNotMatch(onlyOne, /Call #2|data-call-later/);
 
@@ -1408,27 +1469,31 @@ test("occupied column concentrates Call this #1 after Outbid my column", () => {
   const later = occupied.slice(laterStart, laterEnd === -1 ? undefined : laterEnd);
   const stamp = occupied.indexOf('data-call-after-claim-one=""');
   const stampTwo = occupied.indexOf('data-call-after-claim-two=""');
+  const stampThree = occupied.indexOf('data-call-after-claim-three=""');
   const oneAt = occupied.indexOf('data-call-this-one=""');
   const claimOne = occupied.indexOf('data-claim-after-call-one=""');
   const laterCall = occupied.indexOf('data-call-later=""');
   const callAfter = occupied.indexOf('data-call-after-claim=""');
   const formAt = occupied.indexOf("data-bid-form");
   assert.ok(leadStart >= 0 && laterStart > leadStart);
-  assert.match(lead, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(lead, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.match(lead, /data-call-after-claim-one=""/);
   assert.match(lead, /data-call-after-claim-two=""/);
+  assert.match(lead, /data-call-after-claim-three=""/);
   assert.match(lead, /href="\/go\/lst_movers"/);
   assert.doesNotMatch(lead, /data-call-after-claim=""/);
   assert.match(later, /Call #2/);
-  assert.doesNotMatch(later, /data-call-after-claim-one|Call this #1|data-call-this-one|data-call-after-claim-two/);
-  assert.ok(oneAt >= 0 && stamp >= 0 && stampTwo >= 0);
+  assert.doesNotMatch(later, /data-call-after-claim-one|Call this #1|data-call-this-one|data-call-after-claim-two|data-call-after-claim-three/);
+  assert.ok(oneAt >= 0 && stamp >= 0 && stampTwo >= 0 && stampThree >= 0);
   assert.ok(Math.abs(stamp - oneAt) < 80);
   assert.ok(Math.abs(stampTwo - stamp) < 80);
+  assert.ok(Math.abs(stampThree - stampTwo) < 80);
   assert.ok(claimOne > stamp && laterCall > oneAt);
   assert.ok(callAfter > claimOne && formAt > callAfter);
   assert.equal((occupied.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/class="outbid call-this-one/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim=""/g) ?? []).length, 1);
   assert.match(occupied, /after the claim hop/);
@@ -1450,6 +1515,7 @@ test("occupied column concentrates Call this #1 after Outbid my column is re-con
   );
   assert.match(empty, /data-empty-lane="true"/);
   assert.doesNotMatch(empty, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(empty, /data-call-after-claim-three|call-after-claim-three/);
   assert.doesNotMatch(empty, /data-call-after-claim-one|call-after-claim-one/);
   assert.doesNotMatch(empty, /data-call-this-one|Call this #1/);
   assert.doesNotMatch(empty, /data-claim-after-call-one|after Call this #1/);
@@ -1469,6 +1535,7 @@ test("occupied column concentrates Call this #1 after Outbid my column is re-con
   );
   assert.match(laterCard, /Call #2/);
   assert.doesNotMatch(laterCard, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(laterCard, /data-call-after-claim-three|call-after-claim-three/);
   assert.doesNotMatch(laterCard, /data-call-after-claim-one|Call this #1|data-call-this-one/);
   assert.doesNotMatch(laterCard, /data-claim-after-call-two|claim-after-call-two|Outbid my movers column/);
   assert.doesNotMatch(laterCard, /data-claim-after-call-three|claim-after-call-three/);
@@ -1491,25 +1558,29 @@ test("occupied column concentrates Call this #1 after Outbid my column is re-con
   const onlyCall = onlyOne.indexOf("Call this #1");
   const onlyStamp = onlyOne.indexOf('data-call-after-claim-one=""');
   const onlyStampTwo = onlyOne.indexOf('data-call-after-claim-two=""');
+  const onlyStampThree = onlyOne.indexOf('data-call-after-claim-three=""');
   const onlyClaim = onlyOne.indexOf('data-claim-after-call-two=""');
   const onlyClaimThree = onlyOne.indexOf('data-claim-after-call-three=""');
   const onlyForm = onlyOne.indexOf("data-bid-form");
-  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.match(onlyOne, /data-call-this-one=""/);
   assert.match(onlyOne, /data-call-after-claim-one=""/);
   assert.match(onlyOne, /data-call-after-claim-two=""/);
+  assert.match(onlyOne, /data-call-after-claim-three=""/);
   assert.match(onlyOne, /href="\/go\/lst_movers"/);
   assert.match(onlyOne, /class="outbid claim-after-call claim-after-call-one claim-after-call-two claim-after-call-three"/);
   assert.match(onlyOne, /after Call this #1/);
-  assert.ok(onlyCall >= 0 && onlyStamp >= 0 && onlyStampTwo >= 0);
+  assert.ok(onlyCall >= 0 && onlyStamp >= 0 && onlyStampTwo >= 0 && onlyStampThree >= 0);
   assert.ok(Math.abs(onlyStamp - onlyOne.indexOf('data-call-this-one=""')) < 80);
   assert.ok(Math.abs(onlyStampTwo - onlyStamp) < 80);
+  assert.ok(Math.abs(onlyStampThree - onlyStampTwo) < 80);
   assert.ok(onlyClaim > onlyStampTwo && onlyForm > onlyClaim);
   assert.ok(onlyClaimThree > onlyClaim);
   assert.ok(Math.abs(onlyClaimThree - onlyClaim) < 80);
   assert.equal((onlyOne.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((onlyOne.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((onlyOne.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((onlyOne.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.doesNotMatch(onlyOne, /after Call #2|data-call-after-claim=""/);
 
   const occupied = renderToStaticMarkup(
@@ -1541,21 +1612,24 @@ test("occupied column concentrates Call this #1 after Outbid my column is re-con
   const later = occupied.slice(laterStart, laterEnd === -1 ? undefined : laterEnd);
   const stamp = occupied.indexOf('data-call-after-claim-one=""');
   const stampTwo = occupied.indexOf('data-call-after-claim-two=""');
+  const stampThree = occupied.indexOf('data-call-after-claim-three=""');
   const claimTwo = occupied.indexOf('data-claim-after-call-two=""');
   const claimThree = occupied.indexOf('data-claim-after-call-three=""');
   const laterCall = occupied.indexOf("Call #2");
   const callAfter = occupied.indexOf('data-call-after-claim=""');
   const formAt = occupied.indexOf("data-bid-form");
   assert.ok(leadStart >= 0 && laterStart > leadStart);
-  assert.match(lead, /class="outbid call-this-one call-after-claim-one call-after-claim-two"/);
+  assert.match(lead, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
   assert.match(lead, /data-call-after-claim-two=""/);
+  assert.match(lead, /data-call-after-claim-three=""/);
   assert.match(lead, /href="\/go\/lst_movers"/);
   assert.doesNotMatch(lead, /data-call-after-claim=""/);
   assert.match(later, /Call #2/);
-  assert.doesNotMatch(later, /data-call-after-claim-two|call-after-claim-two|Call this #1|data-call-this-one/);
+  assert.doesNotMatch(later, /data-call-after-claim-two|call-after-claim-two|Call this #1|data-call-this-one|data-call-after-claim-three/);
   assert.doesNotMatch(later, /data-claim-after-call-three|claim-after-call-three/);
-  assert.ok(stamp >= 0 && stampTwo >= 0);
+  assert.ok(stamp >= 0 && stampTwo >= 0 && stampThree >= 0);
   assert.ok(Math.abs(stampTwo - stamp) < 80);
+  assert.ok(Math.abs(stampThree - stampTwo) < 80);
   assert.ok(claimTwo > stampTwo && laterCall >= 0 && claimTwo > laterCall);
   assert.ok(claimThree > claimTwo);
   assert.ok(Math.abs(claimThree - claimTwo) < 80);
@@ -1563,6 +1637,144 @@ test("occupied column concentrates Call this #1 after Outbid my column is re-con
   assert.equal((occupied.match(/data-call-this-one=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/class="outbid call-this-one/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-call-after-claim=""/g) ?? []).length, 1);
+  assert.doesNotMatch(occupied, /after Call #2/);
+  assert.doesNotMatch(occupied, /★|⭐|review count|google map|map pin/i);
+});
+
+test("occupied column concentrates Call this #1 after Outbid my column is re-concentrated again", () => {
+  const london = getCity("london");
+  const movers = getCategory("movers");
+  assert.ok(london && movers);
+
+  const empty = renderToStaticMarkup(
+    createElement(LaneBoard, {
+      city: london,
+      category: movers,
+      listings: [],
+      showForm: true,
+    }),
+  );
+  assert.match(empty, /data-empty-lane="true"/);
+  assert.doesNotMatch(empty, /data-call-after-claim-three|call-after-claim-three/);
+  assert.doesNotMatch(empty, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(empty, /data-call-after-claim-one|call-after-claim-one/);
+  assert.doesNotMatch(empty, /data-call-this-one|Call this #1/);
+  assert.doesNotMatch(empty, /data-claim-after-call-one|after Call this #1/);
+  assert.doesNotMatch(empty, /data-claim-after-call-two|claim-after-call-two/);
+  assert.doesNotMatch(empty, /data-claim-after-call-three|claim-after-call-three/);
+
+  const laterCard = renderToStaticMarkup(
+    createElement(ListingCard, {
+      listing: ranked({
+        id: "lst_south",
+        rank: 2,
+        business: "South London Movers",
+        bidUsd: 15,
+        siteHost: "south.example",
+      }),
+    }),
+  );
+  assert.match(laterCard, /Call #2/);
+  assert.doesNotMatch(laterCard, /data-call-after-claim-three|call-after-claim-three/);
+  assert.doesNotMatch(laterCard, /data-call-after-claim-two|call-after-claim-two/);
+  assert.doesNotMatch(laterCard, /data-call-after-claim-one|Call this #1|data-call-this-one/);
+  assert.doesNotMatch(laterCard, /data-claim-after-call-two|claim-after-call-two|Outbid my movers column/);
+  assert.doesNotMatch(laterCard, /data-claim-after-call-three|claim-after-call-three/);
+
+  const onlyOne = renderToStaticMarkup(
+    createElement(LaneBoard, {
+      city: london,
+      category: movers,
+      listings: [
+        ranked({
+          id: "lst_movers",
+          business: "North London Movers",
+          bidUsd: 20,
+          siteHost: "north.example",
+        }),
+      ],
+      showForm: true,
+    }),
+  );
+  const onlyCall = onlyOne.indexOf("Call this #1");
+  const onlyStamp = onlyOne.indexOf('data-call-after-claim-one=""');
+  const onlyStampTwo = onlyOne.indexOf('data-call-after-claim-two=""');
+  const onlyStampThree = onlyOne.indexOf('data-call-after-claim-three=""');
+  const onlyClaim = onlyOne.indexOf('data-claim-after-call-three=""');
+  const onlyForm = onlyOne.indexOf("data-bid-form");
+  assert.match(onlyOne, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
+  assert.match(onlyOne, /data-call-this-one=""/);
+  assert.match(onlyOne, /data-call-after-claim-one=""/);
+  assert.match(onlyOne, /data-call-after-claim-two=""/);
+  assert.match(onlyOne, /data-call-after-claim-three=""/);
+  assert.match(onlyOne, /href="\/go\/lst_movers"/);
+  assert.match(onlyOne, /class="outbid claim-after-call claim-after-call-one claim-after-call-two claim-after-call-three"/);
+  assert.match(onlyOne, /after Call this #1/);
+  assert.ok(onlyCall >= 0 && onlyStamp >= 0 && onlyStampTwo >= 0 && onlyStampThree >= 0);
+  assert.ok(Math.abs(onlyStamp - onlyOne.indexOf('data-call-this-one=""')) < 80);
+  assert.ok(Math.abs(onlyStampTwo - onlyStamp) < 80);
+  assert.ok(Math.abs(onlyStampThree - onlyStampTwo) < 80);
+  assert.ok(onlyClaim > onlyStampThree && onlyForm > onlyClaim);
+  assert.equal((onlyOne.match(/data-call-this-one=""/g) ?? []).length, 1);
+  assert.equal((onlyOne.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
+  assert.equal((onlyOne.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((onlyOne.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
+  assert.doesNotMatch(onlyOne, /after Call #2|data-call-after-claim=""/);
+
+  const occupied = renderToStaticMarkup(
+    createElement(LaneBoard, {
+      city: london,
+      category: movers,
+      listings: [
+        ranked({
+          id: "lst_movers",
+          business: "North London Movers",
+          bidUsd: 20,
+          siteHost: "north.example",
+        }),
+        ranked({
+          id: "lst_south",
+          rank: 2,
+          business: "South London Movers",
+          bidUsd: 15,
+          siteHost: "south.example",
+        }),
+      ],
+      showForm: true,
+    }),
+  );
+  const leadStart = occupied.indexOf('data-rank="1"');
+  const laterStart = occupied.indexOf('data-rank="2"');
+  const laterEnd = occupied.indexOf("</article>", laterStart);
+  const lead = occupied.slice(leadStart, laterStart);
+  const later = occupied.slice(laterStart, laterEnd === -1 ? undefined : laterEnd);
+  const stamp = occupied.indexOf('data-call-after-claim-one=""');
+  const stampTwo = occupied.indexOf('data-call-after-claim-two=""');
+  const stampThree = occupied.indexOf('data-call-after-claim-three=""');
+  const claimThree = occupied.indexOf('data-claim-after-call-three=""');
+  const laterCall = occupied.indexOf("Call #2");
+  const callAfter = occupied.indexOf('data-call-after-claim=""');
+  const formAt = occupied.indexOf("data-bid-form");
+  assert.ok(leadStart >= 0 && laterStart > leadStart);
+  assert.match(lead, /class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three"/);
+  assert.match(lead, /data-call-after-claim-three=""/);
+  assert.match(lead, /href="\/go\/lst_movers"/);
+  assert.doesNotMatch(lead, /data-call-after-claim=""/);
+  assert.match(later, /Call #2/);
+  assert.doesNotMatch(later, /data-call-after-claim-three|call-after-claim-three|Call this #1|data-call-this-one/);
+  assert.doesNotMatch(later, /data-claim-after-call-three|claim-after-call-three/);
+  assert.ok(stamp >= 0 && stampTwo >= 0 && stampThree >= 0);
+  assert.ok(Math.abs(stampTwo - stamp) < 80);
+  assert.ok(Math.abs(stampThree - stampTwo) < 80);
+  assert.ok(claimThree > stampThree && laterCall >= 0 && claimThree > laterCall);
+  assert.ok(callAfter > claimThree && formAt > callAfter);
+  assert.equal((occupied.match(/data-call-this-one=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-call-after-claim-one=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-call-after-claim-two=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-call-after-claim-three=""/g) ?? []).length, 1);
   assert.equal((occupied.match(/class="outbid call-this-one/g) ?? []).length, 1);
   assert.equal((occupied.match(/data-call-after-claim=""/g) ?? []).length, 1);
   assert.doesNotMatch(occupied, /after Call #2/);

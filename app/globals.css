@@ -142,6 +142,8 @@ a:hover {
 .paper-empty[data-paper-empty] [data-listing-card],
 .paper-empty[data-paper-empty] [data-claim-after-call],
 .paper-empty[data-paper-empty] [data-call-after-claim],
+.paper-empty[data-paper-empty] [data-later-claim],
+.paper-empty[data-paper-empty] .later-claim,
 .paper-empty[data-paper-empty] [data-column-index-after],
 .paper-empty[data-paper-empty] [data-category-tabs] {
   display: none;
@@ -255,7 +257,9 @@ a:hover {
 .paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] .later-facts,
 .paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-listing-card],
 .paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-claim-after-call],
-.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-call-after-claim] {
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-call-after-claim],
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-later-claim],
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] .later-claim {
   display: none;
 }
 
@@ -318,6 +322,8 @@ a:hover {
 .paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-listing-card],
 .paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-claim-after-call],
 .paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-call-after-claim],
+.paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] [data-later-claim],
+.paper-occupied[data-paper-occupied] .empty-lane[data-empty-honest] .later-claim,
 .empty-lane[data-empty-honest] [data-call-this-one],
 .empty-lane[data-empty-honest] [data-call-later],
 .empty-lane[data-empty-honest] [data-later-call],
@@ -328,7 +334,9 @@ a:hover {
 .empty-lane[data-empty-honest] .later-facts,
 .empty-lane[data-empty-honest] [data-listing-card],
 .empty-lane[data-empty-honest] [data-claim-after-call],
-.empty-lane[data-empty-honest] [data-call-after-claim] {
+.empty-lane[data-empty-honest] [data-call-after-claim],
+.empty-lane[data-empty-honest] [data-later-claim],
+.empty-lane[data-empty-honest] .later-claim {
   display: none;
 }
 
@@ -533,11 +541,87 @@ a:hover {
   color: var(--muted);
 }
 
+/* Occupied paper: Call this #1 is the only first click. Claim is a later write after the listing. */
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] {
+  margin: 0.85rem auto 0;
+  max-width: 44rem;
+  padding: 0.7rem 0 0.15rem;
+  border-top: 1px dashed var(--rule-soft);
+  color: var(--muted);
+}
+
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .later-claim-label {
+  margin: 0 0 0.35rem;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] h2 {
+  font-size: 1.05rem;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-note {
+  font-size: 0.82rem;
+}
+
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .outbid {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-columns a {
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.1rem 0;
+}
+
+.paper-occupied[data-paper-occupied] .later-claim.claim-after-call-line[data-later-claim] {
+  margin: 0.85rem 0 0;
+  max-width: none;
+  padding: 0.55rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+}
+
 .paper-occupied[data-paper-occupied] .claim-after-call-line {
   margin: 0.85rem 0 0;
   color: var(--muted);
   font-size: 0.86rem;
   line-height: 1.45;
+}
+
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-after-call {
+  display: inline;
+  background: transparent;
+  color: inherit;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+  vertical-align: baseline;
+}
+
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-after-call:hover {
+  background: transparent;
+  color: var(--ink);
 }
 
 .paper-occupied[data-paper-occupied] .claim-after-call {
@@ -561,6 +645,13 @@ a:hover {
   vertical-align: middle;
 }
 
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-after-call.claim-after-call-two,
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-after-call[data-claim-after-call-two] {
+  padding: 0;
+  font-size: inherit;
+  letter-spacing: inherit;
+}
+
 .paper-occupied[data-paper-occupied] .claim-after-call.claim-after-call-two,
 .paper-occupied[data-paper-occupied] .claim-after-call[data-claim-after-call-two] {
   padding: 0.7rem 1.35rem;
@@ -573,6 +664,13 @@ a:hover {
   text-decoration: none;
   padding: 0.4rem 0.85rem;
   vertical-align: middle;
+}
+
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-after-call.claim-after-call-three,
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-after-call[data-claim-after-call-three] {
+  padding: 0;
+  font-size: inherit;
+  letter-spacing: inherit;
 }
 
 .paper-occupied[data-paper-occupied] .claim-after-call.claim-after-call-three,
@@ -589,6 +687,13 @@ a:hover {
   vertical-align: middle;
 }
 
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-after-call.claim-after-call-four,
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-after-call[data-claim-after-call-four] {
+  padding: 0;
+  font-size: inherit;
+  letter-spacing: inherit;
+}
+
 .paper-occupied[data-paper-occupied] .claim-after-call.claim-after-call-four,
 .paper-occupied[data-paper-occupied] .claim-after-call[data-claim-after-call-four] {
   padding: 1.2rem 2.25rem;
@@ -601,6 +706,13 @@ a:hover {
   text-decoration: none;
   padding: 0.4rem 0.85rem;
   vertical-align: middle;
+}
+
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-after-call.claim-after-call-five,
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-after-call[data-claim-after-call-five] {
+  padding: 0;
+  font-size: inherit;
+  letter-spacing: inherit;
 }
 
 .paper-occupied[data-paper-occupied] .claim-after-call.claim-after-call-five,

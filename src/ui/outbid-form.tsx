@@ -135,11 +135,13 @@ export function OutbidForm({
 
   return (
     <section
-      className={emptyPaper ? "claim empty-claim-first" : "claim"}
+      className={
+        emptyPaper ? "claim empty-claim-first" : "claim later-claim"
+      }
       id="claim"
       {...(emptyPaper
         ? { "data-empty-claim-first": "", "aria-label": "Claim #1" }
-        : {})}
+        : { "data-later-claim": "" })}
     >
       <form
         method="post"
@@ -148,6 +150,9 @@ export function OutbidForm({
         data-city={lockCity ? defaultCity : selectedCity}
         data-category={activeCategory}
       >
+        {emptyPaper ? null : (
+          <p className="later-claim-label">Then Claim #1</p>
+        )}
         <h2
           {...(emptyPaper
             ? { "data-empty-claim": "", "data-first-click": "claim" }

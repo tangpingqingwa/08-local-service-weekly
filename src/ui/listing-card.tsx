@@ -54,6 +54,7 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
               className="host call-later"
               href={`/go/${listing.id}`}
               data-call-later=""
+              data-call-later-quiet=""
               aria-label={`Call #${listing.rank} at ${listing.siteHost}`}
             >
               Call #{listing.rank}

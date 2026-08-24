@@ -83,6 +83,7 @@ export function LaneBoard({
                 className="outbid call-after-claim"
                 href={`/go/${lastCall.id}`}
                 data-call-after-claim=""
+                data-call-later-quiet=""
                 aria-label={`Call #${lastCall.rank} after the claim hop at ${lastCall.siteHost}`}
               >
                 {`Call #${lastCall.rank}`}

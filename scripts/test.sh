@@ -219,10 +219,28 @@ grep -q 'Call #' src/ui/listing-card.tsx \
   || fail "later ranks must offer Call #N"
 grep -q 'data-call-later' src/ui/listing-card.tsx \
   || fail "later-rank call hop must stamp data-call-later"
+grep -q 'data-call-later-quiet' src/ui/listing-card.tsx \
+  || fail "later-rank Call #N must stay quieter than Call this #1"
 grep -q 'data-call-ad": "later"' src/ui/listing-card.tsx \
   || fail "later-rank ad must stamp data-call-ad=later"
+if grep -n 'data-call-this-one' -A 12 src/ui/listing-card.tsx | grep -q 'data-call-later-quiet'; then
+  fail "occupied Call this #1 must not stamp later-rank quiet"
+fi
+if grep -q 'data-call-later-quiet' src/ui/claim-column.tsx; then
+  fail "empty-paper Claim #1 must not stamp later-rank quiet"
+fi
+if grep -q 'call-after-claim-six\|claim-after-call-six' src/ui/listing-card.tsx src/ui/lane-board.tsx; then
+  fail "later-rank quiet must not stamp *-after-*-N"
+fi
+grep -q 'data-call-later-quiet' src/ui/lane-board.tsx \
+  || fail "later Call after the claim hop must stay quieter than Call this #1"
+if awk '/data-claim-after-call=/{flag=1} flag{print} /after Call this #1/{exit}' src/ui/lane-board.tsx | grep -q 'data-call-later-quiet'; then
+  fail "Outbid my column must not stamp later-rank quiet"
+fi
 grep -q 'Call #2' tests/board.test.ts \
   || fail "board tests must cover later-rank Call #N"
+grep -q 'occupied later Call #N stays quieter than Call this #1' tests/board.test.ts \
+  || fail "board tests must keep later Call #N quieter than Call this #1"
 grep -q 'data-claim-after-call' src/ui/lane-board.tsx \
   || fail "occupied later ranks must offer a claim-after-call hop"
 grep -q 'after Call this #1' src/ui/lane-board.tsx \
@@ -335,6 +353,36 @@ grep -q 'outbid call-after-claim' src/ui/lane-board.tsx \
   || fail "call-after-claim hop must reuse Outbid button chrome"
 grep -q 'call-after-claim' app/globals.css \
   || fail "classified CSS must style the call-after-claim hop"
+grep -q 'call-later\[data-call-later-quiet\]' app/globals.css \
+  || fail "classified CSS must keep later-rank Call #N quieter than Call this #1"
+grep -q 'call-after-claim\[data-call-later-quiet\]' app/globals.css \
+  || fail "classified CSS must keep Call after the claim hop quieter than Call this #1"
+python3 - app/globals.css <<'PY' || fail "later Call #N must stay quieter than occupied Call this #1"
+import re
+import sys
+
+css = open(sys.argv[1], encoding="utf-8").read()
+
+def first(pattern):
+    match = re.search(pattern, css, re.S)
+    if not match:
+        raise SystemExit(1)
+    return match.group(1)
+
+lead = first(r"\.call-this-one\.call-after-claim-five\s*,\s*\.call-this-one\[data-call-after-claim-five\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
+later_card = first(r"\.call-later\[data-call-later-quiet\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
+later_after = first(r"\.call-after-claim\[data-call-later-quiet\]\s*\{[^}]*font-size:\s*([\d.]+)rem")
+if float(later_card) >= float(lead):
+    raise SystemExit("later Call #N shouts like Call this #1")
+if float(later_after) >= float(lead):
+    raise SystemExit("Call after the claim hop shouts like Call this #1")
+later_block = re.search(r"\.call-later\[data-call-later-quiet\]\s*\{[^}]*\}", css, re.S)
+after_block = re.search(r"\.call-after-claim\[data-call-later-quiet\]\s*\{[^}]*\}", css, re.S)
+if not later_block or "var(--accent)" in later_block.group(0):
+    raise SystemExit("do not recolor later Call #N")
+if not after_block or "var(--accent)" in after_block.group(0):
+    raise SystemExit("do not recolor Call after the claim hop")
+PY
 grep -q 'data-call-after-claim' tests/board.test.ts \
   || fail "board tests must cover calling after the claim hop"
 grep -q 'after the claim hop' tests/board.test.ts \
@@ -556,6 +604,8 @@ if [[ -f package.json ]]; then
   [[ $test_status -eq 0 ]] || fail "unit tests failed"
   grep -Eq 'tests[[:space:]]+[1-9][0-9]*' "$test_log" \
     || fail "test runner reported 0 tests"
+  grep -q 'occupied later Call #N stays quieter than Call this #1' "$test_log" \
+    || fail "occupied later-rank quiet test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"
@@ -645,7 +695,7 @@ if [[ -f package.json ]]; then
   if grep -q 'data-prize' "${home_body}"; then
     fail "empty GET / must not invent a prize business name"
   fi
-  if grep -qE 'Call #[0-9]|data-call-later|data-call-ad="later"' "${home_body}"; then
+  if grep -qE 'Call #[0-9]|data-call-later|data-call-later-quiet|data-call-ad="later"' "${home_body}"; then
     fail "empty GET / must not invent a later-rank call"
   fi
   if grep -qE 'data-claim-after-call|after Call #|after Call this #1' "${home_body}"; then
@@ -703,7 +753,7 @@ if [[ -f package.json ]]; then
   grep -q 'data-empty-honest=""' "${lane_body}" || fail "empty movers lane must stamp honest empty"
   grep -q 'No #1' "${lane_body}" || fail "empty movers lane must say No #1"
   grep -q 'No stars. No map.' "${lane_body}" || fail "empty movers lane must refuse stars and maps"
-  if grep -qE 'Call #[0-9]|data-call-later|data-call-ad="later"' "${lane_body}"; then
+  if grep -qE 'Call #[0-9]|data-call-later|data-call-later-quiet|data-call-ad="later"' "${lane_body}"; then
     fail "empty movers lane must not invent a later-rank call"
   fi
   if grep -qE 'data-claim-after-call|after Call #|after Call this #1' "${lane_body}"; then
@@ -834,7 +884,7 @@ print(chunk.count("data-call-this-one"), chunk.count("data-call-after-claim-one"
   if grep -q 'data-empty-lane="true"' "${movers_paid}"; then
     fail "paid lane must not stay empty"
   fi
-  if grep -qE 'Call #[0-9]|data-call-later|data-call-ad="later"' "${movers_paid}"; then
+  if grep -qE 'Call #[0-9]|data-call-later|data-call-later-quiet|data-call-ad="later"' "${movers_paid}"; then
     fail "lone paid #1 must not invent a later-rank call"
   fi
   grep -q 'data-claim-after-call' "${movers_paid}" \
@@ -929,7 +979,7 @@ print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
   home_claim_after="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-pick"))' "${occupied_home}")"
   [[ "${home_call_at}" -ge 0 && "${home_claim_after}" -gt "${home_call_at}" ]] \
     || fail "GET / paid column must show Call this #1 before the Outbid claim"
-  if grep -qE 'Call #[0-9]|data-call-later|data-call-ad="later"' "${occupied_home}"; then
+  if grep -qE 'Call #[0-9]|data-call-later|data-call-later-quiet|data-call-ad="later"' "${occupied_home}"; then
     fail "GET / with only paid #1 must not invent a later-rank call"
   fi
   grep -q 'data-claim-after-call' "${occupied_home}" \
@@ -1111,7 +1161,20 @@ print("yes" if re.search(r"data-empty-lane=\"true\"[\s\S]{0,800}call-after-claim
   grep -q 'data-rank="2"' "${movers_two}" || fail "\$15 must list below \$20"
   grep -q 'Call #2' "${movers_two}" || fail "rank 2 must offer Call #2"
   grep -q 'data-call-later' "${movers_two}" || fail "rank 2 must stamp data-call-later"
+  grep -q 'data-call-later-quiet' "${movers_two}" || fail "rank 2 Call #N must stay quieter than Call this #1"
   grep -q 'data-call-ad="later"' "${movers_two}" || fail "rank 2 must stamp data-call-ad=later"
+  later_quiet_count="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-call-later-quiet=\"\""))' "${movers_two}")"
+  [[ "${later_quiet_count}" == "2" ]] \
+    || fail "occupied movers must keep two quieter Call #N stamps (got ${later_quiet_count})"
+  later_lead_quiet="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"<article[^>]*data-rank=\"1\"[\s\S]*?</article>", html)
+chunk = m.group(0) if m else ""
+print("yes" if "data-call-later-quiet" in chunk else "no")
+' "${movers_two}")"
+  [[ "${later_lead_quiet}" == "no" ]] \
+    || fail "occupied Call this #1 must not pick up later-rank quiet"
   later_has_lead="$(python3 -c '
 import re, sys
 html = open(sys.argv[1]).read()
@@ -1274,6 +1337,27 @@ print("yes" if "Call this #1" in chunk or "data-call-this-one" in chunk or "data
     || fail "GET / rank 2 must not invent Call this #1"
   grep -q 'Call #2' "${occupied_later_home}" || fail "GET / paid movers column must offer Call #2"
   grep -q 'data-call-later' "${occupied_later_home}" || fail "GET / rank 2 must stamp data-call-later"
+  grep -q 'data-call-later-quiet' "${occupied_later_home}" \
+    || fail "GET / later Call #N must stay quieter than Call this #1"
+  home_later_quiet="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-call-later-quiet=\"\""))' "${occupied_later_home}")"
+  [[ "${home_later_quiet}" == "2" ]] \
+    || fail "GET / later-rank movers must keep two quieter Call #N stamps (got ${home_later_quiet})"
+  home_lead_quiet="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"<article[^>]*data-rank=\"1\"[\s\S]*?</article>", html)
+chunk = m.group(0) if m else ""
+print("yes" if "data-call-later-quiet" in chunk else "no")
+' "${occupied_later_home}")"
+  [[ "${home_lead_quiet}" == "no" ]] \
+    || fail "GET / Call this #1 must not pick up later-rank quiet"
+  home_empty_quiet="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+print("yes" if re.search(r"data-empty-honest=\"\"[\s\S]{0,800}data-call-later-quiet", html) else "no")
+' "${occupied_later_home}")"
+  [[ "${home_empty_quiet}" == "no" ]] \
+    || fail "GET / empty lanes must not pick up later-rank quiet"
   grep -q 'data-claim-after-call' "${occupied_later_home}" \
     || fail "GET / later-rank movers column must offer claim after Call this #1"
   grep -q 'data-claim-after-call-one' "${occupied_later_home}" \
@@ -1394,6 +1478,8 @@ print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
   [[ "${rival_rank}" != "1" ]] || fail "rival \$5 must not be rank 1"
   grep -q 'Call #3' "${movers_rival}" || fail "rival \$5 at later rank must offer Call #3"
   grep -q 'data-call-later' "${movers_rival}" || fail "rival later rank must stamp data-call-later"
+  grep -q 'data-call-later-quiet' "${movers_rival}" \
+    || fail "rival later Call #N must stay quieter than Call this #1"
 
   same_raise="$(mktemp)"
   same_raise_code="$(curl -sS -o "${same_raise}" -w '%{http_code}' \

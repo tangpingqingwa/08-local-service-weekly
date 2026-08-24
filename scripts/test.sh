@@ -211,6 +211,52 @@ grep -q 'data-prize' app/globals.css \
   || fail "classified CSS must make the #1 business name larger than \$bid"
 grep -q 'occupied #1 names the business as the prize before \$bid' tests/board.test.ts \
   || fail "board tests must cover prize-before-price on occupied #1"
+grep -q 'later-facts' src/ui/listing-card.tsx \
+  || fail "occupied #1 must group \$bid as a later-facts block"
+grep -q 'data-later-fact' src/ui/listing-card.tsx \
+  || fail "occupied #1 later-facts group must stamp data-later-fact"
+if grep -qE 'className=\{lead \? "bid later-fact" : "bid"\}|className="bid later-fact"|bid later-fact' src/ui/listing-card.tsx; then
+  fail "occupied #1 must not stamp class=bid later-fact on the same \$bid span (PR #37 REJECT)"
+fi
+if grep -n 'data-empty-lane' -A 20 src/ui/lane-board.tsx | grep -qE 'data-later-fact|later-facts|bid later-fact'; then
+  fail "empty lanes must not stamp later-fact \$bid"
+fi
+if grep -n 'Call #${listing.rank}' -B 20 src/ui/listing-card.tsx | grep -qE 'data-later-fact|later-facts|bid later-fact'; then
+  fail "later ranks must not stamp later-fact \$bid"
+fi
+if grep -qE 'data-later-fact-first|data-later-fact-six|later-fact-after-|later-facts-after-' src/ui/listing-card.tsx src/ui/lane-board.tsx; then
+  fail "later-fact \$bid must not add another numbered hop stamp"
+fi
+python3 - src/ui/listing-card.tsx <<'PY' || fail "occupied #1 \$bid must change grouping, not a muted twin span"
+import re
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+if 'className="bid later-fact"' in src or "bid later-fact" in src:
+    raise SystemExit("stamp-only later-fact class on $bid")
+facts = re.search(
+    r"<p className=\"later-facts\"[^>]*>[\s\S]*?</p>",
+    src,
+)
+if not facts:
+    raise SystemExit("later-facts group missing")
+group = facts.group(0)
+if 'data-later-fact=""' not in group:
+    raise SystemExit("later-facts group must carry data-later-fact")
+if 'data-bid=""' not in group or 'data-clicks=""' not in group:
+    raise SystemExit("$bid and clicks must share the later-facts group")
+if "data-host" in group:
+    raise SystemExit("host is identity, not later-fact money")
+before = src.split("later-facts", 1)[0]
+if "data-prize" not in before:
+    raise SystemExit("occupied #1 prize name must stay before the later-fact group")
+if "Call this #1" not in before:
+    raise SystemExit("Call this #1 must stay before the later-fact group")
+if re.search(r"<p className=\"meta\">[\s\S]*data-bid=\"\"[\s\S]*data-clicks=\"\"", before):
+    raise SystemExit("$bid is still a sibling meta line beside the prize")
+PY
+grep -q 'occupied #1 \$bid stays a later fact in grouping, not a muted stamp on the same \$bid span' tests/board.test.ts \
+  || fail "board tests must cover later-fact grouping on occupied #1"
 grep -q 'Claimed license' src/ui/listing-card.tsx \
   || fail "cards must show claimed license when present"
 grep -q 'href={`/go/${listing.id}`}' src/ui/listing-card.tsx \
@@ -428,6 +474,54 @@ if not later_block or "var(--accent)" in later_block.group(0):
     raise SystemExit("do not recolor later Call #N")
 if not after_block or "var(--accent)" in after_block.group(0):
     raise SystemExit("do not recolor Call after the claim hop")
+PY
+grep -q 'later-facts\[data-later-fact\]' app/globals.css \
+  || fail "classified CSS must keep occupied #1 \$bid in a later-facts group"
+grep -q 'empty-lane\[data-empty-honest\] \[data-later-fact\]' app/globals.css \
+  || fail "classified CSS must keep later-fact \$bid off empty lanes"
+grep -q 'empty-lane\[data-empty-honest\] \.later-facts' app/globals.css \
+  || fail "classified CSS must keep later-facts class off empty lanes"
+if grep -qE '\.bid\.later-fact|class="bid later-fact"' app/globals.css; then
+  fail "classified CSS must not mute \$bid via class=bid later-fact (PR #37 REJECT)"
+fi
+python3 - app/globals.css <<'PY' || fail "occupied #1 later-facts \$bid must stay quieter than the listing name"
+import re
+import sys
+
+css = open(sys.argv[1], encoding="utf-8").read()
+
+def first(pattern):
+    match = re.search(pattern, css, re.S)
+    if not match:
+        raise SystemExit("missing " + pattern)
+    return match.group(1)
+
+prize = first(r'\.card\[data-call-ad="lead"\] \.business\[data-prize\]\s*\{[^}]*font-size:\s*([\d.]+)rem')
+facts = re.search(
+    r'\.card\[data-call-ad="lead"\] \.later-facts\[data-later-fact\]\s*\{[^}]*\}',
+    css,
+    re.S,
+)
+if not facts:
+    raise SystemExit("occupied #1 later-facts CSS missing")
+if "color: var(--muted)" not in facts.group(0):
+    raise SystemExit("occupied #1 later-facts money must recede")
+if "color: var(--accent)" in facts.group(0):
+    raise SystemExit("occupied #1 later-facts money must not shout accent")
+if ".bid.later-fact" in css:
+    raise SystemExit("stamp-only .bid.later-fact mute")
+bid_size = first(
+    r'\.card\[data-call-ad="lead"\] \.later-facts\[data-later-fact\]\s*\{[^}]*font-size:\s*([\d.]+)rem'
+)
+if float(bid_size) >= float(prize):
+    raise SystemExit("occupied #1 later-facts $bid shouts like the listing name")
+inner = re.search(
+    r'\.card\[data-call-ad="lead"\] \.later-facts\[data-later-fact\] \.bid[\s\S]*?\{[^}]*\}',
+    css,
+    re.S,
+)
+if inner and "font-size:" in inner.group(0) and "inherit" not in inner.group(0):
+    raise SystemExit("later-facts $bid must inherit group type, not a second mute stamp")
 PY
 grep -q 'data-call-after-claim' tests/board.test.ts \
   || fail "board tests must cover calling after the claim hop"
@@ -654,6 +748,8 @@ if [[ -f package.json ]]; then
     || fail "occupied later-rank quiet test did not run"
   grep -q 'occupied paper keeps column tabs after the listing' "$test_log" \
     || fail "occupied column-tabs-after-listing test did not run"
+  grep -q 'occupied #1 \$bid stays a later fact in grouping, not a muted stamp on the same \$bid span' "$test_log" \
+    || fail "occupied later-fact grouping test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"
@@ -745,6 +841,9 @@ if [[ -f package.json ]]; then
   fi
   if grep -q 'data-prize' "${home_body}"; then
     fail "empty GET / must not invent a prize business name"
+  fi
+  if grep -qE 'data-later-fact|later-facts|later-fact' "${home_body}"; then
+    fail "empty GET / must not invent later-fact \$bid"
   fi
   if grep -qE 'Call #[0-9]|data-call-later|data-call-later-quiet|data-call-ad="later"' "${home_body}"; then
     fail "empty GET / must not invent a later-rank call"
@@ -840,6 +939,9 @@ if [[ -f package.json ]]; then
   if grep -qE 'data-call-after-claim-five|call-after-claim-five' "${lane_body}"; then
     fail "empty movers lane must not invent Call this #1 after Outbid my column is re-concentrated again"
   fi
+  if grep -qE 'data-later-fact|later-facts|later-fact' "${lane_body}"; then
+    fail "empty movers lane must not invent later-fact \$bid"
+  fi
   grep -q 'Outbid' "${lane_body}" || fail "lane board must show Outbid form chrome"
   grep -q 'data-classified=""' "${lane_body}" || fail "lane page must stay inside the classified edition"
   grep -q 'edition-city' "${lane_body}" || fail "lane page must keep the city edition masthead"
@@ -873,18 +975,41 @@ if [[ -f package.json ]]; then
   grep -q 'data-prize' "${movers_paid}" || fail "paid #1 must stamp the business name as the prize"
   grep -q 'class="business" data-prize' "${movers_paid}" \
     || fail "paid #1 prize must be the business name"
+  grep -q 'class="later-facts"' "${movers_paid}" \
+    || fail "paid #1 \$bid must sit in a later-facts group"
+  grep -q 'data-later-fact=""' "${movers_paid}" \
+    || fail "paid #1 must stamp the later-facts group"
+  if grep -q 'class="bid later-fact"' "${movers_paid}"; then
+    fail "paid #1 must not stamp class=bid later-fact on the same \$bid span"
+  fi
   prize_order="$(python3 -c '
 import re, sys
 html = open(sys.argv[1]).read()
 m = re.search(r"<article[^>]*data-rank=\"1\"[\s\S]*?</article>", html)
 chunk = m.group(0) if m else ""
-print(chunk.find("data-prize"), chunk.find("North London Movers"), chunk.find("$20"), chunk.find("0 clicks"), sep=" ")
+print(chunk.find("data-prize"), chunk.find("North London Movers"), chunk.find("class=\"later-facts\""), chunk.find("data-later-fact"), chunk.find("$20"), chunk.find("0 clicks"), sep=" ")
 ' "${movers_paid}")"
-  read -r prize_at name_at paid_bid_at paid_clicks_at <<< "${prize_order}"
+  read -r prize_at name_at paid_facts_at paid_later_at paid_bid_at paid_clicks_at <<< "${prize_order}"
   [[ "${prize_at}" -ge 0 && "${name_at}" -ge 0 && "${name_at}" -lt "${paid_bid_at}" ]] \
     || fail "paid #1 business name must read before \$bid"
   [[ "${prize_at}" -lt "${paid_bid_at}" && "${prize_at}" -lt "${paid_clicks_at}" ]] \
     || fail "paid #1 prize must read before \$bid and clicks"
+  [[ "${paid_facts_at}" -ge 0 && "${paid_later_at}" -ge 0 && "${paid_facts_at}" -lt "${paid_bid_at}" ]] \
+    || fail "paid #1 later-facts \$bid must sit after the listing name"
+  paid_later_count="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"<article[^>]*data-rank=\"1\"[\s\S]*?</article>", html)
+chunk = m.group(0) if m else ""
+print(chunk.count("data-later-fact=\"\""), chunk.count("class=\"later-facts\""), chunk.count("class=\"bid later-fact\""), sep=" ")
+' "${movers_paid}")"
+  read -r paid_later_stamps paid_later_groups paid_later_span <<< "${paid_later_count}"
+  [[ "${paid_later_stamps}" == "1" ]] \
+    || fail "lone paid #1 must keep one later-fact group stamp (got ${paid_later_stamps})"
+  [[ "${paid_later_groups}" == "1" ]] \
+    || fail "lone paid #1 must keep one later-facts group (got ${paid_later_groups})"
+  [[ "${paid_later_span}" == "0" ]] \
+    || fail "lone paid #1 must not stamp class=bid later-fact (got ${paid_later_span})"
   grep -q 'Call this #1' "${movers_paid}" || fail "paid #1 must offer Call this #1"
   grep -q 'data-call-this-one' "${movers_paid}" || fail "paid #1 must stamp data-call-this-one"
   grep -q 'class="outbid call-this-one call-after-claim-one call-after-claim-two call-after-claim-three call-after-claim-four call-after-claim-five"' "${movers_paid}" \
@@ -1033,16 +1158,25 @@ print("yes" if "data-category-tabs" in header or "data-column-index-after" in he
     || fail "GET / paid #1 must concentrate Call this #1 after Outbid my column is re-concentrated again"
   grep -q 'North London Movers' "${occupied_home}" || fail "GET / must show the paid movers ad"
   grep -q 'data-prize' "${occupied_home}" || fail "GET / paid #1 must stamp the business prize"
+  grep -q 'class="later-facts"' "${occupied_home}" \
+    || fail "GET / paid #1 \$bid must sit in a later-facts group"
+  grep -q 'data-later-fact=""' "${occupied_home}" \
+    || fail "GET / paid #1 must stamp the later-facts group"
+  if grep -q 'class="bid later-fact"' "${occupied_home}"; then
+    fail "GET / paid #1 must not stamp class=bid later-fact on the same \$bid span"
+  fi
   home_prize_order="$(python3 -c '
 import re, sys
 html = open(sys.argv[1]).read()
 m = re.search(r"<article[^>]*data-rank=\"1\"[\s\S]*?</article>", html)
 chunk = m.group(0) if m else ""
-print(chunk.find("data-prize"), chunk.find("North London Movers"), chunk.find("$20"), sep=" ")
+print(chunk.find("data-prize"), chunk.find("North London Movers"), chunk.find("class=\"later-facts\""), chunk.find("data-later-fact"), chunk.find("$20"), sep=" ")
 ' "${occupied_home}")"
-  read -r home_prize_at home_name_at home_bid_at <<< "${home_prize_order}"
+  read -r home_prize_at home_name_at home_facts_at home_later_at home_bid_at <<< "${home_prize_order}"
   [[ "${home_prize_at}" -ge 0 && "${home_name_at}" -ge 0 && "${home_name_at}" -lt "${home_bid_at}" ]] \
     || fail "GET / paid #1 business name must read before \$bid"
+  [[ "${home_facts_at}" -ge 0 && "${home_later_at}" -ge 0 && "${home_name_at}" -lt "${home_facts_at}" && "${home_facts_at}" -lt "${home_bid_at}" ]] \
+    || fail "GET / paid #1 later-facts \$bid must sit after the listing name"
   empty_after_pay="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-empty-lane=\"true\""))' "${occupied_home}")"
   [[ "${empty_after_pay}" == "3" ]] || fail "GET / after one paid lane must keep three honest empty lanes (got ${empty_after_pay})"
   empty_honest_after_pay="$(python3 -c 'import sys; print(open(sys.argv[1]).read().count("data-empty-honest=\"\""))' "${occupied_home}")"
@@ -1114,9 +1248,18 @@ print("yes" if "data-category-tabs" in header or "data-column-index-after" in he
   if grep -qE 'claim-first-click|Then pick the column' "${occupied_home}"; then
     fail "GET / occupied paper must not use the empty-paper first-click chrome"
   fi
-  if grep -qE 'data-later-fact|later-fact' "${occupied_home}"; then
-    fail "GET / occupied paper must not stamp later-fact on \$bid"
+  if grep -q 'class="bid later-fact"' "${occupied_home}"; then
+    fail "GET / occupied paper must not stamp later-fact on the same \$bid span"
   fi
+  home_later_group="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"<article[^>]*data-rank=\"1\"[\s\S]*?</article>", html)
+chunk = m.group(0) if m else ""
+print("yes" if "class=\"later-facts\"" in chunk and "data-later-fact=\"\"" in chunk else "no")
+' "${occupied_home}")"
+  [[ "${home_later_group}" == "yes" ]] \
+    || fail "GET / occupied paper must group \$bid as a later fact"
   grep -q 'after Call this #1' "${occupied_home}" \
     || fail "GET / paid hop must sit after Call this #1"
   home_claim_one="$(python3 -c 'import sys; print(open(sys.argv[1]).read().find("data-claim-after-call-one"))' "${occupied_home}")"
@@ -1171,6 +1314,13 @@ print("yes" if re.search(r"data-empty-lane=\"true\"[\s\S]{0,800}data-prize", htm
 ' "${occupied_home}")"
   [[ "${empty_prize}" == "no" ]] \
     || fail "GET / empty lanes must not invent a prize business name"
+  empty_later_fact="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+print("yes" if re.search(r"data-empty-lane=\"true\"[\s\S]{0,800}(data-later-fact|later-facts|later-fact)", html) else "no")
+' "${occupied_home}")"
+  [[ "${empty_later_fact}" == "no" ]] \
+    || fail "GET / empty lanes must not invent later-fact \$bid"
   empty_call_two="$(python3 -c '
 import re, sys
 html = open(sys.argv[1]).read()
@@ -1400,6 +1550,15 @@ print("yes" if "data-prize" in chunk else "no")
 ' "${movers_two}")"
   [[ "${later_prize}" == "no" ]] \
     || fail "rank 2 must stay quieter than the #1 prize"
+  later_fact_on_two="$(python3 -c '
+import re, sys
+html = open(sys.argv[1]).read()
+m = re.search(r"<article[^>]*data-rank=\"2\"[\s\S]*?</article>", html)
+chunk = m.group(0) if m else ""
+print("yes" if "data-later-fact" in chunk or "later-facts" in chunk or "later-fact" in chunk else "no")
+' "${movers_two}")"
+  [[ "${later_fact_on_two}" == "no" ]] \
+    || fail "rank 2 must not stamp later-fact \$bid"
 
   occupied_later_home="$(mktemp)"
   occupied_later_home_code="$(curl -sS -o "${occupied_later_home}" -w '%{http_code}' "http://127.0.0.1:${port}/")"

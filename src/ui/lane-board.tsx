@@ -107,6 +107,7 @@ export function LaneBoard({
           category={category.slug}
           lockCity
           lockCategory
+          emptyPaper={listings.length === 0}
         />
       ) : null}
     </section>

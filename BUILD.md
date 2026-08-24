@@ -158,6 +158,11 @@ Each heading is one fleet unit. Do not start the next PR in the same change.
 - **Dependencies:** PR 39
 - **Acceptance:** Empty London `/` wraps `paper-empty` (`data-paper-empty`). Occupied paper wraps `paper-occupied`. Occupied later-facts / Call this #1 CSS is scoped to `.paper-occupied`. Empty hide rules cover `.paper-empty` so that chrome cannot paint a week with no paid listing. Empty stays Claim #1. Occupied #1 name still reads before `$bid`. Call this #1 stays the first occupied click. Column tabs stay after the listing. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
 
+### PR 41: first-time neighbor — empty paper has one first click
+- **Files:** `src/ui/outbid-form.tsx`, `src/ui/lane-board.tsx`, `app/globals.css`, `tests/board.test.ts`, `scripts/test.sh`, `BUILD.md`
+- **Dependencies:** PR 40
+- **Acceptance:** Empty London `/c/:city/:category` keeps Claim #1 / Outbid as the first click. The listing name (`name="business"`) is a later write after that hop (`data-later-write`, “Then the listing name”), not same-weight fields fighting Outbid. Occupied lane keeps identity fields with Outbid. Empty `/` stays Claim #1 then a quieter column pick. Occupied Call this #1 stays the first occupied click. Column tabs stay after the listing. Empty lanes stay No #1 / no stars / no map. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Do not re-ship empty/occupied wraps. Stamp-only = REJECT.
+
 ---
 
 ## 6. Live-smoke (operator)

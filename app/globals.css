@@ -462,6 +462,48 @@ a:hover {
   padding: 0.1rem 0;
 }
 
+/* Empty paper: listing name is a later write after Claim #1 / Outbid. */
+.paper-empty[data-paper-empty] .claim.empty-claim-first[data-empty-claim-first] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.paper-empty[data-paper-empty] .claim.empty-claim-first[data-empty-claim-first] .bid-row {
+  justify-content: center;
+  margin: 0.75rem 0 0;
+}
+
+.paper-empty[data-paper-empty] .claim.empty-claim-first[data-empty-claim-first] .listing-identity[data-later-write] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  width: 100%;
+  max-width: 28rem;
+  margin: 0.85rem auto 0;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--rule-soft);
+}
+
+.paper-empty[data-paper-empty] .claim.empty-claim-first[data-empty-claim-first] .later-write-label {
+  margin: 0;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.paper-empty[data-paper-empty] .claim.empty-claim-first[data-empty-claim-first] .listing-identity[data-later-write] .fields {
+  margin: 0;
+}
+
+.paper-empty[data-paper-empty] .claim.empty-claim-first[data-empty-claim-first] .listing-identity[data-later-write] input,
+.paper-empty[data-paper-empty] .claim.empty-claim-first[data-empty-claim-first] .listing-identity[data-later-write] select {
+  color: var(--muted);
+}
+
 .paper-occupied[data-paper-occupied] .claim-after-call-line {
   margin: 0.85rem 0 0;
   color: var(--muted);

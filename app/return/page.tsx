@@ -17,12 +17,16 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
   let state: "paid" | "cancelled" | "unknown" = "unknown";
   let business: string | null = null;
   let bidUsd: number | null = null;
+  let raiseChargeUsd: number | null = null;
 
   try {
     const result = await handleCheckoutReturn(params, getPolarPort());
     state = result.state;
     business = result.listing?.business ?? null;
     bidUsd = result.listing?.bidUsd ?? null;
+    if (result.checkout?.intent === "raise") {
+      raiseChargeUsd = result.checkout.amountUsd;
+    }
   } catch {
     state = "unknown";
   }
@@ -32,6 +36,26 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
       <main className="return-page" data-return="cancelled">
         <h1>Checkout cancelled</h1>
         <p>No rank claimed. An abandoned checkout does not list.</p>
+        <p>
+          <a href="/">Back to the board</a>
+        </p>
+      </main>
+    );
+  }
+
+  if (state === "paid" && raiseChargeUsd !== null) {
+    return (
+      <main className="return-page" data-return="paid" data-raise-return="">
+        <h1>Payment received</h1>
+        <p className="raise-return" data-raise-return="">
+          Polar charged $<span data-raise-charge-usd="">{raiseChargeUsd}</span> — only the difference, not a full rebid.
+        </p>
+        <p>
+          {business && bidUsd !== null
+            ? `${business} is listed at $${bidUsd}. Rank is the bid.`
+            : "The listing stays on the board at the rank that bid can take."}
+        </p>
+        <p>This page does not invent a rank before the payment settles.</p>
         <p>
           <a href="/">Back to the board</a>
         </p>

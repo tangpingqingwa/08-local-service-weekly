@@ -2251,6 +2251,223 @@ if grep -q 'data-first-click="call"' src/ui/outbid-form.tsx src/ui/claim-column.
   fail "raise-difference must not move Call this #1 onto Claim / Outbid"
 fi
 
+echo "== UX: occupied Polar return names difference-only — not a full rebid paid =="
+grep -q 'data-raise-return=""' app/return/page.tsx \
+  || fail "occupied Polar return must stamp raise-return after a raise"
+grep -q 'className="raise-return"' app/return/page.tsx \
+  || fail "occupied Polar return must compose raise-return as the paid fact"
+grep -q 'data-raise-charge-usd=""' app/return/page.tsx \
+  || fail "occupied Polar return must name the Polar raise charge in dollars"
+grep -qF 'Polar charged $' app/return/page.tsx \
+  || fail "occupied Polar return must say Polar charged"
+grep -q 'only the difference, not a full rebid' app/return/page.tsx \
+  || fail "occupied Polar return must name Polar charged only the difference"
+python3 - app/return/page.tsx <<'PY' || fail "raise-return fact must name the difference, not listed-at as a full rebid"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+fact = re.search(
+    r'<p className="raise-return" data-raise-return="">([\s\S]*?)</p>',
+    src,
+)
+if not fact:
+    raise SystemExit("raise-return paragraph missing")
+block = fact.group(1)
+if "Polar charged $" not in block:
+    raise SystemExit("raise-return fact missing Polar charged")
+if "only the difference, not a full rebid" not in block:
+    raise SystemExit("raise-return fact missing difference-only")
+if "is listed at" in block:
+    raise SystemExit("raise-return fact still names listed-at as the paid amount")
+PY
+grep -q 'checkout?.intent === "raise"' app/return/page.tsx \
+  || fail "occupied Polar return must branch on raise intent"
+grep -q 'is listed at' app/return/page.tsx \
+  || fail "new listing Polar return must still name listed at the bid"
+python3 - app/return/page.tsx <<'PY' || fail "cancelled Polar return must not name a paid raise difference"
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+if 'data-return="cancelled"' not in src:
+    raise SystemExit("cancelled return missing")
+cancel = src.split('data-return="cancelled"', 1)[1].split("data-return=", 1)[0]
+if "data-raise-return" in cancel or "Polar charged" in cancel:
+    raise SystemExit("cancelled return named a paid raise difference")
+if "only the difference, not a full rebid" in cancel:
+    raise SystemExit("cancelled return named difference-only as paid")
+PY
+python3 - app/return/page.tsx <<'PY' || fail "new listing Polar return must not stamp raise-return"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+place = re.search(
+    r'if \(state === "paid"\) \{[\s\S]*?data-return="paid"[\s\S]*?</main>',
+    src,
+)
+if not place:
+    raise SystemExit("new listing paid return missing")
+block = place.group(0)
+if "data-raise-return" in block:
+    raise SystemExit("new listing paid return stamped raise-return")
+if "Polar charged" in block:
+    raise SystemExit("new listing paid return named Polar charged a raise")
+if "is listed at" not in block:
+    raise SystemExit("new listing paid return lost listed-at-bid copy")
+PY
+grep -q 'Occupied Polar return: Polar charged only the difference, not a full rebid.' app/globals.css \
+  || fail "CSS must name occupied Polar return difference-only"
+grep -qF '.return-page[data-return="paid"][data-raise-return] .raise-return[data-raise-return]' app/globals.css \
+  || fail "CSS must compose occupied Polar return raise-return as the paid fact"
+grep -qF '.return-page[data-return="cancelled"] [data-raise-return]' app/globals.css \
+  || fail "CSS must keep raise-return off cancelled Polar return"
+grep -qF '.return-page[data-return="paid"]:not([data-raise-return]) .raise-return' app/globals.css \
+  || fail "CSS must keep raise-return off a new listing Polar return"
+python3 - app/globals.css <<'PY' || fail "raise-return CSS must stay a return-page fact, not recolor the classified paper"
+import re
+import sys
+css = open(sys.argv[1], encoding="utf-8").read()
+block = re.search(
+    r"/\* Occupied Polar return: Polar charged only the difference, not a full rebid\. \*/(.*?)(?:/\*|^\.doc-page)",
+    css,
+    re.S | re.M,
+)
+if not block:
+    raise SystemExit("occupied Polar return CSS block missing")
+if "background:" in block.group(1) or "var(--accent)" in block.group(1):
+    raise SystemExit("do not recolor occupied Polar return")
+if ".paper-occupied" in block.group(1) or ".later-claim" in block.group(1):
+    raise SystemExit("do not restamp occupied raise / Outbid CSS from Polar return")
+if '.return-page[data-return="paid"][data-raise-return] .raise-return[data-raise-return]' not in block.group(1):
+    raise SystemExit("occupied Polar return raise-return CSS missing")
+PY
+grep -q 'occupied Polar return names difference-only' tests/checkout.test.ts \
+  || fail "checkout tests must cover occupied Polar return difference-only"
+grep -q 'Occupied Polar return after a raise names Polar charged only the difference' SPEC.md \
+  || fail "SPEC must name occupied Polar return difference-only"
+python3 - src/ui/outbid-form.tsx src/ui/lane-board.tsx src/ui/claim-column.tsx <<'PY' || fail "Polar return cut must not restamp occupied raise / Outbid from #57"
+import sys
+form, lane, claim = (open(path, encoding="utf-8").read() for path in sys.argv[1:])
+if 'data-raise-difference=""' not in form or 'data-raise-difference=""' not in lane or 'data-raise-difference=""' not in claim:
+    raise SystemExit("do not restamp occupied raise-difference from #57")
+if "Same site already on this column: Polar charges only the difference, not a full rebid" not in form:
+    raise SystemExit("do not restamp occupied checkout same-site raise copy from #57")
+if "Polar charges only the difference, not a full rebid." not in lane:
+    raise SystemExit("do not restamp occupied Outbid hop difference copy from #57")
+if "Same site already on a column: Polar charges only the difference, not a full rebid" not in claim:
+    raise SystemExit("do not restamp occupied hub Outbid difference copy from #57")
+if "data-raise-return" in form or "data-raise-return" in lane or "data-raise-return" in claim:
+    raise SystemExit("do not stamp Polar return onto occupied raise / Outbid")
+PY
+python3 - src/ui/lane-board.tsx <<'PY' || fail "Polar return cut must not restamp last-week archive"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+aside = re.search(r"data-last-week[\s\S]*?</aside>", src)
+if not aside:
+    raise SystemExit("do not restamp last-week archive aside")
+block = aside.group(0)
+if "Aged out of the last 7 days" not in block:
+    raise SystemExit("do not restamp last-week archive last-7-days age-out")
+if "Polar charged" in block or "data-raise-return" in block:
+    raise SystemExit("do not restamp last-week archive with Polar return copy")
+if "Last week #1" in block or "this week" in block.lower():
+    raise SystemExit("do not restamp last-week archive back to Monday paper")
+PY
+python3 - src/ui/edition.tsx <<'PY' || fail "Polar return cut must not restamp edition dek or kickers"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+deks = re.findall(r'<p className="edition-dek">(.*?)</p>', src, re.S)
+if len(deks) != 2:
+    raise SystemExit("do not restamp empty/occupied last-7-days deks")
+for label, dek in (("empty", deks[0]), ("occupied", deks[1])):
+    if "this edition" in dek:
+        raise SystemExit(f"do not restamp {label} dek back to this edition Monday paper")
+    if "whoever paid the most in the last 7 days" not in dek:
+        raise SystemExit(f"do not restamp {label} last-7-days dek")
+    if "Polar charged" in dek or "data-raise-return" in dek:
+        raise SystemExit(f"do not restamp {label} dek with Polar return copy")
+kickers = re.findall(r'<p className="edition-kicker">(.*?)</p>', src, re.S)
+if len(kickers) != 2:
+    raise SystemExit("do not restamp empty/occupied last-7-days kickers")
+for label, kicker in (("empty", kickers[0]), ("occupied", kickers[1])):
+    if "Last 7 days" not in kicker or "This week" in kicker:
+        raise SystemExit(f"do not restamp {label} last-7-days kicker")
+PY
+python3 - README.md <<'PY' || fail "Polar return cut must not restamp README last-7-days"
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+if "Weekly pay-to-rank" in src:
+    raise SystemExit("do not restamp README back to weekly Monday paper")
+if "last 7 days" not in src.lower():
+    raise SystemExit("do not restamp README last-7-days")
+if "Rolling last 7 days. Not Monday 00:00 Europe/London." not in src:
+    raise SystemExit("do not restamp README last-7-days")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("do not retouch Call this #1 from Polar return cut")
+if "data-raise-return" in src or "data-raise-difference" in src:
+    raise SystemExit("do not restamp README with Polar return stamps")
+PY
+python3 - app/about/page.tsx <<'PY' || fail "Polar return cut must not restamp about last-7-days"
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+if "paid the most this week" in src:
+    raise SystemExit("do not restamp about back to this week's Monday paper")
+if "Last 7 days" not in src and "last 7 days" not in src:
+    raise SystemExit("do not restamp about last-7-days")
+if "Rolling last 7 days. Not Monday 00:00 Europe/London." not in src:
+    raise SystemExit("do not restamp about last-7-days")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("do not retouch Call this #1 from Polar return cut")
+if "data-raise-return" in src or "data-raise-difference" in src:
+    raise SystemExit("do not restamp about with Polar return stamps")
+PY
+python3 - app/layout.tsx <<'PY' || fail "Polar return cut must not retouch site header last 7 days"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+tagline = re.search(r'<p className="tagline">(.*?)</p>', src, re.S)
+if not tagline:
+    raise SystemExit("site header tagline missing")
+text = tagline.group(1).replace("&apos;", "'").replace("&#x27;", "'")
+if "Last 7 days" not in text:
+    raise SystemExit("do not restamp site header last-7-days tagline")
+if "A weekly classified" in text or "This week" in text:
+    raise SystemExit("do not restamp site header back to a Monday week")
+if "data-raise-return" in src or "data-raise-difference" in src:
+    raise SystemExit("do not restamp site header with Polar return stamps")
+PY
+python3 - app/rules/page.tsx <<'PY' || fail "Polar return cut must not restamp rules Week heading from #56"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+if re.search(r"<h2>\s*Week\s*</h2>", src):
+    raise SystemExit("do not restamp rules Week heading back to Week")
+if "<h2>Last 7 days</h2>" not in src:
+    raise SystemExit("do not restamp rules Week heading last 7 days from #56")
+if "city × category × week" in src:
+    raise SystemExit("do not restamp Ranking back to city × category × week Monday paper")
+if "canonical site URL + category + city + week" in src:
+    raise SystemExit("do not restamp Identity back to + week Monday paper")
+if "city × category, rolling last 7 days" not in src:
+    raise SystemExit("do not restamp Ranking last-7-days lane copy from #55")
+if "canonical site URL + category + city" not in src:
+    raise SystemExit("do not restamp Identity site + category + city from #55")
+if "data-raise-return" in src or "data-raise-difference" in src or "data-raise-charge" in src:
+    raise SystemExit("do not stamp occupied Polar return onto rules")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("rules must not retouch Call this #1")
+PY
+if grep -qE 'data-call-after-claim-six|data-claim-after-call-six|call-after-claim-N|data-raise-after-open' \
+  app/return/page.tsx app/globals.css; then
+  fail "Polar return must not stamp call-after-claim-N or a second named hop"
+fi
+if grep -q 'data-first-click="call"' app/return/page.tsx; then
+  fail "Polar return must not move Call this #1 onto /return"
+fi
+if grep -q 'data-raise-difference' app/return/page.tsx; then
+  fail "Polar return must not restamp occupied raise-difference from #57"
+fi
+
 echo "== polar checkout + fixture =="
 for f in src/polar/port.ts src/polar/fake.ts app/api/checkout/route.ts \
   app/return/page.tsx tests/checkout.test.ts src/migrations/004_checkouts.sql; do
@@ -2506,6 +2723,8 @@ if [[ -f package.json ]]; then
     || fail "rules Week heading last-7-days test did not run"
   grep -q 'occupied raise copy names difference-only — not a full rebid' "$test_log" \
     || fail "occupied raise-pays-difference copy test did not run"
+  grep -q 'occupied Polar return names difference-only — not a full rebid paid' "$test_log" \
+    || fail "occupied Polar return difference-only test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"
@@ -3556,6 +3775,14 @@ print("yes" if re.search(r"data-empty-lane=\"true\"[\s\S]{0,800}call-after-claim
   return_paid_code="$(curl -sS -o "${return_paid}" -w '%{http_code}' "${return_url}")"
   [[ "${return_paid_code}" == "200" ]] || fail "GET return after form pay expected 200 got ${return_paid_code}"
   grep -q 'data-return="paid"' "${return_paid}" || fail "fixture return must show paid"
+  grep -qF 'South London Movers is listed at $15' "${return_paid}" \
+    || fail "new listing Polar return must name listed at the bid"
+  if grep -q 'data-raise-return' "${return_paid}"; then
+    fail "new listing Polar return must not stamp a raise difference"
+  fi
+  if grep -q 'only the difference, not a full rebid' "${return_paid}"; then
+    fail "new listing Polar return must not name a raise as difference-only"
+  fi
 
   movers_two="$(mktemp)"
   curl -sS -o "${movers_two}" "http://127.0.0.1:${port}/c/london/movers"
@@ -3904,6 +4131,31 @@ print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
   grep -q '"status":"paid"' "${raise_body}" || fail "fixture raise must return paid"
   grep -q '"chargedUsd":5' "${raise_body}" || fail "raise \$20→\$25 must charge \$5"
   grep -q '"bidUsd":25' "${raise_body}" || fail "raise must list at \$25"
+  raise_checkout_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "${raise_body}")"
+  [[ -n "${raise_checkout_id}" ]] || fail "fixture raise must return a checkout id"
+  return_raise="$(mktemp)"
+  return_raise_code="$(curl -sS -o "${return_raise}" -w '%{http_code}' \
+    "http://127.0.0.1:${port}/return?checkout=${raise_checkout_id}")"
+  [[ "${return_raise_code}" == "200" ]] || fail "GET return after raise expected 200 got ${return_raise_code}"
+  grep -q 'data-return="paid"' "${return_raise}" || fail "raise Polar return must show paid"
+  grep -q 'data-raise-return=""' "${return_raise}" \
+    || fail "raise Polar return must stamp raise-return"
+  grep -q 'class="raise-return"' "${return_raise}" \
+    || fail "raise Polar return must compose raise-return as the paid fact"
+  grep -q 'data-raise-charge-usd="">5<' "${return_raise}" \
+    || fail "raise Polar return must name Polar charged \$5"
+  grep -qF 'Polar charged $' "${return_raise}" \
+    || fail "raise Polar return must say Polar charged"
+  grep -q 'only the difference, not a full rebid' "${return_raise}" \
+    || fail "raise Polar return must name only the difference, not a full rebid"
+  grep -qF 'North London Movers is listed at $25' "${return_raise}" \
+    || fail "raise Polar return may name listed at \$25 after the difference"
+  if grep -qF 'Polar charged $25' "${return_raise}"; then
+    fail "raise Polar return must not hear a full rebid of \$25"
+  fi
+  if grep -q 'Call this #1' "${return_raise}"; then
+    fail "Polar return must not retouch Call this #1"
+  fi
 
   movers_raised="$(mktemp)"
   curl -sS -o "${movers_raised}" "http://127.0.0.1:${port}/c/london/movers"

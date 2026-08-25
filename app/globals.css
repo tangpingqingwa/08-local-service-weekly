@@ -404,6 +404,15 @@ a:hover {
   font-size: 0.82rem;
 }
 
+/* Archive names rolling last-7-days age-out. Not this week's Monday paper. */
+.last-week[data-last-week][data-aged-out] {
+  color: inherit;
+  margin-top: 0.95rem;
+  padding-top: 0.55rem;
+  border-top: 1px dotted var(--rule-soft);
+  font-size: 0.86rem;
+}
+
 .leaderboard {
   list-style: none;
   margin: 0.55rem 0 0;

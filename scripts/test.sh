@@ -1562,6 +1562,171 @@ fi
 grep -q 'Edition dek names last 7 days' SPEC.md \
   || fail "SPEC must name edition dek last 7 days, not this edition Monday paper"
 
+echo "== UX: last-week archive copy matches rolling last-7-days — not this week's Monday paper =="
+python3 - src/ui/lane-board.tsx <<'PY' || fail "last-week archive must name last-7-days age-out, not this week's Monday paper"
+import re
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+aside = re.search(r"data-last-week[\s\S]*?</aside>", src)
+if not aside:
+    raise SystemExit("last-week archive aside missing")
+block = aside.group(0)
+if "this week" in block.lower():
+    raise SystemExit("archive still says this week's Monday paper")
+if "Last week #1" in block:
+    raise SystemExit("archive still names last week as a Monday paper")
+if "Aged out of the last 7 days" not in block:
+    raise SystemExit("archive must name last-7-days age-out")
+if "Not current #1 unless they pay again" not in block:
+    raise SystemExit("archive must say not current #1 unless they pay again")
+if "data-aged-out" not in block:
+    raise SystemExit("archive must mark age-out, not this week's paper")
+if "data-rolling-week" in block or "week-window" in block:
+    raise SystemExit("archive must not stamp occupied data-rolling-week")
+if "data-first-click" in block or "Call this #1" in block:
+    raise SystemExit("archive must not retouch Call this #1")
+PY
+grep -q 'last-week archive copy matches rolling last-7-days' tests/board.test.ts \
+  || fail "board tests must cover last-week archive rolling last-7-days copy"
+grep -q 'Aged out of the last 7 days' tests/week.test.ts \
+  || fail "week tests must name last-week archive as last-7-days age-out"
+grep -q 'last-week\[data-last-week\]\[data-aged-out\]' app/globals.css \
+  || fail "archive CSS must make last-7-days age-out readable"
+python3 - app/globals.css <<'PY' || fail "last-week archive must name the age-out, not recolor the paper"
+import re
+import sys
+
+css = open(sys.argv[1], encoding="utf-8").read()
+archive = re.search(
+    r"\.last-week\[data-last-week\]\[data-aged-out\]\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not archive:
+    raise SystemExit("archive last-7-days age-out rule missing")
+if "background:" in archive.group(1) or "var(--accent)" in archive.group(1):
+    raise SystemExit("do not recolor the last-week archive")
+if "color: inherit" not in archive.group(1):
+    raise SystemExit("archive must drop muted this-week filler so last-7-days age-out is readable")
+if "border-top:" not in archive.group(1):
+    raise SystemExit("archive must sit below live #1 / No #1, not as this week's paper")
+empty_dek = re.search(
+    r"\.paper-empty\[data-paper-empty\] \.edition-dek\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not empty_dek:
+    raise SystemExit("do not restamp empty last-7-days dek CSS")
+if "color: inherit" not in empty_dek.group(1):
+    raise SystemExit("do not restamp empty last-7-days dek CSS")
+occupied_dek = re.search(
+    r"\.paper-occupied\[data-paper-occupied\] \.edition-dek\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not occupied_dek:
+    raise SystemExit("do not restamp occupied last-7-days dek CSS")
+if "color: inherit" not in occupied_dek.group(1):
+    raise SystemExit("do not restamp occupied last-7-days dek CSS")
+empty_kicker = re.search(
+    r"\.paper-empty\[data-paper-empty\] \.edition-kicker\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not empty_kicker:
+    raise SystemExit("do not restamp empty last-7-days kicker CSS")
+if "text-transform: none" not in empty_kicker.group(1):
+    raise SystemExit("do not restamp empty last-7-days kicker CSS")
+occupied_kicker = re.search(
+    r"\.paper-occupied\[data-paper-occupied\] \.edition-kicker\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not occupied_kicker:
+    raise SystemExit("do not restamp occupied last-7-days kicker CSS")
+if "text-transform: none" not in occupied_kicker.group(1):
+    raise SystemExit("do not restamp occupied last-7-days kicker CSS")
+site = re.search(r"\.site-header \.tagline\s*\{([^}]*)\}", css, re.S)
+if not site:
+    raise SystemExit("do not restamp site-header last-7-days tagline CSS")
+if "text-transform: none" not in site.group(1):
+    raise SystemExit("do not restamp site-header last-7-days tagline CSS")
+if re.search(r"background:\s*var\(--accent\)[\s\S]{0,80}(about|doc-page|readme|edition-dek|last-week)", css):
+    raise SystemExit("do not recolor about or the classified paper")
+PY
+python3 - src/ui/edition.tsx <<'PY' || fail "archive cut must not restamp edition dek or kickers"
+import re
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+deks = re.findall(r'<p className="edition-dek">(.*?)</p>', src, re.S)
+if len(deks) != 2:
+    raise SystemExit("do not restamp empty/occupied last-7-days deks")
+for label, dek in (("empty", deks[0]), ("occupied", deks[1])):
+    if "this edition" in dek:
+        raise SystemExit(f"do not restamp {label} dek back to this edition Monday paper")
+    if "whoever paid the most in the last 7 days" not in dek:
+        raise SystemExit(f"do not restamp {label} last-7-days dek")
+kickers = re.findall(r'<p className="edition-kicker">(.*?)</p>', src, re.S)
+if len(kickers) != 2:
+    raise SystemExit("do not restamp empty/occupied last-7-days kickers")
+for label, kicker in (("empty", kickers[0]), ("occupied", kickers[1])):
+    if "Last 7 days" not in kicker or "This week" in kicker:
+        raise SystemExit(f"do not restamp {label} last-7-days kicker")
+PY
+python3 - README.md <<'PY' || fail "archive cut must not restamp README last-7-days"
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+if "Weekly pay-to-rank" in src:
+    raise SystemExit("do not restamp README back to weekly Monday paper")
+if "last 7 days" not in src.lower():
+    raise SystemExit("do not restamp README last-7-days")
+if "Rolling last 7 days. Not Monday 00:00 Europe/London." not in src:
+    raise SystemExit("do not restamp README last-7-days")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("do not retouch Call this #1 from archive cut")
+PY
+python3 - app/about/page.tsx <<'PY' || fail "archive cut must not restamp about last-7-days"
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+if "paid the most this week" in src:
+    raise SystemExit("do not restamp about back to this week's Monday paper")
+if "Last 7 days" not in src and "last 7 days" not in src:
+    raise SystemExit("do not restamp about last-7-days")
+if "Rolling last 7 days. Not Monday 00:00 Europe/London." not in src:
+    raise SystemExit("do not restamp about last-7-days")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("do not retouch Call this #1 from archive cut")
+if 'className="edition-kicker"' in src or 'className="edition-dek"' in src:
+    raise SystemExit("about must not retouch occupied/empty kickers or dek")
+PY
+python3 - app/layout.tsx <<'PY' || fail "archive cut must not retouch site header last 7 days"
+import re
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+tagline = re.search(r'<p className="tagline">(.*?)</p>', src, re.S)
+if not tagline:
+    raise SystemExit("site header tagline missing")
+text = tagline.group(1).replace("&apos;", "'").replace("&#x27;", "'")
+if "Last 7 days" not in text:
+    raise SystemExit("do not restamp site header last-7-days tagline")
+if "A weekly classified" in text or "This week" in text:
+    raise SystemExit("do not restamp site header back to a Monday week")
+PY
+if grep -qE 'data-call-after-claim-six|data-claim-after-call-six|call-after-claim-N' \
+  src/ui/lane-board.tsx app/globals.css; then
+  fail "last-week archive rolling week must not stamp call-after-claim-N"
+fi
+if grep -q 'data-first-click="call"' src/ui/lane-board.tsx README.md app/about/page.tsx; then
+  fail "last-week archive rolling week must not retouch Call this #1"
+fi
+grep -q 'Last-week archive copy names last 7 days' SPEC.md \
+  || fail "SPEC must name last-week archive last 7 days, not this week's Monday paper"
+
 echo "== polar checkout + fixture =="
 for f in src/polar/port.ts src/polar/fake.ts app/api/checkout/route.ts \
   app/return/page.tsx tests/checkout.test.ts src/migrations/004_checkouts.sql; do
@@ -1809,6 +1974,8 @@ if [[ -f package.json ]]; then
     || fail "README copy rolling last-7-days test did not run"
   grep -q 'edition dek matches rolling last-7-days — not this edition Monday paper' "$test_log" \
     || fail "edition dek rolling last-7-days test did not run"
+  grep -q "last-week archive copy matches rolling last-7-days — not this week's Monday paper" "$test_log" \
+    || fail "last-week archive rolling last-7-days test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"
@@ -3410,6 +3577,30 @@ if "This week" in text:
     raise SystemExit("occupied lane kicker still says this week's Monday paper")
 if "Last 7 days" not in text:
     raise SystemExit("occupied lane kicker must name last 7 days")
+PY
+  python3 - "${movers_week}" <<'PY' || fail "last-week archive must name last-7-days age-out, not this week's Monday paper"
+import re
+import sys
+
+html = open(sys.argv[1], encoding="utf-8").read()
+m = re.search(r'data-last-week[\s\S]*?</aside>', html)
+if not m:
+    raise SystemExit("occupied lane missing last-week archive")
+block = m.group(0)
+if "this week" in block.lower():
+    raise SystemExit("archive still says this week's Monday paper")
+if "Last week #1" in block:
+    raise SystemExit("archive still names last week as a Monday paper")
+if "Aged out of the last 7 days" not in block:
+    raise SystemExit("archive must name last-7-days age-out")
+if "Last Week Van" not in block:
+    raise SystemExit("archive must still name the aged-out business")
+if "Not current #1" not in block:
+    raise SystemExit("archive must say not current #1")
+if "Call this #1" in block or "data-first-click" in block:
+    raise SystemExit("archive must not steal Call this #1")
+if html.find("Call this #1") < 0 or html.find("Call this #1") > html.find("Aged out of the last 7 days"):
+    raise SystemExit("occupied Call this #1 must stay the first occupied click")
 PY
 
   echo "== license + takedown HTTP =="

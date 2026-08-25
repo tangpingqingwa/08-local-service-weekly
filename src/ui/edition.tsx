@@ -32,7 +32,11 @@ export function ClassifiedEdition({
         : { "data-paper-occupied": "true" })}
     >
       <header className="edition" data-edition="">
-        <p className="edition-kicker">This week&apos;s local classified</p>
+        {emptyPaper ? (
+          <p className="edition-kicker">Last 7 days&apos; local classified</p>
+        ) : (
+          <p className="edition-kicker">This week&apos;s local classified</p>
+        )}
         {emptyPaper ? (
           <p className="folio" data-edition-week={weekId}>
             Rolling last 7 days. Not Monday 00:00 Europe/London.

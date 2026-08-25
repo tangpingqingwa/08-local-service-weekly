@@ -126,6 +126,12 @@ a:hover {
   font-size: 0.82rem;
 }
 
+/* Site chrome names last 7 days. Not a Monday paper. Occupied/empty kickers stay. */
+.site-header .tagline {
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
 .paper {
   padding-bottom: 2.6rem;
 }

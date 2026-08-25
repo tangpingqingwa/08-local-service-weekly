@@ -5,7 +5,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Local Service Weekly",
   description:
-    "This week's local classified. Rank is the bid. Weekly #1 local-service provider by city and category.",
+    "Last 7 days' local classified. Rank is the bid. #1 local-service provider by city and category.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -17,7 +17,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <a className="logo" href="/">
               Local Service Weekly
             </a>
-            <p className="tagline">A weekly classified. Rank is the bid.</p>
+            <p className="tagline">Last 7 days&apos; local classified. Rank is the bid.</p>
             <nav className="site-nav" aria-label="Site">
               <a href="/">Edition</a>
               <a href="/about">About</a>

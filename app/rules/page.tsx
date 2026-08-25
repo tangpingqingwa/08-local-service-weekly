@@ -96,9 +96,12 @@ export default function RulesPage() {
 
       <h2>Week</h2>
       <p>
-        The open week is Monday 00:00 Europe/London to the next Monday 00:00
-        Europe/London. Last week&apos;s #1 is not this week&apos;s #1 unless they
-        pay again. v1 public city is <strong>London</strong>.
+        Occupied rank is the rolling last 7 days from paid placement.{" "}
+        <strong>Rolling last 7 days. Not Monday 00:00 Europe/London.</strong>{" "}
+        <code>weekId</code> stays that Monday&apos;s ISO date as a Polar/audit
+        label, not public expiry. A listing older than 7 days is not current #1
+        unless they pay again. Not a 24-hour lock on #1. v1 public city is{" "}
+        <strong>London</strong>.
       </p>
 
       <h2>Site URLs</h2>

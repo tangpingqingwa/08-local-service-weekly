@@ -5,7 +5,14 @@ import {
   type Listing,
   type TakedownReason,
 } from "./db";
-import { currentWeekId, previousWeekId } from "./week";
+import {
+  bidInRollingWeek,
+  currentWeekId,
+  nowUtc,
+  previousWeekId,
+  rollingWeekStart,
+  rollingWeekEnd,
+} from "./week";
 
 export { DEFAULT_CITY_SLUG, MAX_BID_USD, MIN_BID_USD } from "./constants";
 export { resolveCategory } from "./categories";
@@ -79,61 +86,84 @@ export function rankLane(listings: readonly Listing[]): RankedListing[] {
 }
 
 /**
- * Visible Polar-paid listings in one (city, category, weekId) lane.
- * Ranker stays keyed by city; weeks never mix. Clicks stay at the stored integer.
+ * Visible Polar-paid listings in one (city, category) lane.
+ * Live occupancy is rolling last 7 days from paid `createdAt`, not `week_id`.
+ * Pass `week` to read a labeled archive copy. Ranker stays keyed by city.
  * Unpaid checkout drafts never appear.
  */
 export function listLane(
   city: string,
   category: CategorySlug,
   db: AppDb = getDb(),
-  week: string = currentWeekId(),
+  week?: string,
+  now: Date = nowUtc(),
 ): RankedListing[] {
+  if (week) {
+    const rows = db
+      .prepare<[string, string, string], ListingRow>(
+        `SELECT id, business, category, city, site_url, license_id, bid_usd,
+                week_id, created_at, raised_at, clicks, hidden, hidden_reason
+           FROM listings
+          WHERE city = ? AND category = ? AND week_id = ? AND hidden = 0
+          ORDER BY bid_usd DESC, created_at ASC`,
+      )
+      .all(city, category, week);
+    return rankLane(rows.map(listingFromRow));
+  }
+  const since = rollingWeekStart(now).toISOString();
+  const until = rollingWeekEnd(now).toISOString();
   const rows = db
-    .prepare<[string, string, string], ListingRow>(
+    .prepare<[string, string, string, string], ListingRow>(
       `SELECT id, business, category, city, site_url, license_id, bid_usd,
               week_id, created_at, raised_at, clicks, hidden, hidden_reason
          FROM listings
-        WHERE city = ? AND category = ? AND week_id = ? AND hidden = 0
+        WHERE city = ? AND category = ? AND hidden = 0
+          AND created_at >= ? AND created_at <= ?
         ORDER BY bid_usd DESC, created_at ASC`,
     )
-    .all(city, category, week);
-  return rankLane(rows.map(listingFromRow));
+    .all(city, category, since, until);
+  return rankLane(
+    rows
+      .map(listingFromRow)
+      .filter((row) => bidInRollingWeek(row.createdAt, now)),
+  );
 }
 
 export function listCityLanes(
   city: string,
   db: AppDb = getDb(),
-  week: string = currentWeekId(),
+  week?: string,
+  now: Date = nowUtc(),
 ): Record<CategorySlug, RankedListing[]> {
   return Object.fromEntries(
     CATEGORIES.map((category) => [
       category.slug,
-      listLane(city, category.slug, db, week),
+      listLane(city, category.slug, db, week, now),
     ]),
   ) as Record<CategorySlug, RankedListing[]>;
 }
 
-/** Last week's #1 in this city × category, if anyone paid. Not current rank. */
+/** Last week's labeled #1 if they have aged out of the rolling window. Not current rank. */
 export function lastWeekNumberOne(
   city: string,
   category: CategorySlug,
   db: AppDb = getDb(),
-  now: Date = new Date(),
+  now: Date = nowUtc(),
 ): RankedListing | undefined {
   const lastWeek = previousWeekId(currentWeekId(now));
-  return listLane(city, category, db, lastWeek)[0];
+  return listLane(city, category, db, lastWeek, now).find(
+    (row) => !bidInRollingWeek(row.createdAt, now),
+  );
 }
 
 export function listLastWeekChampions(
   city: string,
   db: AppDb = getDb(),
-  now: Date = new Date(),
+  now: Date = nowUtc(),
 ): Partial<Record<CategorySlug, RankedListing>> {
-  const lastWeek = previousWeekId(currentWeekId(now));
   const out: Partial<Record<CategorySlug, RankedListing>> = {};
   for (const category of CATEGORIES) {
-    const champion = listLane(city, category.slug, db, lastWeek)[0];
+    const champion = lastWeekNumberOne(city, category.slug, db, now);
     if (champion) {
       out[category.slug] = champion;
     }

@@ -15,7 +15,7 @@ Pay-to-rank clone of outbid.lol for **city × category** local services. Rank is
 | DB | SQLite (`better-sqlite3`) — listings, weeks, clicks, takedowns. City is a column, not a fork |
 | Payments | `PolarPort`. Fixture adapter in tests. Live Polar when `POLAR_LIVE=1` + secrets. `POLAR_FIXTURE_ONLY=1` always wins |
 | Rank | Pure function `rankLane(listings) → ordered[]` — bid desc, older `createdAt` wins ties |
-| Week | `weekId(now, "Europe/London")` — Monday 00:00 London |
+| Week | `weekId` is Monday 00:00 Europe/London Polar/audit label. Occupied rank is rolling last 7 days from paid `createdAt`. Not London Monday midnight. Not a 24h lock on #1 |
 | URLs | `canonicalizeSiteUrl` strips tracking, rejects chat/NSFW/shorteners |
 | Tests | `node:test` + fixture Polar. Offline. No polar.sh in `scripts/test.sh` |
 | Host | One box / Vercel-shaped Node later. Not in this docs unit |
@@ -72,7 +72,7 @@ This docs unit does **not** create that tree.
 | Module | Rule |
 |---|---|
 | `rank.ts` | Input: listings in one `(city, category, weekId)`. Output: sorted visible rows. No IO. |
-| `week.ts` | Open week in `Europe/London`. Closed week rejects writes (`week_closed`). |
+| `week.ts` | `weekId` label in `Europe/London`. Occupied rank is rolling last 7 days from paid `createdAt`. Closed `weekId` rejects writes (`week_closed`). |
 | `urls.ts` | Strip `utm_*` / gclid / fbclid / ref / affiliate. Reject chat, NSFW, unresolved shorteners. |
 | `listings.ts` | Identity = canonical URL + category + city + weekId. Dentist / immigration lawyer require `licenseId`. |
 | `PolarPort` | `createCheckout({ amountUsd, listing })`, `settle(id)`. Fake settles in-process. Live talks to Polar only if live-enabled. |
@@ -96,7 +96,7 @@ UI copy: “Rank is the bid.” Never render stars, `★`, or review counts.
 | no chat / NSFW | telegram / adult host → `400` |
 | license required | dentist without `licenseId` → `license_required` |
 | takedown | hidden #1 gone; next bid is #1; no invented row |
-| week rollover | Monday 00:00 London opens a new empty week |
+| week rollover | Monday 00:00 London rolls the `weekId` label; occupied rank is rolling last 7 days; a Sunday pay stays ranked across Monday midnight |
 | multi-city key | same URL in `london` vs future city are different lanes |
 | no invented ratings | board HTML has no star / review-count affordance |
 | Polar fixture | checkout without network; `POLAR_FIXTURE_ONLY=1` wins |
@@ -136,7 +136,7 @@ Each heading is one fleet unit. Do not start the next PR in the same change.
 ### PR 6: Weekly window + London v1 lane
 - **Files:** `src/week.ts`, `tests/week.test.ts`, board filter by `weekId`
 - **Dependencies:** PR 5
-- **Acceptance:** Monday 00:00 Europe/London rollover. Last week is not current #1. Ranker still keyed by city (London shipped).
+- **Acceptance:** Monday 00:00 Europe/London rolls the `weekId` label. Occupied rank is rolling last 7 days. Last week aged out of the window is not current #1. Ranker still keyed by city (London shipped).
 
 ### PR 7: License and complaint takedown
 - **Files:** `src/takedown.ts`, license guard on dentists / immigration lawyers, operator hide path, `tests/takedown.test.ts`
@@ -182,6 +182,11 @@ Each heading is one fleet unit. Do not start the next PR in the same change.
 - **Files:** `src/ui/listing-card.tsx`, `src/ui/lane-board.tsx`, `src/ui/claim-column.tsx`, `src/ui/outbid-form.tsx`, `app/globals.css`, `tests/board.test.ts`, `scripts/test.sh`, `BUILD.md`
 - **Dependencies:** PR 44
 - **Acceptance:** Occupied London `/` keeps Call this #1 as the first occupied click (`data-first-click="call"`). Claim / Outbid my column is a later write after the listing (`later-claim`, `data-later-claim`, “Then Claim #1”), not a same-weight rail above the prize. Occupied #1 name stays the prize. Unpaid stays off the board. Empty lanes stay No #1 / no stars / no map. Column tabs stay after the listing. Empty paper stays Claim #1. Do not add another named hop. Do not stamp `call-after-claim-N`. Do not recolor. Do not rebuild the classified paper. Do not re-ship unpaid-off, empty-lane isolation, or later-call grouping. Stamp-only = REJECT.
+
+### PR 46: first-time neighbor — occupied week window is rolling last-7-days
+- **Files:** `src/week.ts`, `src/board.ts`, `src/ui/edition.tsx`, `src/ui/lane-board.tsx`, `app/globals.css`, `app/rules/page.tsx`, `tests/week.test.ts`, `tests/board.test.ts`, `scripts/test.sh`, `SPEC.md`, `BUILD.md`
+- **Dependencies:** PR 45
+- **Acceptance:** Occupied London `/` names rolling last 7 days, not Monday 00:00 Europe/London. Live occupancy filters Polar-paid `createdAt` in that window; `weekId` stays a label. Empty lanes stay No #1. Occupied #1 name still reads before `$bid`. Call this #1 stays the first occupied click. Claim stays after the listing. Unpaid stays off. Column tabs stay after the listing. Not a 24h lock on #1. Do not add another named hop. Do not stamp `call-after-claim-N`. Do not recolor. Do not rebuild the classified paper. Do not re-ship unpaid-off, empty-lane isolation, later-call grouping, or Claim-after-listing. Stamp-only = REJECT.
 
 ---
 

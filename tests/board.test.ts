@@ -22,7 +22,7 @@ import { CATEGORIES, CATEGORY_SLUGS, getCategory } from "../src/categories";
 import { getCity } from "../src/cities";
 import type { Listing } from "../src/db";
 import { openDatabase } from "../src/db";
-import { currentWeekId, ensureWeek, formatWeekLabel, previousWeekId } from "../src/week";
+import { currentWeekId, ensureWeek, formatWeekLabel, nowUtc, previousWeekId, ROLLING_WEEK_MS } from "../src/week";
 import { ClaimColumn } from "../src/ui/claim-column";
 import { CityHub } from "../src/ui/city-hub";
 import { LaneBoard } from "../src/ui/lane-board";
@@ -130,6 +130,7 @@ test("listLane on a fresh db is empty and clicks stay at the stored 0", () => {
     bidUsd: 20,
     clicks: 0,
     weekId: currentWeekId(),
+    createdAt: nowUtc().toISOString(),
   });
   insertListing(db, {
     id: "lst_last",
@@ -140,6 +141,7 @@ test("listLane on a fresh db is empty and clicks stay at the stored 0", () => {
     bidUsd: 99,
     clicks: 0,
     weekId: previousWeekId(currentWeekId()),
+    createdAt: new Date(nowUtc().getTime() - ROLLING_WEEK_MS - 1000).toISOString(),
   });
   const [row] = listLane("london", "movers", db);
   assert.ok(row);
@@ -191,6 +193,8 @@ test("empty London hub is empty: four lanes, Outbid, no invented cards or stars"
   assert.match(html, /This week(?:&apos;|&#x27;|')s local classified/);
   assert.match(html, new RegExp(`data-edition-week="${weekId}"`));
   assert.match(html, new RegExp(formatWeekLabel(weekId)));
+  assert.doesNotMatch(html, /data-rolling-week/);
+  assert.doesNotMatch(html, /Rolling last 7 days/);
   assert.match(html, /<h1 class="edition-city">London<\/h1>/);
   assert.match(html, /Rank is the bid/);
   assert.match(html, /data-claim-pick/);
@@ -4727,6 +4731,126 @@ test("occupied paper keeps one first click — Call this #1, Claim stays after t
   assert.match(emptyHub, /data-first-click="claim"|claim-first-click/);
   assert.doesNotMatch(emptyHub, /data-later-claim|Then Claim #1|data-first-click="call"/);
   assert.doesNotMatch(emptyHub, /Call this #1|data-prize|data-category-tabs/);
+  assert.doesNotMatch(emptyHub, /data-rolling-week|Rolling last 7 days|24h lock/);
+});
+
+test("occupied week window is rolling last-7-days — not Monday 00:00 Europe/London", () => {
+  const london = getCity("london");
+  const movers = getCategory("movers");
+  assert.ok(london && movers);
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+
+  const empty = renderToStaticMarkup(
+    createElement(CityHub, {
+      city: london,
+      weekId: currentWeekId(),
+      lanes: {
+        movers: [],
+        dentists: [],
+        immigration_lawyers: [],
+        tutors: [],
+      },
+    }),
+  );
+  assert.match(empty, /data-paper-empty="true"/);
+  assert.match(empty, /No #1/);
+  assert.match(empty, /Claim #1 for/);
+  assert.match(empty, /claim-first-click/);
+  assert.doesNotMatch(empty, /data-rolling-week/);
+  assert.doesNotMatch(empty, /Rolling last 7 days/);
+  assert.doesNotMatch(empty, /data-prize=/);
+  assert.doesNotMatch(empty, /24h lock/);
+  assert.doesNotMatch(empty, /Call this #1|data-first-click="call"|data-later-claim|Then Claim #1/);
+  assert.doesNotMatch(empty, /data-call-after-claim-N|call-after-claim-N/);
+  assert.doesNotMatch(empty, /leaflet|google\.maps|OpenStreetMap/i);
+  assert.doesNotMatch(empty, /★|4\.8|star-rating|data-stars|review count|rated 4\.9/i);
+
+  const occupied = renderToStaticMarkup(
+    createElement(CityHub, {
+      city: london,
+      weekId: currentWeekId(),
+      lanes: {
+        movers: [
+          ranked({
+            id: "lst_movers",
+            business: "North London Movers",
+            bidUsd: 20,
+            siteHost: "north.example",
+          }),
+          ranked({
+            id: "lst_south",
+            rank: 2,
+            business: "South London Movers",
+            bidUsd: 15,
+            siteHost: "south.example",
+          }),
+        ],
+        dentists: [],
+        immigration_lawyers: [],
+        tutors: [],
+      },
+    }),
+  );
+  const prizeAt = occupied.indexOf('data-prize=""');
+  const nameAt = occupied.indexOf("North London Movers");
+  const windowAt = occupied.indexOf('data-rolling-week=""');
+  const firstClickAt = occupied.indexOf('data-first-click="call"');
+  const callAt = occupied.indexOf("Call this #1");
+  const bidAt = occupied.indexOf("$20");
+  const laterCallAt = occupied.indexOf("Call #2");
+  const tabsAt = occupied.indexOf("data-category-tabs");
+  const claimAt = occupied.indexOf("data-claim-pick");
+  const laterClaimAt = occupied.indexOf('data-later-claim=""');
+  const headerEnd = occupied.indexOf("</header>");
+  assert.ok(windowAt >= 0 && windowAt < headerEnd);
+  assert.ok(prizeAt > headerEnd && nameAt > headerEnd);
+  assert.ok(nameAt < bidAt && prizeAt < bidAt);
+  assert.ok(callAt > nameAt && firstClickAt > nameAt);
+  assert.ok(laterCallAt > callAt);
+  assert.ok(tabsAt > callAt && claimAt > tabsAt && laterClaimAt > callAt);
+  assert.match(occupied, /data-paper-occupied="true"/);
+  assert.match(occupied, /data-rolling-week=""/);
+  assert.match(occupied, /class="folio week-window"/);
+  assert.match(occupied, /Rolling last 7 days\. Not Monday 00:00 Europe\/London\./);
+  assert.match(occupied, /data-leaderboard=""/);
+  assert.match(occupied, /class="leaderboard"[^>]*data-rolling-week=""/);
+  assert.match(occupied, /Call this #1/);
+  assert.match(occupied, /data-first-click="call"/);
+  assert.match(occupied, /Then Claim #1/);
+  assert.match(occupied, /data-later-claim=""/);
+  assert.equal((occupied.match(/data-prize=""/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-first-click="call"/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-empty-honest=""/g) ?? []).length, 3);
+  assert.doesNotMatch(occupied, /24h lock/);
+  assert.doesNotMatch(occupied, /data-call-after-claim-six|data-claim-after-call-six/);
+  assert.doesNotMatch(occupied, /leaflet|google\.maps|OpenStreetMap/i);
+  assert.doesNotMatch(occupied, /★|4\.8|star-rating|data-stars|review count|rated 4\.9/i);
+
+  const emptyLane = renderToStaticMarkup(
+    createElement(LaneBoard, {
+      city: london,
+      category: movers,
+      listings: [],
+    }),
+  );
+  assert.match(emptyLane, /No #1/);
+  assert.doesNotMatch(emptyLane, /data-rolling-week/);
+  assert.doesNotMatch(emptyLane, /Rolling last 7 days/);
+
+  assert.match(
+    css,
+    /\.paper-occupied\[data-paper-occupied\] \.folio\.week-window\[data-rolling-week\]/,
+  );
+  assert.match(
+    css,
+    /\.paper-occupied\[data-paper-occupied\] \.lane-occupied\[data-lane-occupied\] \.leaderboard\[data-rolling-week\]/,
+  );
+  assert.match(css, /\.paper-empty\[data-paper-empty\] \[data-rolling-week\]/);
+  assert.match(
+    css,
+    /\.paper-occupied\[data-paper-occupied\] \.lane-empty\[data-lane-empty\] \[data-rolling-week\]/,
+  );
+  assert.doesNotMatch(css, /background:\s*var\(--accent\)[\s\S]{0,80}rolling-week/);
 });
 
 function listing(overrides: Partial<Listing> = {}): Listing {
@@ -4774,6 +4898,7 @@ function insertListing(
     bidUsd: number;
     clicks: number;
     weekId?: string;
+    createdAt?: string;
   },
 ): void {
   const week = row.weekId ?? currentWeekId();
@@ -4792,7 +4917,7 @@ function insertListing(
     null,
     row.bidUsd,
     week,
-    "2026-08-17T00:00:00.000Z",
+    row.createdAt ?? nowUtc().toISOString(),
     null,
     row.clicks,
     0,

@@ -145,7 +145,9 @@ a:hover {
 .paper-empty[data-paper-empty] [data-later-claim],
 .paper-empty[data-paper-empty] .later-claim,
 .paper-empty[data-paper-empty] [data-column-index-after],
-.paper-empty[data-paper-empty] [data-category-tabs] {
+.paper-empty[data-paper-empty] [data-category-tabs],
+.paper-empty[data-paper-empty] [data-rolling-week],
+.paper-empty[data-paper-empty] .week-window {
   display: none;
 }
 
@@ -175,6 +177,25 @@ a:hover {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+/* Occupied paper names the rolling last-7-days window. Not London Monday midnight. */
+.paper-occupied[data-paper-occupied] .folio.week-window[data-rolling-week] {
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-size: 0.82rem;
+}
+
+.paper-occupied[data-paper-occupied] .lane-occupied[data-lane-occupied] .leaderboard[data-rolling-week] {
+  list-style: none;
+}
+
+/* Empty paper / empty lanes do not name a rolling week. */
+.paper-empty[data-paper-empty] [data-rolling-week],
+.paper-empty[data-paper-empty] .week-window,
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-rolling-week],
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] .week-window {
+  display: none;
 }
 
 .edition-city {

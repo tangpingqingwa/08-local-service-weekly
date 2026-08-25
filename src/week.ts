@@ -1,7 +1,62 @@
 import type { AppDb } from "./db";
 
-/** SPEC §6 / BUILD: open week is Monday 00:00 Europe/London. */
+/**
+ * SPEC §6 / BUILD: `weekId` is the Monday 00:00 Europe/London Polar/audit label.
+ * Occupied rank is rolling last 7 days from paid `createdAt`.
+ * Rank does not expire at London Monday midnight. Not a 24h lock on #1.
+ */
 export const WEEK_TIMEZONE = "Europe/London";
+
+const DAY_MS = 86_400_000;
+/** Inclusive length of the occupied classified window. Not a Monday midnight bucket. */
+export const ROLLING_WEEK_MS = 7 * DAY_MS;
+/** Fixture clocks can stamp paidAt a few ms ahead of `now`. Not a 24h lock. */
+export const ROLLING_WEEK_CLOCK_SKEW_MS = 100;
+
+/** Split so Next/webpack cannot replace `process.env.WEEK_NOW` at build time. */
+const WEEK_NOW_KEY = ["WEEK", "NOW"].join("_");
+
+/**
+ * Operator / test clock. `WEEK_NOW` is an ISO-8601 instant.
+ * Live rank is a rolling last-7-days filter on paid `createdAt`, not a delete.
+ */
+export function nowUtc(env: NodeJS.ProcessEnv = process.env): Date {
+  const raw = env[WEEK_NOW_KEY];
+  if (raw === undefined || raw.trim() === "") {
+    return new Date();
+  }
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`invalid ${WEEK_NOW_KEY}: ${raw}`);
+  }
+  return parsed;
+}
+
+/** Exclusive-enough end of the rolling window, with fixture clock skew. */
+export function rollingWeekEnd(now: Date = nowUtc()): Date {
+  return new Date(now.getTime() + ROLLING_WEEK_CLOCK_SKEW_MS);
+}
+
+/** Inclusive start of the rolling last-7-days window. Not civil midnight. */
+export function rollingWeekStart(now: Date = nowUtc()): Date {
+  return new Date(now.getTime() - ROLLING_WEEK_MS);
+}
+
+/**
+ * Polar-paid placement still occupies the paper if `paidAt` is in `[now − 7d, now]`.
+ * Monday 00:00 Europe/London is not the drop. Not a 24h lock on #1.
+ */
+export function bidInRollingWeek(
+  paidAt: string,
+  now: Date = nowUtc(),
+): boolean {
+  const paid = Date.parse(paidAt);
+  if (!Number.isFinite(paid) || paid <= 0) {
+    return false;
+  }
+  const t = now.getTime();
+  return paid >= t - ROLLING_WEEK_MS && paid <= t + ROLLING_WEEK_CLOCK_SKEW_MS;
+}
 
 const WEEK_ID_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -196,8 +251,8 @@ export function weekId(
   );
 }
 
-/** Open week id in Europe/London. */
-export function currentWeekId(now: Date = new Date()): string {
+/** Open week id label in Europe/London. Occupied rank does not use this as expiry. */
+export function currentWeekId(now: Date = nowUtc()): string {
   return weekId(now, WEEK_TIMEZONE);
 }
 

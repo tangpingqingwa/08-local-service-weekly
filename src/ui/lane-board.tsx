@@ -64,7 +64,11 @@ export function LaneBoard({
         </div>
       ) : (
         <>
-          <ol className="leaderboard" data-leaderboard="">
+          <ol
+            className="leaderboard"
+            data-leaderboard=""
+            data-rolling-week=""
+          >
             {paid.map((listing) => (
               <li key={listing.id}>
                 <ListingCard listing={listing} />

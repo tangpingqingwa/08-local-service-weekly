@@ -45,6 +45,7 @@ grep -q '### PR 42:' BUILD.md || fail "BUILD.md missing ### PR 42:"
 grep -q '### PR 43:' BUILD.md || fail "BUILD.md missing ### PR 43:"
 grep -q '### PR 44:' BUILD.md || fail "BUILD.md missing ### PR 44:"
 grep -q '### PR 45:' BUILD.md || fail "BUILD.md missing ### PR 45:"
+grep -q '### PR 46:' BUILD.md || fail "BUILD.md missing ### PR 46:"
 grep -q 'live-smoke' BUILD.md || fail "BUILD.md missing live-smoke"
 if ! grep -E '^### PR [0-9]+:' BUILD.md >/dev/null; then
   fail "BUILD.md PR headings must be ### PR N: title"
@@ -857,6 +858,73 @@ grep -q 'isPolarPaidListing' src/board.ts \
 grep -q 'Claim #1' src/ui/outbid-form.tsx \
   || fail "occupied first-click cut must keep empty Claim #1"
 
+echo "== UX: occupied week window is rolling last-7-days — not Monday 00:00 Europe/London =="
+grep -q 'export function rollingWeekStart' src/week.ts \
+  || fail "week.ts must export rollingWeekStart"
+grep -q 'export function bidInRollingWeek' src/week.ts \
+  || fail "week.ts must export bidInRollingWeek"
+grep -q 'ROLLING_WEEK_MS' src/week.ts \
+  || fail "week.ts must name the rolling last-7-days length"
+grep -q 'created_at >=' src/board.ts \
+  || fail "live board must filter Polar-paid createdAt in the rolling window"
+grep -q 'week_id = ?' src/board.ts \
+  || fail "board must still read labeled week_id archive copies"
+grep -q 'bidInRollingWeek' src/board.ts \
+  || fail "live occupancy must use bidInRollingWeek, not Monday midnight"
+grep -q 'data-rolling-week' src/ui/edition.tsx \
+  || fail "occupied edition must name the rolling week window"
+grep -q 'folio week-window' src/ui/edition.tsx \
+  || fail "occupied edition must compose a week-window folio, not a stamp on Monday midnight"
+grep -q 'Rolling last 7 days. Not Monday 00:00 Europe/London.' src/ui/edition.tsx \
+  || fail "occupied edition must say rolling last 7 days, not London Monday midnight"
+grep -q 'data-rolling-week' src/ui/lane-board.tsx \
+  || fail "occupied leaderboard must be the rolling week window"
+if grep -q 'data-rolling-week' src/ui/claim-column.tsx src/ui/outbid-form.tsx src/ui/listing-card.tsx; then
+  fail "rolling week must not re-ship Claim / Call hops"
+fi
+if grep -q '24h lock' src/ui/edition.tsx src/ui/lane-board.tsx src/ui/claim-column.tsx src/ui/city-hub.tsx; then
+  fail "rolling week must not become a 24h lock on #1"
+fi
+grep -q 'folio.week-window\[data-rolling-week\]' app/globals.css \
+  || fail "occupied CSS must style the rolling week-window folio"
+grep -q 'lane-occupied\[data-lane-occupied\] .leaderboard\[data-rolling-week\]' app/globals.css \
+  || fail "occupied CSS must scope the rolling window to occupied columns"
+grep -q 'paper-empty\[data-paper-empty\] \[data-rolling-week\]' app/globals.css \
+  || fail "empty paper CSS must hide rolling-week chrome"
+grep -q 'lane-empty\[data-lane-empty\] \[data-rolling-week\]' app/globals.css \
+  || fail "empty-lane CSS must hide rolling-week chrome"
+python3 - app/globals.css <<'PY' || fail "rolling-week CSS must name the window, not recolor the paper"
+import re
+import sys
+
+css = open(sys.argv[1], encoding="utf-8").read()
+block = re.search(
+    r"\.paper-occupied\[data-paper-occupied\] \.folio\.week-window\[data-rolling-week\]\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not block:
+    raise SystemExit("occupied week-window folio rule missing")
+if "background:" in block.group(1) or "var(--accent)" in block.group(1):
+    raise SystemExit("do not recolor the rolling week window")
+if "text-transform: none" not in block.group(1):
+    raise SystemExit("occupied week-window must drop Monday folio uppercase")
+PY
+grep -q 'Rolling last 7 days' app/rules/page.tsx \
+  || fail "rules must state rolling last 7 days"
+grep -q 'Not Monday 00:00 Europe/London' app/rules/page.tsx \
+  || fail "rules must say the window is not London Monday midnight"
+grep -q 'occupied week window is rolling last-7-days' tests/board.test.ts \
+  || fail "board tests must cover occupied rolling last-7-days"
+grep -q 'not Monday 00:00 Europe/London' tests/board.test.ts \
+  || fail "board tests must keep occupied window off London Monday midnight"
+grep -q 'Monday 00:00 Europe/London does not drop a bid still inside the rolling week' tests/week.test.ts \
+  || fail "week tests must keep Sunday pays across London Monday midnight"
+if grep -qE 'data-call-after-claim-six|data-claim-after-call-six|call-after-claim-N' \
+  src/ui/edition.tsx src/ui/lane-board.tsx src/week.ts src/board.ts; then
+  fail "rolling week must not stamp call-after-claim-N"
+fi
+
 echo "== polar checkout + fixture =="
 for f in src/polar/port.ts src/polar/fake.ts app/api/checkout/route.ts \
   app/return/page.tsx tests/checkout.test.ts src/migrations/004_checkouts.sql; do
@@ -933,9 +1001,11 @@ done
 grep -q 'export function weekId' src/week.ts || fail "week.ts must export weekId"
 grep -q 'Europe/London' src/week.ts || fail "week.ts must use Europe/London"
 grep -q 'week_closed' src/week.ts || fail "week.ts must reject closed weeks"
-grep -q 'week_id = ?' src/board.ts || fail "board must filter lanes by weekId"
+grep -q 'week_id = ?' src/board.ts || fail "board must filter labeled archive lanes by weekId"
+grep -q 'created_at >=' src/board.ts || fail "live board must filter rolling createdAt, not Monday midnight"
 grep -q 'lastWeekNumberOne' src/board.ts || fail "board must expose last-week archive, not current #1"
 grep -q 'Monday 00:00' tests/week.test.ts || fail "week tests must pin Monday 00:00 London rollover"
+grep -q 'rolling last-7-days' tests/week.test.ts || fail "week tests must cover rolling last-7-days occupancy"
 grep -q 'week_closed' tests/week.test.ts || fail "week tests must cover week_closed"
 grep -q 'Last Week Van' tests/week.test.ts || fail "week tests must keep last week off current #1"
 grep -q 'manchester' tests/week.test.ts || fail "week tests must keep ranker keyed by city"
@@ -1086,6 +1156,8 @@ if [[ -f package.json ]]; then
     || fail "unpaid stays off the classified paper leftover test did not run"
   grep -q 'occupied paper keeps one first click — Call this #1, Claim stays after the listing' "$test_log" \
     || fail "occupied one-first-click leftover test did not run"
+  grep -q 'occupied week window is rolling last-7-days — not Monday 00:00 Europe/London' "$test_log" \
+    || fail "occupied rolling last-7-days window test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"
@@ -1209,6 +1281,12 @@ if [[ -f package.json ]]; then
   fi
   if grep -qE 'data-claim-after-call|after Call #|after Call this #1' "${home_body}"; then
     fail "empty GET / must not invent a claim-after-call hop"
+  fi
+  if grep -q 'data-rolling-week' "${home_body}"; then
+    fail "empty GET / must not name a rolling week window"
+  fi
+  if grep -q 'Rolling last 7 days' "${home_body}"; then
+    fail "empty GET / must not print rolling last 7 days"
   fi
   if grep -qE 'data-claim-after-call-two|claim-after-call-two' "${home_body}"; then
     fail "empty GET / must not invent a claim-after-call-two hop"
@@ -1680,6 +1758,15 @@ print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
     || fail "GET / paid #1 must stamp later-claim grouping"
   grep -q 'Then Claim #1' "${occupied_home}" \
     || fail "GET / occupied Claim must name itself a later write"
+  grep -q 'data-rolling-week=""' "${occupied_home}" \
+    || fail "GET / occupied paper must name the rolling week window"
+  grep -q 'class="folio week-window"' "${occupied_home}" \
+    || fail "GET / occupied paper must compose a week-window folio"
+  grep -q 'Rolling last 7 days. Not Monday 00:00 Europe/London.' "${occupied_home}" \
+    || fail "GET / occupied paper must say rolling last 7 days, not London Monday midnight"
+  if grep -q '24h lock' "${occupied_home}"; then
+    fail "GET / occupied paper must not become a 24h lock on #1"
+  fi
   grep -q 'Outbid my movers column' "${occupied_home}" \
     || fail "GET / paid hop must name Outbid my movers column"
   grep -q 'data-category-tabs' "${occupied_home}" \
@@ -2301,6 +2388,9 @@ print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
   grep -q 'Rank is the bid' "${rules_body}" || fail "GET /rules must state rank is the bid"
   grep -q 'older' "${rules_body}" || fail "GET /rules must state older wins ties"
   grep -q 'difference' "${rules_body}" || fail "GET /rules must state raise pays the difference"
+  grep -q 'Rolling last 7 days' "${rules_body}" || fail "GET /rules must state rolling last 7 days"
+  grep -q 'Not Monday 00:00 Europe/London' "${rules_body}" \
+    || fail "GET /rules must say the window is not London Monday midnight"
 
   echo "== URL hygiene HTTP =="
   tracked_body="$(mktemp)"
@@ -2388,6 +2478,26 @@ print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
       0,
       null,
     );
+    db.prepare(
+      `INSERT INTO listings (
+         id, business, category, city, site_url, license_id, bid_usd, week_id,
+         created_at, raised_at, clicks, hidden, hidden_reason
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "lst_still_live",
+      "Still Live Van",
+      "movers",
+      "london",
+      "https://still-live.example",
+      null,
+      15,
+      last,
+      new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      null,
+      0,
+      0,
+      null,
+    );
     db.close();
   '
 
@@ -2401,6 +2511,15 @@ print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
   current_one="$(python3 -c 'import re,sys; html=open(sys.argv[1]).read(); m=re.search(r"data-rank=\"1\"[\s\S]{0,400}<h3 class=\"business\"(?: data-prize=\"\")?>([^<]+)", html); print(m.group(1) if m else "")' "${movers_week}")"
   [[ "${current_one}" != "Last Week Van" ]] || fail "last week occupant must not be this week #1"
   grep -q 'North London Movers' "${movers_week}" || fail "current-week occupant must remain listed"
+  grep -q 'Still Live Van' "${movers_week}" \
+    || fail "a last-week label still inside 7 days must stay on the rolling board"
+  still_live_rank="$(python3 -c 'import re,sys; html=open(sys.argv[1]).read(); m=re.search(r"data-rank=\"(\d)\"[\s\S]{0,400}Still Live Van", html); print(m.group(1) if m else "")' "${movers_week}")"
+  [[ "${still_live_rank}" == "2" ]] \
+    || fail "rolling last-7-days occupant with a last-week label must still list (rank=${still_live_rank})"
+  grep -q 'data-rolling-week=""' "${movers_week}" \
+    || fail "occupied lane must name the rolling week window"
+  grep -q 'Rolling last 7 days. Not Monday 00:00 Europe/London.' "${movers_week}" \
+    || fail "occupied lane must say rolling last 7 days, not London Monday midnight"
 
   echo "== license + takedown HTTP =="
   dentist_missing="$(mktemp)"

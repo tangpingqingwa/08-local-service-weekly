@@ -34,9 +34,19 @@ export function ClassifiedEdition({
     >
       <header className="edition" data-edition="">
         <p className="edition-kicker">This week&apos;s local classified</p>
-        <p className="folio" data-edition-week={weekId}>
-          Week of {formatWeekLabel(weekId)} · Europe/London · Vol. {weekId}
-        </p>
+        {emptyPaper ? (
+          <p className="folio" data-edition-week={weekId}>
+            Week of {formatWeekLabel(weekId)} · Europe/London · Vol. {weekId}
+          </p>
+        ) : (
+          <p
+            className="folio week-window"
+            data-edition-week={weekId}
+            data-rolling-week=""
+          >
+            Rolling last 7 days. Not Monday 00:00 Europe/London.
+          </p>
+        )}
         <h1 className="edition-city">{city.display}</h1>
         <p className="edition-dek">
           Four classified columns. The #1 mover, dentist, immigration lawyer, or

@@ -228,6 +228,11 @@ Each heading is one fleet unit. Do not start the next PR in the same change.
 - **Dependencies:** PR 54 (last-week archive last 7 days on `main`)
 - **Acceptance:** Rules keys the lane as city × category over rolling last 7 days, not "city × category × week" Monday paper. Identity is site + category + city; `weekId` stays a Polar/audit label. Last-week archive stays last 7 days. Edition dek stays last 7 days. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Empty does not stamp occupied `data-rolling-week` or `week-window`. Empty lanes stay No #1. Occupied Call this #1 stays the first occupied click. Do not retouch Call, README, About, site header, kickers, edition dek, or last-week archive. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
 
+### PR 56: first-time neighbor — rules Week heading matches rolling last-7-days
+- **Files:** `app/rules/page.tsx`, `tests/board.test.ts`, `tests/urls.test.ts`, `scripts/test.sh`, `SPEC.md`, `BUILD.md`
+- **Dependencies:** PR 55 (rules lane last 7 days on `main`)
+- **Acceptance:** Rules Week heading names last 7 days, not a Monday paper. Ranking still keys the lane as city × category over rolling last 7 days. Identity stays site + category + city; `weekId` stays a Polar/audit label. Last-week archive stays last 7 days. Edition dek stays last 7 days. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Empty does not stamp occupied `data-rolling-week` or `week-window`. Empty lanes stay No #1. Occupied Call this #1 stays the first occupied click. Do not retouch Call, README, About, site header, kickers, edition dek, last-week archive, or the rules Ranking / Identity copy from #55. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
+
 ---
 
 ## 6. Live-smoke (operator)

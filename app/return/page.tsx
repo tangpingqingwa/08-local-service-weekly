@@ -1,5 +1,11 @@
+import type { Listing } from "../../src/db";
+import { findListingByIdentity } from "../../src/listings";
 import { getPolarPort } from "../../src/polar/fake";
-import { handleCheckoutReturn } from "../../src/polar/port";
+import {
+  handleCheckoutReturn,
+  type CheckoutRecord,
+  type PolarPort,
+} from "../../src/polar/port";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,23 +18,66 @@ type ReturnPageProps = {
   }>;
 };
 
+function occupyingAfterAbandonedRaise(
+  checkout: CheckoutRecord | null,
+  port: PolarPort,
+): Listing | null {
+  if (checkout?.intent !== "raise") {
+    return null;
+  }
+  const db = port.database?.();
+  const weekId = checkout.listing.weekId;
+  if (!db || !weekId) {
+    return null;
+  }
+  const occupying = findListingByIdentity(db, {
+    siteUrl: checkout.listing.siteUrl,
+    category: checkout.listing.category,
+    city: checkout.listing.city,
+    weekId,
+  });
+  if (!occupying || occupying.hidden) {
+    return null;
+  }
+  return occupying;
+}
+
 export default async function ReturnPage({ searchParams }: ReturnPageProps) {
   const params = (await searchParams) ?? {};
   let state: "paid" | "cancelled" | "unknown" = "unknown";
   let business: string | null = null;
   let bidUsd: number | null = null;
   let raiseChargeUsd: number | null = null;
+  let occupying: Listing | null = null;
 
   try {
-    const result = await handleCheckoutReturn(params, getPolarPort());
+    const port = getPolarPort();
+    const result = await handleCheckoutReturn(params, port);
     state = result.state;
     business = result.listing?.business ?? null;
     bidUsd = result.listing?.bidUsd ?? null;
     if (result.checkout?.intent === "raise") {
       raiseChargeUsd = result.checkout.amountUsd;
     }
+    if (state === "cancelled") {
+      occupying = occupyingAfterAbandonedRaise(result.checkout, port);
+    }
   } catch {
     state = "unknown";
+  }
+
+  if (state === "cancelled" && occupying) {
+    return (
+      <main className="return-page" data-return="cancelled" data-raise-cancel="">
+        <h1>Checkout cancelled</h1>
+        <p className="raise-cancel" data-raise-cancel="">
+          {occupying.business} still occupies at $<span data-occupy-bid-usd="">{occupying.bidUsd}</span>. An abandoned raise does not unlist.
+        </p>
+        <p>
+          <a href="/">Back to the board</a>
+        </p>
+      </main>
+    );
   }
 
   if (state === "cancelled") {

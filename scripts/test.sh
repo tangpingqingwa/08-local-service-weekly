@@ -992,10 +992,6 @@ if "This week" in empty:
     raise SystemExit("empty kicker must not say this week's Monday paper")
 if "data-rolling-week" in empty or "week-window" in empty:
     raise SystemExit("empty kicker must not stamp occupied rolling chrome")
-if "This week" not in occupied:
-    raise SystemExit("occupied kicker must stay this week's local classified")
-if "Last 7 days" in occupied:
-    raise SystemExit("do not retouch occupied kicker")
 if "data-rolling-week" in occupied:
     raise SystemExit("occupied kicker must not stamp data-rolling-week")
 PY
@@ -1019,8 +1015,6 @@ if "background:" in block.group(1) or "var(--accent)" in block.group(1):
     raise SystemExit("do not recolor the empty fair-window kicker")
 if "text-transform: none" not in block.group(1):
     raise SystemExit("empty kicker must drop Monday uppercase so last 7 days is readable")
-if re.search(r"\.paper-occupied\[data-paper-occupied\] \.edition-kicker", css):
-    raise SystemExit("do not retouch occupied kicker CSS")
 PY
 if grep -qE 'data-call-after-claim-six|data-claim-after-call-six|call-after-claim-N' \
   src/ui/edition.tsx app/globals.css; then
@@ -1028,6 +1022,72 @@ if grep -qE 'data-call-after-claim-six|data-claim-after-call-six|call-after-clai
 fi
 if grep -q 'data-rolling-week' src/ui/claim-column.tsx src/ui/outbid-form.tsx src/ui/listing-card.tsx; then
   fail "empty rolling kicker must not re-ship Claim / Call hops"
+fi
+
+echo "== UX: occupied kicker matches rolling last-7-days — not this week Monday paper =="
+python3 - src/ui/edition.tsx <<'PY' || fail "occupied kicker must name last 7 days, not this week's Monday paper"
+import re
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+kickers = re.findall(r'<p className="edition-kicker">(.*?)</p>', src, re.S)
+if len(kickers) != 2:
+    raise SystemExit("empty and occupied kickers must both exist")
+empty, occupied = kickers
+if "Last 7 days" not in occupied:
+    raise SystemExit("occupied kicker must name last 7 days")
+if "This week" in occupied:
+    raise SystemExit("occupied kicker must not say this week's Monday paper")
+if "data-rolling-week" in occupied or "week-window" in occupied:
+    raise SystemExit("occupied kicker must not stamp data-rolling-week onto the kicker")
+if "Last 7 days" not in empty:
+    raise SystemExit("do not restamp empty last-7-days kicker")
+if "This week" in empty:
+    raise SystemExit("do not restamp empty kicker back to this week's Monday paper")
+if "data-rolling-week" in empty or "week-window" in empty:
+    raise SystemExit("empty kicker must not stamp occupied rolling chrome")
+PY
+grep -q 'occupied kicker matches rolling last-7-days' tests/board.test.ts \
+  || fail "board tests must cover occupied kicker rolling last-7-days copy"
+grep -q 'paper-occupied\[data-paper-occupied\] .edition-kicker' app/globals.css \
+  || fail "occupied paper CSS must make the fair-window kicker readable"
+python3 - app/globals.css <<'PY' || fail "occupied fair-window kicker must name the window, not recolor the paper"
+import re
+import sys
+
+css = open(sys.argv[1], encoding="utf-8").read()
+occupied = re.search(
+    r"\.paper-occupied\[data-paper-occupied\] \.edition-kicker\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not occupied:
+    raise SystemExit("occupied kicker fair-window rule missing")
+if "background:" in occupied.group(1) or "var(--accent)" in occupied.group(1):
+    raise SystemExit("do not recolor the occupied fair-window kicker")
+if "text-transform: none" not in occupied.group(1):
+    raise SystemExit("occupied kicker must drop Monday uppercase so last 7 days is readable")
+empty = re.search(
+    r"\.paper-empty\[data-paper-empty\] \.edition-kicker\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not empty:
+    raise SystemExit("do not restamp empty last-7-days kicker CSS")
+if "text-transform: none" not in empty.group(1):
+    raise SystemExit("do not restamp empty last-7-days kicker CSS")
+if "background:" in empty.group(1) or "var(--accent)" in empty.group(1):
+    raise SystemExit("do not recolor the empty fair-window kicker")
+PY
+if grep -qE 'data-call-after-claim-six|data-claim-after-call-six|call-after-claim-N' \
+  src/ui/edition.tsx app/globals.css; then
+  fail "occupied rolling kicker must not stamp call-after-claim-N"
+fi
+if grep -q 'data-rolling-week' src/ui/claim-column.tsx src/ui/outbid-form.tsx src/ui/listing-card.tsx; then
+  fail "occupied rolling kicker must not re-ship Claim / Call hops"
+fi
+if grep -q 'data-first-click="call"' src/ui/edition.tsx; then
+  fail "occupied rolling kicker must not retouch Call this #1"
 fi
 
 echo "== polar checkout + fixture =="
@@ -1267,6 +1327,8 @@ if [[ -f package.json ]]; then
     || fail "empty paper rolling last-7-days copy test did not run"
   grep -q 'empty kicker matches rolling last-7-days — not this week Monday paper' "$test_log" \
     || fail "empty kicker rolling last-7-days test did not run"
+  grep -q 'occupied kicker matches rolling last-7-days — not this week Monday paper' "$test_log" \
+    || fail "occupied kicker rolling last-7-days test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"
@@ -1920,7 +1982,7 @@ print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
     || fail "GET / occupied paper must compose a week-window folio"
   grep -q 'Rolling last 7 days. Not Monday 00:00 Europe/London.' "${occupied_home}" \
     || fail "GET / occupied paper must say rolling last 7 days, not London Monday midnight"
-  python3 - "${occupied_home}" <<'PY' || fail "occupied GET / kicker must stay this week's local classified"
+  python3 - "${occupied_home}" <<'PY' || fail "occupied GET / kicker must name last 7 days, not this week's Monday paper"
 import re
 import sys
 
@@ -1929,10 +1991,10 @@ m = re.search(r'class="edition-kicker"[^>]*>([^<]+)', html)
 if not m:
     raise SystemExit("occupied GET / missing edition kicker")
 text = m.group(1).replace("&apos;", "'").replace("&#x27;", "'")
-if "This week" not in text:
-    raise SystemExit("do not retouch occupied kicker")
-if "Last 7 days" in text:
-    raise SystemExit("do not retouch occupied kicker with empty last-7-days copy")
+if "This week" in text:
+    raise SystemExit("occupied kicker still says this week's Monday paper")
+if "Last 7 days" not in text:
+    raise SystemExit("occupied kicker must name last 7 days")
 PY
   if grep -q '24h lock' "${occupied_home}"; then
     fail "GET / occupied paper must not become a 24h lock on #1"
@@ -2690,6 +2752,20 @@ print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
     || fail "occupied lane must name the rolling week window"
   grep -q 'Rolling last 7 days. Not Monday 00:00 Europe/London.' "${movers_week}" \
     || fail "occupied lane must say rolling last 7 days, not London Monday midnight"
+  python3 - "${movers_week}" <<'PY' || fail "occupied lane kicker must name last 7 days, not this week's Monday paper"
+import re
+import sys
+
+html = open(sys.argv[1], encoding="utf-8").read()
+m = re.search(r'class="edition-kicker"[^>]*>([^<]+)', html)
+if not m:
+    raise SystemExit("occupied lane missing edition kicker")
+text = m.group(1).replace("&apos;", "'").replace("&#x27;", "'")
+if "This week" in text:
+    raise SystemExit("occupied lane kicker still says this week's Monday paper")
+if "Last 7 days" not in text:
+    raise SystemExit("occupied lane kicker must name last 7 days")
+PY
 
   echo "== license + takedown HTTP =="
   dentist_missing="$(mktemp)"

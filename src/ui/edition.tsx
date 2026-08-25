@@ -35,7 +35,7 @@ export function ClassifiedEdition({
         {emptyPaper ? (
           <p className="edition-kicker">Last 7 days&apos; local classified</p>
         ) : (
-          <p className="edition-kicker">This week&apos;s local classified</p>
+          <p className="edition-kicker">Last 7 days&apos; local classified</p>
         )}
         {emptyPaper ? (
           <p className="folio" data-edition-week={weekId}>

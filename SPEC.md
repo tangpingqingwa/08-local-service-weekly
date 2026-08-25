@@ -126,16 +126,17 @@ Inside one lane `(city, category, weekId)`:
 
 ## 6. Weekly window
 
-Week is **Monday 00:00 Europe/London** to the next Monday 00:00 Europe/London.  
-`weekId` = that Monday’s ISO date, e.g. `2026-08-17`.
+Occupied rank is the **rolling last 7 days** from paid `createdAt` (`now − 7d` inclusive). **Not** Monday 00:00 Europe/London. **Not** a 24h lock on #1.
 
-At rollover:
+`weekId` = that Monday’s ISO date in Europe/London, e.g. `2026-08-17`. It is a Polar/audit label, not public expiry. A Sunday pay still occupies the paper after London Monday midnight if it is inside 7 days.
 
-- Previous week’s listings freeze. They are not current rank.
-- The new week starts empty. Last week’s #1 may be shown as “last week” archive copy. It is not this week’s #1 unless they pay again.
-- Raise and new bids apply only to the **open** week.
+At age-out:
 
-The #1 **visible provider** for a city × category is the current open week’s rank `#1`. That is the product.
+- A listing older than 7 days leaves the live board. It is not current rank.
+- Last week’s labeled #1 may be shown as a “last week” archive copy once it is outside the rolling window. It is not this week’s #1 unless they pay again.
+- Raise and new bids apply only to the **open** `weekId` label. Occupied rank is the rolling window.
+
+The #1 **visible provider** for a city × category is whoever still occupies the rolling last-7-days window at rank `#1`. That is the product. The occupied classified paper names that window.
 
 ---
 
@@ -256,7 +257,7 @@ No stack traces on public pages.
 | 7 | Telegram / NSFW URL | `400`, not listed |
 | 8 | Dentist without license | `400 license_required` |
 | 9 | Operator takedown on #1 | listing gone; next visible bid is #1; no invented replacement |
-| 10 | Week rolls Monday 00:00 Europe/London | new week empty; last week not current #1 |
+| 10 | Occupied week is rolling last 7 days | Sunday pay still listed after Monday 00:00 London; listing older than 7 days is not current #1 |
 | 11 | Click `/go/:id` | `clicks` +1 public; 302 to cleaned site |
 | 12 | Non-London city slug in v1 | `404 city_unknown` (ranker still keyed by city) |
 | 13 | UI never shows stars / review counts | asserted in tests |

@@ -19,13 +19,17 @@ import {
 import { PolarError, type ListingDraft } from "../src/polar/port";
 import { LaneBoard } from "../src/ui/lane-board";
 import {
+  ROLLING_WEEK_MS,
   WEEK_TIMEZONE,
   WeekError,
+  bidInRollingWeek,
   currentWeekId,
   ensureWeek,
   formatWeekLabel,
+  nowUtc,
   previousWeekId,
   requireOpenWeek,
+  rollingWeekStart,
   weekId,
   weekWindow,
 } from "../src/week";
@@ -81,7 +85,7 @@ function listing(overrides: Partial<Listing> = {}): Listing {
 
 function insertListing(
   db: AppDb,
-  row: {
+    row: {
     id: string;
     business: string;
     city?: string;
@@ -106,7 +110,7 @@ function insertListing(
     null,
     row.bidUsd ?? 20,
     row.weekId,
-    row.createdAt ?? "2026-08-17T00:00:00.000Z",
+    row.createdAt ?? nowUtc().toISOString(),
     null,
     0,
     0,
@@ -147,6 +151,78 @@ test("closed week rejects writes with week_closed 409", () => {
   assert.equal(requireOpenWeek(currentWeekId()), currentWeekId());
 });
 
+test("rolling last-7-days window is 7 * 24h, not Monday 00:00 Europe/London", () => {
+  const now = new Date("2026-08-24T00:00:00.000Z");
+  assert.equal(ROLLING_WEEK_MS, 7 * 86_400_000);
+  assert.equal(rollingWeekStart(now).toISOString(), "2026-08-17T00:00:00.000Z");
+  assert.equal(bidInRollingWeek("2026-08-17T00:00:00.000Z", now), true);
+  assert.equal(bidInRollingWeek("2026-08-16T23:59:59.000Z", now), false);
+  assert.equal(bidInRollingWeek("2026-08-24T00:00:00.000Z", now), true);
+  assert.equal(bidInRollingWeek("2026-08-24T00:00:01.000Z", now), false);
+  assert.equal(bidInRollingWeek("1970-01-01T00:00:00.000Z", now), false);
+});
+
+test("Monday 00:00 Europe/London does not drop a bid still inside the rolling week", () => {
+  const sundayPay = "2026-08-23T12:00:00.000Z";
+  assert.equal(bidInRollingWeek(sundayPay, LONDON_MONDAY), true);
+  assert.equal(weekId(new Date(sundayPay), WEEK_TIMEZONE), "2026-08-17");
+  assert.equal(weekId(LONDON_MONDAY, WEEK_TIMEZONE), "2026-08-24");
+  assert.notEqual(currentWeekId(BEFORE_ROLLOVER), currentWeekId(LONDON_MONDAY));
+
+  const db = openDatabase(":memory:");
+  after(() => db.close());
+  insertListing(db, {
+    id: "lst_sunday",
+    business: "Sunday Van",
+    weekId: "2026-08-17",
+    createdAt: sundayPay,
+    bidUsd: 40,
+    siteUrl: "https://sunday.example",
+  });
+  const live = listLane("london", "movers", db, undefined, LONDON_MONDAY);
+  assert.equal(live.length, 1);
+  assert.equal(live[0]?.business, "Sunday Van");
+  assert.equal(live[0]?.rank, 1);
+  assert.equal(live[0]?.weekId, "2026-08-17");
+  assert.notEqual(live[0]?.weekId, currentWeekId(LONDON_MONDAY));
+  assert.equal(lastWeekNumberOne("london", "movers", db, LONDON_MONDAY), undefined);
+
+  const aged = new Date(LONDON_MONDAY.getTime() + ROLLING_WEEK_MS);
+  assert.deepEqual(listLane("london", "movers", db, undefined, aged), []);
+  assert.equal(
+    listLane("london", "movers", db, "2026-08-17", aged)[0]?.business,
+    "Sunday Van",
+  );
+});
+
+test("only the rolling last 7 days is ranked on the live board", () => {
+  const db = openDatabase(":memory:");
+  after(() => db.close());
+  const now = LONDON_MONDAY;
+  insertListing(db, {
+    id: "lst_stale",
+    business: "Stale Current-Label Van",
+    weekId: currentWeekId(now),
+    createdAt: new Date(now.getTime() - ROLLING_WEEK_MS - 1000).toISOString(),
+    bidUsd: 99,
+    siteUrl: "https://stale.example",
+  });
+  insertListing(db, {
+    id: "lst_live",
+    business: "Still Live Van",
+    weekId: previousWeekId(currentWeekId(now)),
+    createdAt: new Date(now.getTime() - 60 * 60 * 1000).toISOString(),
+    bidUsd: 15,
+    siteUrl: "https://still-live.example",
+  });
+  const live = listLane("london", "movers", db, undefined, now);
+  assert.deepEqual(
+    live.map((row) => [row.business, row.rank, row.bidUsd]),
+    [["Still Live Van", 1, 15]],
+  );
+  assert.doesNotMatch(live.map((row) => row.business).join(","), /Stale/);
+});
+
 test("Monday 00:00 London opens a new empty week; last week is not current #1", () => {
   const db = openDatabase(":memory:");
   after(() => db.close());
@@ -158,6 +234,7 @@ test("Monday 00:00 London opens a new empty week; last week is not current #1", 
     weekId: lastWeek,
     bidUsd: 99,
     siteUrl: "https://last.example",
+    createdAt: new Date(nowUtc().getTime() - ROLLING_WEEK_MS - 1000).toISOString(),
   });
 
   assert.deepEqual(listLane("london", "movers", db, openWeek), []);

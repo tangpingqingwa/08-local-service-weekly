@@ -284,5 +284,12 @@ test("Rules page states min $5, rank=bid, older wins ties, raise pays difference
   assert.match(html, /nsfw/);
   assert.match(html, /url_shortener/);
   assert.match(html, /utm_/);
+  assert.match(html, /city × category, rolling last 7 days/);
+  assert.match(html, /canonical site URL \+ category \+ city/);
+  assert.match(html, /Polar\/audit label/);
+  assert.match(html, /Rolling last 7 days\. Not Monday 00:00 Europe\/London\./);
+  assert.doesNotMatch(html, /city × category × week/);
+  assert.doesNotMatch(html, /canonical site URL \+ category \+ city \+ week/);
+  assert.doesNotMatch(html, /data-rolling-week|week-window/);
   assert.doesNotMatch(html, /★|⭐|review count/i);
 });

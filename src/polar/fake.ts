@@ -31,6 +31,11 @@ export { currentWeekId, ensureWeek } from "../week";
 export type FakePolarOptions = {
   /** Default true: createCheckout returns paid and places the listing. */
   autoSettle?: boolean;
+  /**
+   * Default true. False matches live Polar `/return`: open checkouts stay
+   * unsettled until a later confirm (webhook), so status can be unknown.
+   */
+  confirmOpen?: boolean;
 };
 
 type CheckoutRow = {
@@ -178,6 +183,9 @@ function settlePaidRaise(
 export class FakePolarPort implements PolarPort {
   readonly kind = "fixture" as const;
   private readonly autoSettle: boolean;
+  private readonly confirmOpen: boolean;
+  /** Checkouts this adapter opened. SQL-injected open rows stay unsettled on /return. */
+  private readonly opened = new Set<string>();
   private seq = 0;
 
   constructor(
@@ -185,6 +193,7 @@ export class FakePolarPort implements PolarPort {
     options: FakePolarOptions = {},
   ) {
     this.autoSettle = options.autoSettle !== false;
+    this.confirmOpen = options.confirmOpen !== false;
   }
 
   database(): AppDb {
@@ -194,6 +203,7 @@ export class FakePolarPort implements PolarPort {
   reset(): void {
     this.db.exec("DELETE FROM checkouts");
     this.seq = 0;
+    this.opened.clear();
   }
 
   async createCheckout(input: CreateCheckoutInput): Promise<CheckoutStart> {
@@ -212,6 +222,7 @@ export class FakePolarPort implements PolarPort {
       weekId,
     };
     const id = newId("chk");
+    this.opened.add(id);
     this.db
       .prepare(
         `INSERT INTO checkouts (
@@ -255,6 +266,9 @@ export class FakePolarPort implements PolarPort {
     }
     if (checkout.status === "paid" && checkout.listingId) {
       return this.loadListing(checkout.listingId);
+    }
+    if (!this.confirmOpen || !this.opened.has(id)) {
+      return null;
     }
     const listing =
       checkout.intent === "raise"

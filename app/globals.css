@@ -240,6 +240,18 @@ a:hover {
   line-height: 1.4;
 }
 
+/* Empty dek names last 7 days. Not this edition Monday paper. Occupied kicker stays. */
+.paper-empty[data-paper-empty] .edition-dek {
+  color: inherit;
+  max-width: 36rem;
+}
+
+/* Occupied dek names last 7 days. Not this edition Monday paper. Empty kicker stays. */
+.paper-occupied[data-paper-occupied] .edition-dek {
+  color: inherit;
+  max-width: 36rem;
+}
+
 .column-index {
   display: flex;
   flex-wrap: wrap;

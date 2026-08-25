@@ -51,10 +51,17 @@ export function ClassifiedEdition({
           </p>
         )}
         <h1 className="edition-city">{city.display}</h1>
-        <p className="edition-dek">
-          Four classified columns. The #1 mover, dentist, immigration lawyer, or
-          tutor in this edition is whoever paid the most. Rank is the bid.
-        </p>
+        {emptyPaper ? (
+          <p className="edition-dek">
+            Four classified columns. The #1 mover, dentist, immigration lawyer, or
+            tutor is whoever paid the most in the last 7 days. Rank is the bid.
+          </p>
+        ) : (
+          <p className="edition-dek">
+            Four classified columns. The #1 mover, dentist, immigration lawyer, or
+            tutor is whoever paid the most in the last 7 days. Rank is the bid.
+          </p>
+        )}
         {claim}
       </header>
       {children}

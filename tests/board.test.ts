@@ -22,7 +22,7 @@ import { CATEGORIES, CATEGORY_SLUGS, getCategory } from "../src/categories";
 import { getCity } from "../src/cities";
 import type { Listing } from "../src/db";
 import { openDatabase } from "../src/db";
-import { currentWeekId, ensureWeek, formatWeekLabel, nowUtc, previousWeekId, ROLLING_WEEK_MS } from "../src/week";
+import { currentWeekId, ensureWeek, nowUtc, previousWeekId, ROLLING_WEEK_MS } from "../src/week";
 import { ClaimColumn } from "../src/ui/claim-column";
 import { CityHub } from "../src/ui/city-hub";
 import { LaneBoard } from "../src/ui/lane-board";
@@ -192,9 +192,11 @@ test("empty London hub is empty: four lanes, Outbid, no invented cards or stars"
   assert.match(html, /data-classified-columns=""/);
   assert.match(html, /This week(?:&apos;|&#x27;|')s local classified/);
   assert.match(html, new RegExp(`data-edition-week="${weekId}"`));
-  assert.match(html, new RegExp(formatWeekLabel(weekId)));
+  assert.match(html, /Rolling last 7 days\. Not Monday 00:00 Europe\/London\./);
   assert.doesNotMatch(html, /data-rolling-week/);
-  assert.doesNotMatch(html, /Rolling last 7 days/);
+  assert.doesNotMatch(html, /week-window/);
+  assert.doesNotMatch(html, /Week of /);
+  assert.doesNotMatch(html, /24h lock/);
   assert.match(html, /<h1 class="edition-city">London<\/h1>/);
   assert.match(html, /Rank is the bid/);
   assert.match(html, /data-claim-pick/);
@@ -4489,6 +4491,8 @@ test("GET / default page is the London hub", async () => {
   assert.doesNotMatch(html, /data-category-tabs/);
   assert.doesNotMatch(html, /data-column-index-after/);
   assert.doesNotMatch(html, /name="business"/);
+  assert.match(html, /Rolling last 7 days\. Not Monday 00:00 Europe\/London\./);
+  assert.doesNotMatch(html, /data-rolling-week|week-window|Week of |24h lock/);
   assert.doesNotMatch(html, /★|⭐|review count/i);
 });
 
@@ -4731,7 +4735,8 @@ test("occupied paper keeps one first click — Call this #1, Claim stays after t
   assert.match(emptyHub, /data-first-click="claim"|claim-first-click/);
   assert.doesNotMatch(emptyHub, /data-later-claim|Then Claim #1|data-first-click="call"/);
   assert.doesNotMatch(emptyHub, /Call this #1|data-prize|data-category-tabs/);
-  assert.doesNotMatch(emptyHub, /data-rolling-week|Rolling last 7 days|24h lock/);
+  assert.match(emptyHub, /Rolling last 7 days\. Not Monday 00:00 Europe\/London\./);
+  assert.doesNotMatch(emptyHub, /data-rolling-week|week-window|24h lock|Week of /);
 });
 
 test("occupied week window is rolling last-7-days — not Monday 00:00 Europe/London", () => {
@@ -4756,8 +4761,10 @@ test("occupied week window is rolling last-7-days — not Monday 00:00 Europe/Lo
   assert.match(empty, /No #1/);
   assert.match(empty, /Claim #1 for/);
   assert.match(empty, /claim-first-click/);
+  assert.match(empty, /Rolling last 7 days\. Not Monday 00:00 Europe\/London\./);
   assert.doesNotMatch(empty, /data-rolling-week/);
-  assert.doesNotMatch(empty, /Rolling last 7 days/);
+  assert.doesNotMatch(empty, /week-window/);
+  assert.doesNotMatch(empty, /Week of /);
   assert.doesNotMatch(empty, /data-prize=/);
   assert.doesNotMatch(empty, /24h lock/);
   assert.doesNotMatch(empty, /Call this #1|data-first-click="call"|data-later-claim|Then Claim #1/);
@@ -4835,6 +4842,7 @@ test("occupied week window is rolling last-7-days — not Monday 00:00 Europe/Lo
   );
   assert.match(emptyLane, /No #1/);
   assert.doesNotMatch(emptyLane, /data-rolling-week/);
+  assert.doesNotMatch(emptyLane, /week-window/);
   assert.doesNotMatch(emptyLane, /Rolling last 7 days/);
 
   assert.match(
@@ -4851,6 +4859,102 @@ test("occupied week window is rolling last-7-days — not Monday 00:00 Europe/Lo
     /\.paper-occupied\[data-paper-occupied\] \.lane-empty\[data-lane-empty\] \[data-rolling-week\]/,
   );
   assert.doesNotMatch(css, /background:\s*var\(--accent\)[\s\S]{0,80}rolling-week/);
+});
+
+test("empty paper copy is rolling last-7-days — not Monday 00:00 Europe/London", () => {
+  const london = getCity("london");
+  const movers = getCategory("movers");
+  assert.ok(london && movers);
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+  const weekId = currentWeekId();
+
+  const empty = renderToStaticMarkup(
+    createElement(CityHub, {
+      city: london,
+      weekId,
+      lanes: {
+        movers: [],
+        dentists: [],
+        immigration_lawyers: [],
+        tutors: [],
+      },
+    }),
+  );
+  const headerEnd = empty.indexOf("</header>");
+  const windowAt = empty.indexOf("Rolling last 7 days");
+  const claimAt = empty.indexOf("Claim #1 for");
+  assert.ok(windowAt >= 0 && windowAt < headerEnd);
+  assert.ok(claimAt > headerEnd);
+  assert.match(empty, /data-paper-empty="true"/);
+  assert.match(empty, /class="folio"/);
+  assert.match(empty, /Rolling last 7 days\. Not Monday 00:00 Europe\/London\./);
+  assert.match(empty, new RegExp(`data-edition-week="${weekId}"`));
+  assert.doesNotMatch(empty, /data-rolling-week/);
+  assert.doesNotMatch(empty, /week-window/);
+  assert.doesNotMatch(empty, /Week of /);
+  assert.doesNotMatch(empty, /24h lock/);
+  assert.match(empty, /No #1/);
+  assert.match(empty, /claim-first-click/);
+  assert.equal((empty.match(/No #1/g) ?? []).length, 4);
+  assert.doesNotMatch(empty, /Call this #1|data-first-click="call"|data-later-claim|Then Claim #1/);
+  assert.doesNotMatch(empty, /data-prize=/);
+  assert.doesNotMatch(empty, /data-call-after-claim-N|call-after-claim-N/);
+  assert.doesNotMatch(empty, /leaflet|google\.maps|OpenStreetMap/i);
+  assert.doesNotMatch(empty, /★|4\.8|star-rating|data-stars|review count|rated 4\.9/i);
+
+  const occupied = renderToStaticMarkup(
+    createElement(CityHub, {
+      city: london,
+      weekId,
+      lanes: {
+        movers: [
+          ranked({
+            id: "lst_movers",
+            business: "North London Movers",
+            bidUsd: 20,
+            siteHost: "north.example",
+          }),
+        ],
+        dentists: [],
+        immigration_lawyers: [],
+        tutors: [],
+      },
+    }),
+  );
+  assert.match(occupied, /data-paper-occupied="true"/);
+  assert.match(occupied, /data-rolling-week=""/);
+  assert.match(occupied, /class="folio week-window"/);
+  assert.match(occupied, /Rolling last 7 days\. Not Monday 00:00 Europe\/London\./);
+  assert.match(occupied, /Call this #1/);
+  assert.match(occupied, /data-first-click="call"/);
+  assert.equal((occupied.match(/data-first-click="call"/g) ?? []).length, 1);
+  assert.doesNotMatch(occupied, /24h lock/);
+
+  const emptyLane = renderToStaticMarkup(
+    createElement(LaneBoard, {
+      city: london,
+      category: movers,
+      listings: [],
+    }),
+  );
+  assert.match(emptyLane, /No #1/);
+  assert.doesNotMatch(emptyLane, /data-rolling-week/);
+  assert.doesNotMatch(emptyLane, /week-window/);
+  assert.doesNotMatch(emptyLane, /Rolling last 7 days/);
+
+  assert.match(css, /\.paper-empty\[data-paper-empty\] \.folio\s*\{/);
+  assert.match(css, /\.paper-empty\[data-paper-empty\] \[data-rolling-week\]/);
+  assert.match(
+    css,
+    /\.paper-occupied\[data-paper-occupied\] \.lane-empty\[data-lane-empty\] \[data-rolling-week\]/,
+  );
+  const emptyFolio = css.match(
+    /\.paper-empty\[data-paper-empty\] \.folio\s*\{([^}]*)\}/,
+  );
+  assert.ok(emptyFolio);
+  assert.match(emptyFolio[1] ?? "", /text-transform:\s*none/);
+  assert.doesNotMatch(emptyFolio[1] ?? "", /background:|var\(--accent\)/);
+  assert.doesNotMatch(css, /background:\s*var\(--accent\)[\s\S]{0,80}folio/);
 });
 
 function listing(overrides: Partial<Listing> = {}): Listing {

@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import type { City } from "../cities";
-import { formatWeekLabel } from "../week";
 
 type ClassifiedEditionProps = {
   city: City;
@@ -36,7 +35,7 @@ export function ClassifiedEdition({
         <p className="edition-kicker">This week&apos;s local classified</p>
         {emptyPaper ? (
           <p className="folio" data-edition-week={weekId}>
-            Week of {formatWeekLabel(weekId)} · Europe/London · Vol. {weekId}
+            Rolling last 7 days. Not Monday 00:00 Europe/London.
           </p>
         ) : (
           <p

@@ -925,6 +925,57 @@ if grep -qE 'data-call-after-claim-six|data-claim-after-call-six|call-after-clai
   fail "rolling week must not stamp call-after-claim-N"
 fi
 
+echo "== UX: empty paper copy is rolling last-7-days — not Monday 00:00 Europe/London =="
+python3 - src/ui/edition.tsx <<'PY' || fail "empty paper must name rolling last 7 days without occupied chrome"
+import re
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+block = re.search(r"emptyPaper \? \((.*?)\) : \(", src, re.S)
+if not block:
+    raise SystemExit("emptyPaper folio branch missing")
+empty = block.group(1)
+if "Rolling last 7 days. Not Monday 00:00 Europe/London." not in empty:
+    raise SystemExit("empty paper must name rolling last 7 days")
+if "data-rolling-week" in empty:
+    raise SystemExit("empty paper must not stamp occupied data-rolling-week")
+if "week-window" in empty:
+    raise SystemExit("empty paper must not use occupied week-window chrome")
+if "Week of" in empty or "formatWeekLabel" in empty:
+    raise SystemExit("empty paper must not present Monday 00:00 as the drop")
+PY
+grep -q 'empty paper copy is rolling last-7-days' tests/board.test.ts \
+  || fail "board tests must cover empty paper rolling last-7-days copy"
+grep -q 'paper-empty\[data-paper-empty\] .folio' app/globals.css \
+  || fail "empty paper CSS must make the fair-window folio readable"
+python3 - app/globals.css <<'PY' || fail "empty fair-window folio must name the window, not recolor the paper"
+import re
+import sys
+
+css = open(sys.argv[1], encoding="utf-8").read()
+block = re.search(
+    r"\.paper-empty\[data-paper-empty\] \.folio\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not block:
+    raise SystemExit("empty folio fair-window rule missing")
+if "background:" in block.group(1) or "var(--accent)" in block.group(1):
+    raise SystemExit("do not recolor the empty fair-window folio")
+if "text-transform: none" not in block.group(1):
+    raise SystemExit("empty folio must drop Monday folio uppercase so the window is readable")
+PY
+if grep -q 'Week of ' src/ui/edition.tsx; then
+  fail "empty paper must not keep Monday week-of copy"
+fi
+if grep -qE 'data-call-after-claim-six|data-claim-after-call-six|call-after-claim-N' \
+  src/ui/edition.tsx app/globals.css; then
+  fail "empty rolling copy must not stamp call-after-claim-N"
+fi
+if grep -q 'data-rolling-week' src/ui/claim-column.tsx src/ui/outbid-form.tsx src/ui/listing-card.tsx; then
+  fail "empty rolling copy must not re-ship Claim / Call hops"
+fi
+
 echo "== polar checkout + fixture =="
 for f in src/polar/port.ts src/polar/fake.ts app/api/checkout/route.ts \
   app/return/page.tsx tests/checkout.test.ts src/migrations/004_checkouts.sql; do
@@ -1158,6 +1209,8 @@ if [[ -f package.json ]]; then
     || fail "occupied one-first-click leftover test did not run"
   grep -q 'occupied week window is rolling last-7-days — not Monday 00:00 Europe/London' "$test_log" \
     || fail "occupied rolling last-7-days window test did not run"
+  grep -q 'empty paper copy is rolling last-7-days — not Monday 00:00 Europe/London' "$test_log" \
+    || fail "empty paper rolling last-7-days copy test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"
@@ -1283,10 +1336,18 @@ if [[ -f package.json ]]; then
     fail "empty GET / must not invent a claim-after-call hop"
   fi
   if grep -q 'data-rolling-week' "${home_body}"; then
-    fail "empty GET / must not name a rolling week window"
+    fail "empty GET / must not stamp occupied data-rolling-week"
   fi
-  if grep -q 'Rolling last 7 days' "${home_body}"; then
-    fail "empty GET / must not print rolling last 7 days"
+  if grep -q 'week-window' "${home_body}"; then
+    fail "empty GET / must not use occupied week-window chrome"
+  fi
+  if grep -q 'Week of ' "${home_body}"; then
+    fail "empty GET / must not present Monday week-of as the drop"
+  fi
+  grep -q 'Rolling last 7 days. Not Monday 00:00 Europe/London.' "${home_body}" \
+    || fail "empty GET / must name rolling last 7 days, not London Monday midnight"
+  if grep -q '24h lock' "${home_body}"; then
+    fail "empty GET / must not become a 24h lock on #1"
   fi
   if grep -qE 'data-claim-after-call-two|claim-after-call-two' "${home_body}"; then
     fail "empty GET / must not invent a claim-after-call-two hop"
@@ -1425,6 +1486,17 @@ print(
     || fail "empty movers lane must wrap in paper-empty"
   grep -q 'data-paper-empty="true"' "${lane_body}" \
     || fail "empty movers lane must stamp data-paper-empty"
+  grep -q 'Rolling last 7 days. Not Monday 00:00 Europe/London.' "${lane_body}" \
+    || fail "empty movers lane paper must name rolling last 7 days"
+  if grep -q 'data-rolling-week' "${lane_body}"; then
+    fail "empty movers lane must not stamp occupied data-rolling-week"
+  fi
+  if grep -q 'week-window' "${lane_body}"; then
+    fail "empty movers lane must not use occupied week-window chrome"
+  fi
+  if grep -q 'Week of ' "${lane_body}"; then
+    fail "empty movers lane must not present Monday week-of as the drop"
+  fi
   if grep -q 'paper-occupied' "${lane_body}"; then
     fail "empty movers lane must not wrap as occupied"
   fi

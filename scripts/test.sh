@@ -2068,6 +2068,189 @@ fi
 grep -q 'Rules Week heading names last 7 days' SPEC.md \
   || fail "SPEC must name rules Week heading last 7 days, not a Monday paper"
 
+echo "== UX: occupied raise copy names difference-only — not a full rebid =="
+grep -q 'function OccupiedCheckoutCopy' src/ui/outbid-form.tsx \
+  || fail "occupied claim must compose OccupiedCheckoutCopy"
+grep -q 'data-raise-difference=""' src/ui/outbid-form.tsx \
+  || fail "occupied checkout copy must stamp raise-pays-difference"
+grep -q 'data-raise-charge=""' src/ui/outbid-form.tsx \
+  || fail "occupied checkout copy must stamp Polar raise charge"
+grep -q 'data-raise-charge-usd=""' src/ui/outbid-form.tsx \
+  || fail "occupied checkout copy must name the Polar raise charge in dollars"
+grep -qF 'Polar charges $' src/ui/outbid-form.tsx \
+  || fail "occupied checkout copy must say Polar charges"
+grep -q 'only the difference, not a full rebid' src/ui/outbid-form.tsx \
+  || fail "occupied checkout copy must name Polar raise-pays-difference"
+grep -q 'Polar charges the difference on a raise' src/ui/outbid-form.tsx \
+  || fail "occupied checkout copy must name raise-pays-difference below #1"
+grep -q 'New listing: Polar charges that full amount' src/ui/outbid-form.tsx \
+  || fail "occupied checkout copy must name a new listing as a full Polar charge"
+grep -q 'Same site already on this column: Polar charges only the difference, not a full rebid' src/ui/outbid-form.tsx \
+  || fail "occupied checkout copy must name same-site raise as Polar difference"
+grep -q 'data-raise-difference=""' src/ui/lane-board.tsx \
+  || fail "occupied Outbid hop must stamp raise-pays-difference"
+grep -q 'Polar charges only the difference, not a full rebid' src/ui/lane-board.tsx \
+  || fail "occupied Outbid hop must name Polar charges only the difference"
+grep -q 'data-raise-difference=""' src/ui/claim-column.tsx \
+  || fail "occupied hub Outbid must stamp raise-pays-difference"
+grep -q 'Same site already on a column: Polar charges only the difference, not a full rebid' src/ui/claim-column.tsx \
+  || fail "occupied hub Outbid must name Polar charges only the difference"
+python3 - src/ui/outbid-form.tsx <<'PY' || fail "empty Claim #1 write must not stamp occupied raise-pays-difference"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+note = re.search(r'emptyPaper \? \(\s*<p className="claim-note">[\s\S]*?</p>', src)
+if not note:
+    raise SystemExit("empty claim-note missing")
+if "data-raise-difference" in note.group(0) or "Polar charges only the difference" in note.group(0):
+    raise SystemExit("empty Claim #1 write stamped occupied raise-pays-difference")
+PY
+python3 - src/ui/claim-column.tsx <<'PY' || fail "empty column pick must not name occupied raise-pays-difference"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+note = re.search(r"Then pick the column[\s\S]*?</p>", src)
+if not note:
+    raise SystemExit("empty Then pick the column note missing")
+if "data-raise-difference" in note.group(0) or "Polar charges only the difference" in note.group(0):
+    raise SystemExit("empty column pick named occupied raise-pays-difference")
+PY
+grep -q 'Occupied raise / Outbid: Polar charges only the difference, not a full rebid.' app/globals.css \
+  || fail "CSS must name occupied Polar raise-pays-difference"
+grep -qF '.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-note[data-raise-difference]' app/globals.css \
+  || fail "CSS must compose occupied raise-pays-difference on later Claim"
+grep -qF '.paper-empty[data-paper-empty] .claim-note[data-raise-difference]' app/globals.css \
+  || fail "empty paper CSS must keep occupied raise-pays-difference off Claim #1"
+grep -qF '.lane-empty[data-lane-empty] .claim-note[data-raise-difference]' app/globals.css \
+  || fail "empty lanes CSS must keep occupied raise-pays-difference off No #1"
+python3 - app/globals.css <<'PY' || fail "raise-pays-difference CSS must stay muted, not recolor the classified paper"
+import re
+import sys
+css = open(sys.argv[1], encoding="utf-8").read()
+block = re.search(
+    r"/\* Occupied raise / Outbid: Polar charges only the difference, not a full rebid\. \*/(.*?)\.paper-occupied\[data-paper-occupied\] \.later-claim\[data-later-claim\] \.outbid",
+    css,
+    re.S,
+)
+if not block:
+    raise SystemExit("occupied raise-difference CSS block missing")
+if "background:" in block.group(1) or "var(--accent)" in block.group(1):
+    raise SystemExit("do not recolor occupied raise-pays-difference")
+if ".paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-note[data-raise-difference]" not in block.group(1):
+    raise SystemExit("occupied raise-difference claim-note CSS missing")
+PY
+grep -q 'occupied raise copy names difference-only' tests/board.test.ts \
+  || fail "board tests must cover occupied raise-pays-difference copy"
+grep -q 'Occupied raise / Outbid copy names Polar charges only the difference' SPEC.md \
+  || fail "SPEC must name occupied Polar raise-pays-difference copy"
+python3 - src/ui/lane-board.tsx <<'PY' || fail "raise-difference cut must not restamp last-week archive"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+aside = re.search(r"data-last-week[\s\S]*?</aside>", src)
+if not aside:
+    raise SystemExit("do not restamp last-week archive aside")
+block = aside.group(0)
+if "Aged out of the last 7 days" not in block:
+    raise SystemExit("do not restamp last-week archive last-7-days age-out")
+if "Polar charges only the difference" in block:
+    raise SystemExit("do not restamp last-week archive with occupied raise copy")
+if "Last week #1" in block or "this week" in block.lower():
+    raise SystemExit("do not restamp last-week archive back to Monday paper")
+PY
+python3 - src/ui/edition.tsx <<'PY' || fail "raise-difference cut must not restamp edition dek or kickers"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+deks = re.findall(r'<p className="edition-dek">(.*?)</p>', src, re.S)
+if len(deks) != 2:
+    raise SystemExit("do not restamp empty/occupied last-7-days deks")
+for label, dek in (("empty", deks[0]), ("occupied", deks[1])):
+    if "this edition" in dek:
+        raise SystemExit(f"do not restamp {label} dek back to this edition Monday paper")
+    if "whoever paid the most in the last 7 days" not in dek:
+        raise SystemExit(f"do not restamp {label} last-7-days dek")
+    if "Polar charges only the difference" in dek:
+        raise SystemExit(f"do not restamp {label} dek with occupied raise copy")
+kickers = re.findall(r'<p className="edition-kicker">(.*?)</p>', src, re.S)
+if len(kickers) != 2:
+    raise SystemExit("do not restamp empty/occupied last-7-days kickers")
+for label, kicker in (("empty", kickers[0]), ("occupied", kickers[1])):
+    if "Last 7 days" not in kicker or "This week" in kicker:
+        raise SystemExit(f"do not restamp {label} last-7-days kicker")
+PY
+python3 - README.md <<'PY' || fail "raise-difference cut must not restamp README last-7-days"
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+if "Weekly pay-to-rank" in src:
+    raise SystemExit("do not restamp README back to weekly Monday paper")
+if "last 7 days" not in src.lower():
+    raise SystemExit("do not restamp README last-7-days")
+if "Rolling last 7 days. Not Monday 00:00 Europe/London." not in src:
+    raise SystemExit("do not restamp README last-7-days")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("do not retouch Call this #1 from raise-difference cut")
+if "data-raise-difference" in src:
+    raise SystemExit("do not restamp README with occupied raise stamps")
+PY
+python3 - app/about/page.tsx <<'PY' || fail "raise-difference cut must not restamp about last-7-days"
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+if "paid the most this week" in src:
+    raise SystemExit("do not restamp about back to this week's Monday paper")
+if "Last 7 days" not in src and "last 7 days" not in src:
+    raise SystemExit("do not restamp about last-7-days")
+if "Rolling last 7 days. Not Monday 00:00 Europe/London." not in src:
+    raise SystemExit("do not restamp about last-7-days")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("do not retouch Call this #1 from raise-difference cut")
+if "data-raise-difference" in src:
+    raise SystemExit("do not restamp about with occupied raise stamps")
+PY
+python3 - app/layout.tsx <<'PY' || fail "raise-difference cut must not retouch site header last 7 days"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+tagline = re.search(r'<p className="tagline">(.*?)</p>', src, re.S)
+if not tagline:
+    raise SystemExit("site header tagline missing")
+text = tagline.group(1).replace("&apos;", "'").replace("&#x27;", "'")
+if "Last 7 days" not in text:
+    raise SystemExit("do not restamp site header last-7-days tagline")
+if "A weekly classified" in text or "This week" in text:
+    raise SystemExit("do not restamp site header back to a Monday week")
+if "data-raise-difference" in src:
+    raise SystemExit("do not restamp site header with occupied raise stamps")
+PY
+python3 - app/rules/page.tsx <<'PY' || fail "raise-difference cut must not restamp rules Week heading from #56"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+if re.search(r"<h2>\s*Week\s*</h2>", src):
+    raise SystemExit("do not restamp rules Week heading back to Week")
+if "<h2>Last 7 days</h2>" not in src:
+    raise SystemExit("do not restamp rules Week heading last 7 days from #56")
+if "city × category × week" in src:
+    raise SystemExit("do not restamp Ranking back to city × category × week Monday paper")
+if "canonical site URL + category + city + week" in src:
+    raise SystemExit("do not restamp Identity back to + week Monday paper")
+if "city × category, rolling last 7 days" not in src:
+    raise SystemExit("do not restamp Ranking last-7-days lane copy from #55")
+if "canonical site URL + category + city" not in src:
+    raise SystemExit("do not restamp Identity site + category + city from #55")
+if "data-raise-difference" in src or "data-raise-charge" in src:
+    raise SystemExit("do not stamp occupied raise-difference onto rules")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("rules must not retouch Call this #1")
+PY
+if grep -qE 'data-call-after-claim-six|data-claim-after-call-six|call-after-claim-N|data-raise-after-open' \
+  src/ui/outbid-form.tsx src/ui/lane-board.tsx src/ui/claim-column.tsx app/globals.css; then
+  fail "raise-difference must not stamp call-after-claim-N or a second named hop"
+fi
+if grep -q 'data-first-click="call"' src/ui/outbid-form.tsx src/ui/claim-column.tsx; then
+  fail "raise-difference must not move Call this #1 onto Claim / Outbid"
+fi
+
 echo "== polar checkout + fixture =="
 for f in src/polar/port.ts src/polar/fake.ts app/api/checkout/route.ts \
   app/return/page.tsx tests/checkout.test.ts src/migrations/004_checkouts.sql; do
@@ -2321,6 +2504,8 @@ if [[ -f package.json ]]; then
     || fail "rules lane rolling last-7-days test did not run"
   grep -q 'rules Week heading matches rolling last-7-days — not a Monday paper' "$test_log" \
     || fail "rules Week heading last-7-days test did not run"
+  grep -q 'occupied raise copy names difference-only — not a full rebid' "$test_log" \
+    || fail "occupied raise-pays-difference copy test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"
@@ -2412,6 +2597,15 @@ if [[ -f package.json ]]; then
     || fail "GET / claim must send a first-time local into one column"
   grep -q 'data-claim-job="movers"' "${home_body}" \
     || fail "GET / hop must stamp the movers job on the claim link"
+  if grep -q 'data-raise-difference' "${home_body}"; then
+    fail "empty GET / must not stamp occupied raise-pays-difference"
+  fi
+  if grep -q 'Polar charges only the difference' "${home_body}"; then
+    fail "empty GET / must not name occupied raise-pays-difference"
+  fi
+  if grep -q 'not a full rebid' "${home_body}"; then
+    fail "empty GET / must not hear occupied raise as a difference-only rebid"
+  fi
   if grep -q 'Outbid my movers column' "${home_body}"; then
     fail "GET / empty paper must not print four same-weight Outbid-my-column buttons"
   fi
@@ -2583,6 +2777,12 @@ PY
   grep -q 'data-empty-honest=""' "${lane_body}" || fail "empty movers lane must stamp honest empty"
   grep -q 'No #1' "${lane_body}" || fail "empty movers lane must say No #1"
   grep -q 'No stars. No map.' "${lane_body}" || fail "empty movers lane must refuse stars and maps"
+  if grep -q 'data-raise-difference' "${lane_body}"; then
+    fail "empty movers lane must not stamp occupied raise-pays-difference"
+  fi
+  if grep -q 'Polar charges only the difference' "${lane_body}"; then
+    fail "empty movers lane must not name occupied raise-pays-difference"
+  fi
   if grep -qE 'Call #[0-9]|data-call-later|data-later-call|data-call-ad="later"' "${lane_body}"; then
     fail "empty movers lane must not invent a later-rank call"
   fi
@@ -2898,6 +3098,14 @@ print("yes" if "data-category-tabs" in header or "data-column-index-after" in he
     || fail "lone paid #1 form must name Claim a later write"
   grep -q 'Outbid my movers column' "${movers_paid}" \
     || fail "lone paid #1 hop must name Outbid my movers column"
+  grep -q 'data-raise-difference=""' "${movers_paid}" \
+    || fail "lone paid #1 Outbid must name Polar raise-pays-difference"
+  grep -q 'Polar charges only the difference, not a full rebid' "${movers_paid}" \
+    || fail "lone paid #1 Outbid must name Polar charges only the difference"
+  grep -q 'Polar charges $<span data-raise-charge-usd="">1</span> to raise — only the difference, not a full rebid' "${movers_paid}" \
+    || fail "lone paid #1 form must name Polar charges the raise difference"
+  grep -q 'Same site already on this column: Polar charges only the difference, not a full rebid' "${movers_paid}" \
+    || fail "lone paid #1 form must name same-site raise as Polar difference"
   grep -q 'after Call this #1' "${movers_paid}" \
     || fail "lone paid #1 hop must sit after Call this #1"
   grep -q 'href="/c/london/movers#claim"' "${movers_paid}" \
@@ -3118,6 +3326,27 @@ PY
   fi
   grep -q 'Outbid my movers column' "${occupied_home}" \
     || fail "GET / paid hop must name Outbid my movers column"
+  grep -q 'data-raise-difference=""' "${occupied_home}" \
+    || fail "GET / occupied Outbid must name Polar raise-pays-difference"
+  grep -q 'Polar charges only the difference, not a full rebid' "${occupied_home}" \
+    || fail "GET / occupied Outbid must name Polar charges only the difference"
+  grep -q 'Same site already on a column: Polar charges only the difference, not a full rebid' "${occupied_home}" \
+    || fail "GET / occupied hub Outbid must name Polar charges only the difference"
+  python3 - "${occupied_home}" <<'PY' || fail "GET / empty mixed-paper columns must not name occupied raise-pays-difference"
+import re
+import sys
+html = open(sys.argv[1], encoding="utf-8").read()
+chunks = re.findall(r'<section class="lane classified-column lane-empty"[\s\S]*?</section>', html)
+if len(chunks) != 3:
+    raise SystemExit(f"expected 3 empty lanes, got {len(chunks)}")
+for chunk in chunks:
+    if "data-raise-difference" in chunk or "Polar charges only the difference" in chunk:
+        raise SystemExit("empty mixed-paper column named occupied raise-pays-difference")
+    if "No #1" not in chunk:
+        raise SystemExit("empty mixed-paper column lost No #1")
+if "Call this #1" not in html or 'data-first-click="call"' not in html:
+    raise SystemExit("occupied Call this #1 must stay the first occupied click")
+PY
   grep -q 'data-category-tabs' "${occupied_home}" \
     || fail "GET / occupied paper must keep the classified column index"
   grep -q 'data-column-index-after=""' "${occupied_home}" \

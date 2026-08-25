@@ -6327,6 +6327,260 @@ test("rules Week heading matches rolling last-7-days — not a Monday paper", ()
   assert.doesNotMatch(css, /data-call-after-claim-N|call-after-claim-N/);
 });
 
+test("occupied raise copy names difference-only — not a full rebid", () => {
+  const london = getCity("london");
+  const movers = getCategory("movers");
+  assert.ok(london && movers);
+  const formSrc = readFileSync(
+    join(process.cwd(), "src", "ui", "outbid-form.tsx"),
+    "utf8",
+  );
+  const laneSrc = readFileSync(
+    join(process.cwd(), "src", "ui", "lane-board.tsx"),
+    "utf8",
+  );
+  const claimSrc = readFileSync(
+    join(process.cwd(), "src", "ui", "claim-column.tsx"),
+    "utf8",
+  );
+  const edition = readFileSync(join(process.cwd(), "src", "ui", "edition.tsx"), "utf8");
+  const aboutSrc = readFileSync(join(process.cwd(), "app", "about", "page.tsx"), "utf8");
+  const layout = readFileSync(join(process.cwd(), "app", "layout.tsx"), "utf8");
+  const readme = readFileSync(join(process.cwd(), "README.md"), "utf8");
+  const rulesSrc = readFileSync(join(process.cwd(), "app", "rules", "page.tsx"), "utf8");
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+  const weekId = currentWeekId();
+  const lastSevenHeader = /Last 7 days(?:&apos;|&#x27;|') local classified/;
+  const rolling = /Rolling last 7 days\. Not Monday 00:00 Europe\/London\./;
+  const dekWindow = /whoever paid the most in the last 7 days/;
+  const archived = ranked({
+    id: "lst_last",
+    business: "Last Week Van",
+    bidUsd: 99,
+    weekId: previousWeekId(weekId),
+    siteHost: "last.example",
+  });
+
+  assert.match(formSrc, /function OccupiedCheckoutCopy/);
+  assert.match(formSrc, /data-raise-difference=""/);
+  assert.match(formSrc, /data-raise-charge=""/);
+  assert.match(formSrc, /data-raise-charge-usd=""/);
+  assert.match(formSrc, /Polar charges \$/);
+  assert.match(formSrc, /only the difference, not a full rebid/);
+  assert.match(formSrc, /Polar charges the difference on a raise/);
+  assert.match(formSrc, /New listing: Polar charges that full amount/);
+  assert.match(
+    formSrc,
+    /Same site already on this column: Polar charges only the difference, not a full rebid/,
+  );
+  const emptyFormNote = formSrc.match(
+    /emptyPaper \? \(\s*<p className="claim-note">[\s\S]*?<\/p>/,
+  );
+  assert.ok(emptyFormNote);
+  assert.doesNotMatch(emptyFormNote[0] ?? "", /data-raise-difference/);
+  assert.doesNotMatch(emptyFormNote[0] ?? "", /Polar charges only the difference/);
+
+  assert.match(laneSrc, /data-raise-difference=""/);
+  assert.match(laneSrc, /Polar charges only the difference, not a full rebid/);
+  assert.match(laneSrc, /Outbid my \$\{category\.display\.toLowerCase\(\)\} column/);
+  assert.match(claimSrc, /data-raise-difference=""/);
+  assert.match(
+    claimSrc,
+    /Same site already on a column: Polar charges only the difference, not a full rebid/,
+  );
+  const emptyClaimNote = claimSrc.match(/Then pick the column[\s\S]*?<\/p>/);
+  assert.ok(emptyClaimNote);
+  assert.doesNotMatch(emptyClaimNote[0] ?? "", /data-raise-difference/);
+  assert.doesNotMatch(emptyClaimNote[0] ?? "", /Polar charges only the difference/);
+
+  assert.match(css, /Occupied raise \/ Outbid: Polar charges only the difference, not a full rebid/);
+  const raiseCss = css.match(
+    /\/\* Occupied raise \/ Outbid: Polar charges only the difference, not a full rebid\. \*\/([\s\S]*?)\.paper-occupied\[data-paper-occupied\] \.later-claim\[data-later-claim\] \.outbid/,
+  );
+  assert.ok(raiseCss);
+  assert.match(
+    raiseCss[1] ?? "",
+    /\.paper-occupied\[data-paper-occupied\] \.later-claim\[data-later-claim\] \.claim-note\[data-raise-difference\]/,
+  );
+  assert.match(
+    raiseCss[1] ?? "",
+    /\.paper-empty\[data-paper-empty\] \.claim-note\[data-raise-difference\]/,
+  );
+  assert.doesNotMatch(raiseCss[1] ?? "", /background:|var\(--accent\)/);
+
+  assert.match(rulesSrc, /<h2>Last 7 days<\/h2>/);
+  assert.match(rulesSrc, /city × category, rolling last 7 days/);
+  assert.match(rulesSrc, /canonical site URL \+ category \+ city/);
+  assert.doesNotMatch(rulesSrc, /data-raise-difference|data-raise-charge/);
+  assert.doesNotMatch(rulesSrc, /Call this #1|data-first-click="call"/);
+
+  const deks = [...edition.matchAll(/<p className="edition-dek">(.*?)<\/p>/gs)];
+  assert.equal(deks.length, 2);
+  for (const dek of deks) {
+    assert.match(dek[1] ?? "", dekWindow);
+    assert.doesNotMatch(dek[1] ?? "", /this edition/);
+    assert.doesNotMatch(dek[1] ?? "", /data-raise-difference|Polar charges only the difference/);
+  }
+  const kickers = [...edition.matchAll(/<p className="edition-kicker">(.*?)<\/p>/gs)];
+  assert.equal(kickers.length, 2);
+  for (const kicker of kickers) {
+    assert.match(kicker[1] ?? "", lastSevenHeader);
+    assert.doesNotMatch(kicker[1] ?? "", /This week/);
+  }
+
+  const asideSrc = laneSrc.match(/data-last-week[\s\S]*?<\/aside>/);
+  assert.ok(asideSrc);
+  assert.match(asideSrc[0] ?? "", /Aged out of the last 7 days/);
+  assert.doesNotMatch(asideSrc[0] ?? "", /Polar charges only the difference/);
+
+  assert.match(readme, rolling);
+  assert.doesNotMatch(readme, /data-raise-difference|Polar charges only the difference/);
+  assert.match(aboutSrc, rolling);
+  assert.doesNotMatch(aboutSrc, /data-raise-difference|Call this #1/);
+  const tagline = layout.match(/<p className="tagline">(.*?)<\/p>/s);
+  assert.ok(tagline);
+  assert.match(tagline[1] ?? "", lastSevenHeader);
+
+  const emptyLane = renderToStaticMarkup(
+    createElement(LaneBoard, {
+      city: london,
+      category: movers,
+      listings: [],
+      showForm: true,
+    }),
+  );
+  assert.match(emptyLane, /No #1/);
+  assert.match(emptyLane, /data-first-click="claim"/);
+  assert.match(emptyLane, />Outbid</);
+  assert.doesNotMatch(emptyLane, /data-raise-difference/);
+  assert.doesNotMatch(emptyLane, /data-raise-charge/);
+  assert.doesNotMatch(emptyLane, /Polar charges only the difference/);
+  assert.doesNotMatch(emptyLane, /not a full rebid/);
+  assert.doesNotMatch(emptyLane, /Call this #1|data-first-click="call"/);
+
+  const occupiedLane = renderToStaticMarkup(
+    createElement(LaneBoard, {
+      city: london,
+      category: movers,
+      listings: [
+        ranked({
+          id: "lst_movers",
+          business: "North London Movers",
+          bidUsd: 20,
+          siteHost: "north.example",
+        }),
+      ],
+      showForm: true,
+    }),
+  );
+  const callAt = occupiedLane.indexOf("Call this #1");
+  const firstClickAt = occupiedLane.indexOf('data-first-click="call"');
+  const outbidLineAt = occupiedLane.indexOf("Outbid my movers column");
+  const raiseAt = occupiedLane.indexOf('data-raise-difference=""');
+  const thenClaimAt = occupiedLane.indexOf("Then Claim #1");
+  const formRaiseAt = occupiedLane.indexOf("Same site already on this column");
+  assert.match(occupiedLane, /Call this #1/);
+  assert.match(occupiedLane, /data-first-click="call"/);
+  assert.equal((occupiedLane.match(/data-first-click="call"/g) ?? []).length, 1);
+  assert.ok(callAt >= 0 && firstClickAt >= 0 && outbidLineAt > callAt);
+  assert.ok(raiseAt > callAt && thenClaimAt > raiseAt);
+  assert.ok(formRaiseAt > thenClaimAt);
+  assert.match(occupiedLane, /data-raise-difference=""/);
+  assert.match(occupiedLane, /Polar charges only the difference, not a full rebid/);
+  assert.match(
+    occupiedLane,
+    /Polar charges \$<span data-raise-charge-usd="">1<\/span> to raise — only the difference, not a full rebid/,
+  );
+  assert.match(occupiedLane, /data-current-usd="20"/);
+  assert.match(occupiedLane, /New listing: Polar charges that full amount/);
+  assert.match(
+    occupiedLane,
+    /Same site already on this column: Polar charges only the difference, not a full rebid/,
+  );
+  assert.match(occupiedLane, /Then Claim #1/);
+  assert.doesNotMatch(occupiedLane, /data-empty-claim-first|data-first-click="claim"/);
+  assert.doesNotMatch(occupiedLane, /data-raise-after-open|raise-after-open-N|call-after-claim-N/);
+
+  const emptyHub = renderToStaticMarkup(
+    createElement(CityHub, {
+      city: london,
+      weekId,
+      lanes: {
+        movers: [],
+        dentists: [],
+        immigration_lawyers: [],
+        tutors: [],
+      },
+    }),
+  );
+  assert.match(emptyHub, /No #1/);
+  assert.match(emptyHub, /claim-first-click/);
+  assert.match(emptyHub, /Then pick the column/);
+  assert.equal((emptyHub.match(/No #1/g) ?? []).length, 4);
+  assert.doesNotMatch(emptyHub, /data-raise-difference/);
+  assert.doesNotMatch(emptyHub, /data-raise-charge/);
+  assert.doesNotMatch(emptyHub, /Polar charges only the difference/);
+  assert.doesNotMatch(emptyHub, /not a full rebid/);
+  assert.doesNotMatch(emptyHub, /Call this #1|data-first-click="call"/);
+  assert.doesNotMatch(emptyHub, /data-rolling-week|week-window/);
+
+  const occupiedHub = renderToStaticMarkup(
+    createElement(CityHub, {
+      city: london,
+      weekId,
+      lastWeek: { movers: archived },
+      lanes: {
+        movers: [
+          ranked({
+            id: "lst_movers",
+            business: "North London Movers",
+            bidUsd: 20,
+            siteHost: "north.example",
+          }),
+        ],
+        dentists: [],
+        immigration_lawyers: [],
+        tutors: [],
+      },
+    }),
+  );
+  const hubCallAt = occupiedHub.indexOf("Call this #1");
+  const hubFirstAt = occupiedHub.indexOf('data-first-click="call"');
+  const hubOutbidAt = occupiedHub.indexOf("Outbid my movers column");
+  const hubRaiseAt = occupiedHub.indexOf('data-raise-difference=""');
+  const hubThenAt = occupiedHub.indexOf("Then Claim #1");
+  const hubPickAt = occupiedHub.indexOf("Same site already on a column");
+  assert.match(occupiedHub, /data-paper-occupied="true"/);
+  assert.match(occupiedHub, /Call this #1/);
+  assert.match(occupiedHub, /data-first-click="call"/);
+  assert.equal((occupiedHub.match(/data-first-click="call"/g) ?? []).length, 1);
+  assert.ok(hubCallAt >= 0 && hubFirstAt >= 0 && hubOutbidAt > hubCallAt);
+  assert.ok(hubRaiseAt > hubCallAt && hubThenAt > hubRaiseAt);
+  assert.ok(hubPickAt > hubThenAt);
+  assert.match(occupiedHub, /Polar charges only the difference, not a full rebid/);
+  assert.match(
+    occupiedHub,
+    /Same site already on a column: Polar charges only the difference, not a full rebid/,
+  );
+  assert.match(occupiedHub, /Pick one column/);
+  assert.equal((occupiedHub.match(/No #1/g) ?? []).length, 3);
+  const emptyChunks = occupiedHub.match(
+    /<section class="lane classified-column lane-empty"[\s\S]*?<\/section>/g,
+  );
+  assert.equal(emptyChunks?.length, 3);
+  for (const chunk of emptyChunks ?? []) {
+    assert.match(chunk, /No #1/);
+    assert.doesNotMatch(chunk, /data-raise-difference/);
+    assert.doesNotMatch(chunk, /Polar charges only the difference/);
+    assert.doesNotMatch(chunk, /Call this #1/);
+  }
+  assert.match(occupiedHub, /Aged out of the last 7 days/);
+  assert.match(occupiedHub, dekWindow);
+  assert.match(occupiedHub, lastSevenHeader);
+  assert.doesNotMatch(occupiedHub, /data-raise-after-open|call-after-claim-N/);
+  assert.doesNotMatch(occupiedHub, /★|⭐|review count/i);
+});
+
 function listing(overrides: Partial<Listing> = {}): Listing {
   return {
     id: "lst_default",

@@ -95,7 +95,7 @@ export default function RulesPage() {
         </tbody>
       </table>
 
-      <h2>Week</h2>
+      <h2>Last 7 days</h2>
       <p>
         Occupied rank is the rolling last 7 days from paid placement.{" "}
         <strong>Rolling last 7 days. Not Monday 00:00 Europe/London.</strong>{" "}

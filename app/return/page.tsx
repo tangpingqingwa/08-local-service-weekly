@@ -18,7 +18,7 @@ type ReturnPageProps = {
   }>;
 };
 
-function occupyingAfterAbandonedRaise(
+function occupyingFromRaiseCheckout(
   checkout: CheckoutRecord | null,
   port: PolarPort,
 ): Listing | null {
@@ -59,8 +59,8 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
     if (result.checkout?.intent === "raise") {
       raiseChargeUsd = result.checkout.amountUsd;
     }
-    if (state === "cancelled") {
-      occupying = occupyingAfterAbandonedRaise(result.checkout, port);
+    if (state === "cancelled" || state === "unknown") {
+      occupying = occupyingFromRaiseCheckout(result.checkout, port);
     }
   } catch {
     state = "unknown";
@@ -122,6 +122,20 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
             : "The listing is on the board at the rank that bid can take."}
         </p>
         <p>This page does not invent a rank before the payment settles.</p>
+        <p>
+          <a href="/">Back to the board</a>
+        </p>
+      </main>
+    );
+  }
+
+  if (state === "unknown" && occupying) {
+    return (
+      <main className="return-page" data-return="unknown" data-raise-unknown="">
+        <h1>Checkout status unknown</h1>
+        <p className="raise-unknown" data-raise-unknown="">
+          {occupying.business} still occupies at $<span data-occupy-bid-usd="">{occupying.bidUsd}</span>. An unpaid raise draft does not unlist.
+        </p>
         <p>
           <a href="/">Back to the board</a>
         </p>

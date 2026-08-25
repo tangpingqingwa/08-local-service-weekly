@@ -2703,6 +2703,283 @@ if grep -q 'data-raise-difference' app/return/page.tsx; then
   fail "cancelled Polar return must not restamp occupied raise-difference from #57"
 fi
 
+echo "== UX: occupied unknown Polar return still occupies — not never listed =="
+grep -q 'data-raise-unknown=""' app/return/page.tsx \
+  || fail "occupied unknown Polar return must stamp raise-unknown after an open raise"
+grep -q 'className="raise-unknown"' app/return/page.tsx \
+  || fail "occupied unknown Polar return must compose raise-unknown as the occupying fact"
+grep -q 'An unpaid raise draft does not unlist' app/return/page.tsx \
+  || fail "occupied unknown Polar return must name an unpaid raise draft does not unlist"
+grep -q 'confirmOpen' src/polar/fake.ts \
+  || fail "fixture Polar must be able to leave an open raise unsettled on /return"
+python3 - app/return/page.tsx <<'PY' || fail "raise-unknown fact must name still occupy, not never listed"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+fact = re.search(
+    r'<p className="raise-unknown" data-raise-unknown="">([\s\S]*?)</p>',
+    src,
+)
+if not fact:
+    raise SystemExit("raise-unknown paragraph missing")
+block = fact.group(1)
+if "still occupies at $" not in block:
+    raise SystemExit("raise-unknown fact missing still occupies")
+if "An unpaid raise draft does not unlist" not in block:
+    raise SystemExit("raise-unknown fact missing does not unlist")
+if "No rank claimed" in block:
+    raise SystemExit("raise-unknown fact still says no rank claimed")
+if "never appear" in block:
+    raise SystemExit("raise-unknown fact still says unpaid drafts never appear")
+if "Polar charged" in block or "data-raise-return" in block:
+    raise SystemExit("raise-unknown fact named a paid raise difference")
+if "only the difference, not a full rebid" in block:
+    raise SystemExit("raise-unknown fact restamped paid difference-only")
+if "An abandoned raise does not unlist" in block or "data-raise-cancel" in block:
+    raise SystemExit("raise-unknown fact restamped cancelled raise-cancel from #59")
+PY
+python3 - app/return/page.tsx <<'PY' || fail "new listing unknown Polar return must still name never appear"
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+if src.count('data-return="unknown"') < 2:
+    raise SystemExit("generic unknown return missing beside occupied raise-unknown")
+generic = None
+for chunk in src.split('data-return="unknown"')[1:]:
+    block = chunk.split("data-return=", 1)[0]
+    if "data-raise-unknown" in block:
+        continue
+    generic = block
+    break
+if generic is None:
+    raise SystemExit("new listing unknown return missing")
+if "No rank claimed" not in generic:
+    raise SystemExit("new listing unknown return lost no rank claimed")
+if "Unpaid checkout drafts never appear" not in generic:
+    raise SystemExit("new listing unknown return lost never appear")
+if "still occupies" in generic or "does not unlist" in generic:
+    raise SystemExit("new listing unknown return named still occupy")
+if "data-raise-cancel" in generic or "data-raise-return" in generic:
+    raise SystemExit("new listing unknown return named a raise return")
+if "Polar charged" in generic:
+    raise SystemExit("new listing unknown return named Polar charged")
+PY
+python3 - app/return/page.tsx <<'PY' || fail "cancelled raise Polar return must stay still-occupies from #59"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+fact = re.search(
+    r'<p className="raise-cancel" data-raise-cancel="">([\s\S]*?)</p>',
+    src,
+)
+if not fact:
+    raise SystemExit("do not restamp raise-cancel paragraph from #59")
+block = fact.group(1)
+if "still occupies at $" not in block:
+    raise SystemExit("do not restamp still occupies from #59")
+if "An abandoned raise does not unlist" not in block:
+    raise SystemExit("do not restamp abandoned raise does not unlist from #59")
+if "data-raise-unknown" in block or "An unpaid raise draft does not unlist" in block:
+    raise SystemExit("do not stamp raise-unknown onto cancelled raise-cancel from #59")
+PY
+python3 - app/return/page.tsx <<'PY' || fail "paid raise Polar return must stay difference-only from #58"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+fact = re.search(
+    r'<p className="raise-return" data-raise-return="">([\s\S]*?)</p>',
+    src,
+)
+if not fact:
+    raise SystemExit("do not restamp raise-return paragraph from #58")
+block = fact.group(1)
+if "Polar charged $" not in block:
+    raise SystemExit("do not restamp Polar charged from #58")
+if "only the difference, not a full rebid" not in block:
+    raise SystemExit("do not restamp difference-only from #58")
+if "still occupies" in block or "data-raise-cancel" in block or "data-raise-unknown" in block:
+    raise SystemExit("do not stamp occupying copy onto paid raise-return from #58")
+PY
+grep -q 'Occupied unknown Polar return: still occupies at the old bid.' app/globals.css \
+  || fail "CSS must name occupied unknown Polar return still occupies"
+grep -qF '.return-page[data-return="unknown"][data-raise-unknown] .raise-unknown[data-raise-unknown]' app/globals.css \
+  || fail "CSS must compose occupied unknown Polar return raise-unknown as the occupying fact"
+grep -qF '.return-page[data-return="paid"] [data-raise-unknown]' app/globals.css \
+  || fail "CSS must keep raise-unknown off paid Polar return"
+grep -qF '.return-page[data-return="cancelled"] [data-raise-unknown]' app/globals.css \
+  || fail "CSS must keep raise-unknown off cancelled Polar return"
+grep -qF '.return-page[data-return="unknown"]:not([data-raise-unknown]) .raise-unknown' app/globals.css \
+  || fail "CSS must keep raise-unknown off a new listing unknown Polar return"
+python3 - app/globals.css <<'PY' || fail "raise-unknown CSS must stay a return-page fact, not recolor the classified paper"
+import re
+import sys
+css = open(sys.argv[1], encoding="utf-8").read()
+block = re.search(
+    r"/\* Occupied unknown Polar return: still occupies at the old bid\. \*/(.*?)(?:/\*|^\.doc-page)",
+    css,
+    re.S | re.M,
+)
+if not block:
+    raise SystemExit("occupied unknown Polar return CSS block missing")
+if "background:" in block.group(1) or "var(--accent)" in block.group(1):
+    raise SystemExit("do not recolor occupied unknown Polar return")
+if ".paper-occupied" in block.group(1) or ".later-claim" in block.group(1):
+    raise SystemExit("do not restamp occupied raise / Outbid CSS from unknown Polar return")
+if "data-raise-return" in block.group(1):
+    raise SystemExit("do not restamp raise-return CSS from unknown Polar return")
+if "data-raise-cancel" in block.group(1):
+    raise SystemExit("do not restamp raise-cancel CSS from unknown Polar return")
+if '.return-page[data-return="unknown"][data-raise-unknown] .raise-unknown[data-raise-unknown]' not in block.group(1):
+    raise SystemExit("occupied unknown Polar return raise-unknown CSS missing")
+PY
+python3 - app/globals.css <<'PY' || fail "raise-cancel CSS must stay still-occupies from #59"
+import re
+import sys
+css = open(sys.argv[1], encoding="utf-8").read()
+block = re.search(
+    r"/\* Occupied cancelled Polar return: still occupies at the old bid\. \*/(.*?)(?:/\*|^\.doc-page)",
+    css,
+    re.S | re.M,
+)
+if not block:
+    raise SystemExit("do not restamp occupied cancelled Polar return CSS block from #59")
+if "data-raise-unknown" in block.group(1):
+    raise SystemExit("do not stamp raise-unknown CSS onto cancelled Polar return from #59")
+if '.return-page[data-return="cancelled"][data-raise-cancel] .raise-cancel[data-raise-cancel]' not in block.group(1):
+    raise SystemExit("do not restamp raise-cancel CSS from #59")
+PY
+grep -q 'occupied unknown Polar return still occupies — not never listed' tests/checkout.test.ts \
+  || fail "checkout tests must cover occupied unknown Polar return still occupies"
+grep -q 'Occupied unknown Polar return after an open raise names they still occupy at the old bid' SPEC.md \
+  || fail "SPEC must name occupied unknown Polar return still occupies"
+python3 - src/ui/outbid-form.tsx src/ui/lane-board.tsx src/ui/claim-column.tsx <<'PY' || fail "unknown Polar return cut must not restamp occupied raise / Outbid from #57"
+import sys
+form, lane, claim = (open(path, encoding="utf-8").read() for path in sys.argv[1:])
+if 'data-raise-difference=""' not in form or 'data-raise-difference=""' not in lane or 'data-raise-difference=""' not in claim:
+    raise SystemExit("do not restamp occupied raise-difference from #57")
+if "Same site already on this column: Polar charges only the difference, not a full rebid" not in form:
+    raise SystemExit("do not restamp occupied checkout same-site raise copy from #57")
+if "Polar charges only the difference, not a full rebid." not in lane:
+    raise SystemExit("do not restamp occupied Outbid hop difference copy from #57")
+if "Same site already on a column: Polar charges only the difference, not a full rebid" not in claim:
+    raise SystemExit("do not restamp occupied hub Outbid difference copy from #57")
+if "data-raise-unknown" in form or "data-raise-unknown" in lane or "data-raise-unknown" in claim:
+    raise SystemExit("do not stamp unknown Polar return onto occupied raise / Outbid")
+if "data-raise-cancel" in form or "data-raise-cancel" in lane or "data-raise-cancel" in claim:
+    raise SystemExit("do not stamp cancelled Polar return onto occupied raise / Outbid")
+if "data-raise-return" in form or "data-raise-return" in lane or "data-raise-return" in claim:
+    raise SystemExit("do not stamp Polar return onto occupied raise / Outbid")
+PY
+python3 - src/ui/lane-board.tsx <<'PY' || fail "unknown Polar return cut must not restamp last-week archive"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+aside = re.search(r"data-last-week[\s\S]*?</aside>", src)
+if not aside:
+    raise SystemExit("do not restamp last-week archive aside")
+block = aside.group(0)
+if "Aged out of the last 7 days" not in block:
+    raise SystemExit("do not restamp last-week archive last-7-days age-out")
+if "still occupies" in block or "data-raise-unknown" in block or "data-raise-cancel" in block or "data-raise-return" in block:
+    raise SystemExit("do not restamp last-week archive with unknown Polar return copy")
+if "Last week #1" in block or "this week" in block.lower():
+    raise SystemExit("do not restamp last-week archive back to Monday paper")
+PY
+python3 - src/ui/edition.tsx <<'PY' || fail "unknown Polar return cut must not restamp edition dek or kickers"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+deks = re.findall(r'<p className="edition-dek">(.*?)</p>', src, re.S)
+if len(deks) != 2:
+    raise SystemExit("do not restamp empty/occupied last-7-days deks")
+for label, dek in (("empty", deks[0]), ("occupied", deks[1])):
+    if "this edition" in dek:
+        raise SystemExit(f"do not restamp {label} dek back to this edition Monday paper")
+    if "whoever paid the most in the last 7 days" not in dek:
+        raise SystemExit(f"do not restamp {label} last-7-days dek")
+    if "still occupies" in dek or "data-raise-unknown" in dek or "data-raise-cancel" in dek or "data-raise-return" in dek:
+        raise SystemExit(f"do not restamp {label} dek with unknown Polar return copy")
+kickers = re.findall(r'<p className="edition-kicker">(.*?)</p>', src, re.S)
+if len(kickers) != 2:
+    raise SystemExit("do not restamp empty/occupied last-7-days kickers")
+for label, kicker in (("empty", kickers[0]), ("occupied", kickers[1])):
+    if "Last 7 days" not in kicker or "This week" in kicker:
+        raise SystemExit(f"do not restamp {label} last-7-days kicker")
+PY
+python3 - README.md <<'PY' || fail "unknown Polar return cut must not restamp README last-7-days"
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+if "Weekly pay-to-rank" in src:
+    raise SystemExit("do not restamp README back to weekly Monday paper")
+if "last 7 days" not in src.lower():
+    raise SystemExit("do not restamp README last-7-days")
+if "Rolling last 7 days. Not Monday 00:00 Europe/London." not in src:
+    raise SystemExit("do not restamp README last-7-days")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("do not retouch Call this #1 from unknown Polar return cut")
+if "data-raise-unknown" in src or "data-raise-cancel" in src or "data-raise-return" in src or "data-raise-difference" in src:
+    raise SystemExit("do not restamp README with unknown Polar return stamps")
+PY
+python3 - app/about/page.tsx <<'PY' || fail "unknown Polar return cut must not restamp about last-7-days"
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+if "paid the most this week" in src:
+    raise SystemExit("do not restamp about back to this week's Monday paper")
+if "Last 7 days" not in src and "last 7 days" not in src:
+    raise SystemExit("do not restamp about last-7-days")
+if "Rolling last 7 days. Not Monday 00:00 Europe/London." not in src:
+    raise SystemExit("do not restamp about last-7-days")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("do not retouch Call this #1 from unknown Polar return cut")
+if "data-raise-unknown" in src or "data-raise-cancel" in src or "data-raise-return" in src or "data-raise-difference" in src:
+    raise SystemExit("do not restamp about with unknown Polar return stamps")
+PY
+python3 - app/layout.tsx <<'PY' || fail "unknown Polar return cut must not retouch site header last 7 days"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+tagline = re.search(r'<p className="tagline">(.*?)</p>', src, re.S)
+if not tagline:
+    raise SystemExit("site header tagline missing")
+text = tagline.group(1).replace("&apos;", "'").replace("&#x27;", "'")
+if "Last 7 days" not in text:
+    raise SystemExit("do not restamp site header last-7-days tagline")
+if "A weekly classified" in text or "This week" in text:
+    raise SystemExit("do not restamp site header back to a Monday week")
+if "data-raise-unknown" in src or "data-raise-cancel" in src or "data-raise-return" in src or "data-raise-difference" in src:
+    raise SystemExit("do not restamp site header with unknown Polar return stamps")
+PY
+python3 - app/rules/page.tsx <<'PY' || fail "unknown Polar return cut must not restamp rules Week heading from #56"
+import re
+import sys
+src = open(sys.argv[1], encoding="utf-8").read()
+if re.search(r"<h2>\s*Week\s*</h2>", src):
+    raise SystemExit("do not restamp rules Week heading back to Week")
+if "<h2>Last 7 days</h2>" not in src:
+    raise SystemExit("do not restamp rules Week heading last 7 days from #56")
+if "city × category × week" in src:
+    raise SystemExit("do not restamp Ranking back to city × category × week Monday paper")
+if "canonical site URL + category + city + week" in src:
+    raise SystemExit("do not restamp Identity back to + week Monday paper")
+if "city × category, rolling last 7 days" not in src:
+    raise SystemExit("do not restamp Ranking last-7-days lane copy from #55")
+if "canonical site URL + category + city" not in src:
+    raise SystemExit("do not restamp Identity site + category + city from #55")
+if "data-raise-unknown" in src or "data-raise-cancel" in src or "data-raise-return" in src or "data-raise-difference" in src or "data-raise-charge" in src:
+    raise SystemExit("do not stamp occupied unknown Polar return onto rules")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("rules must not retouch Call this #1")
+PY
+if grep -qE 'data-call-after-claim-six|data-claim-after-call-six|call-after-claim-N|data-raise-after-open' \
+  app/return/page.tsx app/globals.css; then
+  fail "unknown Polar return must not stamp call-after-claim-N or a second named hop"
+fi
+if grep -q 'data-first-click="call"' app/return/page.tsx; then
+  fail "unknown Polar return must not move Call this #1 onto /return"
+fi
+if grep -q 'data-raise-difference' app/return/page.tsx; then
+  fail "unknown Polar return must not restamp occupied raise-difference from #57"
+fi
+
 echo "== polar checkout + fixture =="
 for f in src/polar/port.ts src/polar/fake.ts app/api/checkout/route.ts \
   app/return/page.tsx tests/checkout.test.ts src/migrations/004_checkouts.sql; do
@@ -2962,6 +3239,8 @@ if [[ -f package.json ]]; then
     || fail "occupied Polar return difference-only test did not run"
   grep -q 'occupied cancelled Polar return still occupies — not never listed' "$test_log" \
     || fail "occupied cancelled Polar return still-occupies test did not run"
+  grep -q 'occupied unknown Polar return still occupies — not never listed' "$test_log" \
+    || fail "occupied unknown Polar return still-occupies test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"
@@ -3988,8 +4267,18 @@ print("yes" if re.search(r"data-empty-lane=\"true\"[\s\S]{0,800}call-after-claim
   return_unknown_code="$(curl -sS -o "${return_unknown}" -w '%{http_code}' "http://127.0.0.1:${port}/return")"
   [[ "${return_unknown_code}" == "200" ]] || fail "GET /return expected 200 got ${return_unknown_code}"
   grep -q 'data-return="unknown"' "${return_unknown}" || fail "GET /return without checkout is unknown"
+  grep -q 'No rank claimed' "${return_unknown}" \
+    || fail "generic unknown Polar return must name no rank claimed"
+  grep -q 'Unpaid checkout drafts never appear' "${return_unknown}" \
+    || fail "generic unknown Polar return must name unpaid drafts never appear"
   if grep -q 'data-raise-cancel' "${return_unknown}"; then
     fail "unknown Polar return must not stamp raise-cancel"
+  fi
+  if grep -q 'data-raise-unknown' "${return_unknown}"; then
+    fail "generic unknown Polar return must not stamp raise-unknown"
+  fi
+  if grep -q 'still occupies' "${return_unknown}"; then
+    fail "generic unknown Polar return must not name still occupy"
   fi
 
   return_cancel="$(mktemp)"
@@ -4003,6 +4292,9 @@ print("yes" if re.search(r"data-empty-lane=\"true\"[\s\S]{0,800}call-after-claim
     || fail "new listing cancelled Polar return must name does not list"
   if grep -q 'data-raise-cancel' "${return_cancel}"; then
     fail "new listing cancelled Polar return must not stamp raise-cancel"
+  fi
+  if grep -q 'data-raise-unknown' "${return_cancel}"; then
+    fail "new listing cancelled Polar return must not stamp raise-unknown"
   fi
   if grep -q 'still occupies' "${return_cancel}"; then
     fail "new listing cancelled Polar return must not name still occupy"
@@ -4035,6 +4327,9 @@ print("yes" if re.search(r"data-empty-lane=\"true\"[\s\S]{0,800}call-after-claim
     || fail "new listing Polar return must name listed at the bid"
   if grep -q 'data-raise-return' "${return_paid}"; then
     fail "new listing Polar return must not stamp a raise difference"
+  fi
+  if grep -q 'data-raise-unknown' "${return_paid}"; then
+    fail "new listing Polar return must not stamp raise-unknown"
   fi
   if grep -q 'only the difference, not a full rebid' "${return_paid}"; then
     fail "new listing Polar return must not name a raise as difference-only"
@@ -4415,6 +4710,9 @@ print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
   if grep -q 'data-raise-cancel' "${return_raise}"; then
     fail "paid raise Polar return must not stamp raise-cancel"
   fi
+  if grep -q 'data-raise-unknown' "${return_raise}"; then
+    fail "paid raise Polar return must not stamp raise-unknown"
+  fi
   if grep -q 'still occupies' "${return_raise}"; then
     fail "paid raise Polar return must not name still occupy"
   fi
@@ -4478,11 +4776,89 @@ print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
   if grep -q 'data-raise-return' "${return_raise_cancel}"; then
     fail "cancelled raise Polar return must not stamp a paid raise difference"
   fi
+  if grep -q 'data-raise-unknown' "${return_raise_cancel}"; then
+    fail "cancelled raise Polar return must not stamp raise-unknown"
+  fi
+  if grep -q 'An unpaid raise draft does not unlist' "${return_raise_cancel}"; then
+    fail "cancelled raise Polar return must not restamp unpaid raise draft"
+  fi
   if grep -q 'Polar charged' "${return_raise_cancel}"; then
     fail "cancelled raise Polar return must not name Polar charged"
   fi
   if grep -q 'Call this #1' "${return_raise_cancel}"; then
     fail "cancelled Polar return must not retouch Call this #1"
+  fi
+
+  DATABASE_PATH="${db_file}" npx tsx -e '
+    import { openDatabase } from "./src/db.ts";
+    const db = openDatabase(process.env.DATABASE_PATH);
+    const row = db.prepare(
+      "SELECT site_url, week_id, bid_usd FROM listings WHERE business = ?",
+    ).get("North London Movers");
+    if (!row) {
+      throw new Error("North London Movers listing missing for raise-unknown");
+    }
+    db.prepare(
+      `INSERT INTO checkouts (
+         id, amount_usd, business, category, city, site_url, license_id,
+         week_id, status, listing_id, created_at, intent, target_bid_usd
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "chk_raise_unknown",
+      5,
+      "North London Movers",
+      "movers",
+      "london",
+      row.site_url,
+      null,
+      row.week_id,
+      "open",
+      null,
+      new Date().toISOString(),
+      "raise",
+      row.bid_usd + 5,
+    );
+    db.close();
+  '
+  return_raise_unknown="$(mktemp)"
+  return_raise_unknown_code="$(curl -sS -o "${return_raise_unknown}" -w '%{http_code}' \
+    "http://127.0.0.1:${port}/return?checkout=chk_raise_unknown")"
+  [[ "${return_raise_unknown_code}" == "200" ]] \
+    || fail "GET unknown raise return expected 200 got ${return_raise_unknown_code}"
+  grep -q 'data-return="unknown"' "${return_raise_unknown}" \
+    || fail "unknown raise Polar return must show unknown"
+  grep -q 'data-raise-unknown=""' "${return_raise_unknown}" \
+    || fail "unknown raise Polar return must stamp raise-unknown"
+  grep -q 'class="raise-unknown"' "${return_raise_unknown}" \
+    || fail "unknown raise Polar return must compose raise-unknown as the occupying fact"
+  grep -q 'data-occupy-bid-usd="">25<' "${return_raise_unknown}" \
+    || fail "unknown raise Polar return must name the old bid \$25"
+  grep -q 'North London Movers' "${return_raise_unknown}" \
+    || fail "unknown raise Polar return must name the occupying listing"
+  grep -q 'still occupies at' "${return_raise_unknown}" \
+    || fail "unknown raise Polar return must name they still occupy"
+  grep -q 'An unpaid raise draft does not unlist' "${return_raise_unknown}" \
+    || fail "unknown raise Polar return must name an unpaid raise draft does not unlist"
+  if grep -q 'No rank claimed' "${return_raise_unknown}"; then
+    fail "unknown raise Polar return must not say no rank claimed"
+  fi
+  if grep -q 'Unpaid checkout drafts never appear' "${return_raise_unknown}"; then
+    fail "unknown raise Polar return must not say unpaid drafts never appear"
+  fi
+  if grep -q 'data-raise-cancel' "${return_raise_unknown}"; then
+    fail "unknown raise Polar return must not stamp raise-cancel"
+  fi
+  if grep -q 'An abandoned raise does not unlist' "${return_raise_unknown}"; then
+    fail "unknown raise Polar return must not restamp abandoned raise from #59"
+  fi
+  if grep -q 'data-raise-return' "${return_raise_unknown}"; then
+    fail "unknown raise Polar return must not stamp a paid raise difference"
+  fi
+  if grep -q 'Polar charged' "${return_raise_unknown}"; then
+    fail "unknown raise Polar return must not name Polar charged"
+  fi
+  if grep -q 'Call this #1' "${return_raise_unknown}"; then
+    fail "unknown Polar return must not retouch Call this #1"
   fi
 
   movers_raised="$(mktemp)"

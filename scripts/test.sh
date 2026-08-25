@@ -1090,6 +1090,99 @@ if grep -q 'data-first-click="call"' src/ui/edition.tsx; then
   fail "occupied rolling kicker must not retouch Call this #1"
 fi
 
+echo "== UX: site header matches rolling last-7-days — not this week Monday paper =="
+python3 - app/layout.tsx <<'PY' || fail "site header must name last 7 days, not this week's Monday paper"
+import re
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+if "data-rolling-week" in src or "week-window" in src:
+    raise SystemExit("do not stamp occupied data-rolling-week onto site chrome")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("site header must not retouch Call this #1")
+tagline = re.search(r'<p className="tagline">(.*?)</p>', src, re.S)
+if not tagline:
+    raise SystemExit("site header tagline missing")
+text = tagline.group(1).replace("&apos;", "'").replace("&#x27;", "'")
+if "Last 7 days" not in text:
+    raise SystemExit("site header tagline must name last 7 days")
+if "A weekly classified" in text or "This week" in text:
+    raise SystemExit("site header still names a Monday week")
+desc = re.search(r'description:\s*"([^"]+)"', src)
+if not desc:
+    raise SystemExit("layout meta description missing")
+meta = desc.group(1)
+if "Last 7 days" not in meta:
+    raise SystemExit("layout meta must name last 7 days")
+if "This week's local classified" in meta or "A weekly classified" in meta:
+    raise SystemExit("layout meta still names a Monday week")
+PY
+grep -q 'site header matches rolling last-7-days' tests/board.test.ts \
+  || fail "board tests must cover site header rolling last-7-days copy"
+grep -q 'site-header .tagline' app/globals.css \
+  || fail "site-header CSS must make the fair-window tagline readable"
+python3 - app/globals.css <<'PY' || fail "site-header fair-window tagline must name the window, not recolor the paper"
+import re
+import sys
+
+css = open(sys.argv[1], encoding="utf-8").read()
+block = re.search(r"\.site-header \.tagline\s*\{([^}]*)\}", css, re.S)
+if not block:
+    raise SystemExit("site-header tagline fair-window rule missing")
+if "background:" in block.group(1) or "var(--accent)" in block.group(1):
+    raise SystemExit("do not recolor the site-header tagline")
+if "text-transform: none" not in block.group(1):
+    raise SystemExit("site-header tagline must drop Monday uppercase so last 7 days is readable")
+occupied = re.search(
+    r"\.paper-occupied\[data-paper-occupied\] \.edition-kicker\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not occupied:
+    raise SystemExit("do not restamp occupied last-7-days kicker CSS")
+if "text-transform: none" not in occupied.group(1):
+    raise SystemExit("do not restamp occupied last-7-days kicker CSS")
+empty = re.search(
+    r"\.paper-empty\[data-paper-empty\] \.edition-kicker\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not empty:
+    raise SystemExit("do not restamp empty last-7-days kicker CSS")
+if "text-transform: none" not in empty.group(1):
+    raise SystemExit("do not restamp empty last-7-days kicker CSS")
+PY
+python3 - src/ui/edition.tsx <<'PY' || fail "site-header cut must keep occupied/empty last-7-days kickers"
+import re
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+kickers = re.findall(r'<p className="edition-kicker">(.*?)</p>', src, re.S)
+if len(kickers) != 2:
+    raise SystemExit("empty and occupied kickers must both exist")
+empty, occupied = kickers
+if "Last 7 days" not in empty or "This week" in empty:
+    raise SystemExit("do not restamp empty last-7-days kicker")
+if "Last 7 days" not in occupied or "This week" in occupied:
+    raise SystemExit("do not restamp occupied last-7-days kicker")
+if "data-rolling-week" in empty or "week-window" in empty:
+    raise SystemExit("empty kicker must not stamp occupied rolling chrome")
+if "data-rolling-week" in occupied or "week-window" in occupied:
+    raise SystemExit("occupied kicker must not stamp data-rolling-week onto the kicker")
+PY
+if grep -qE 'data-call-after-claim-six|data-claim-after-call-six|call-after-claim-N' \
+  app/layout.tsx app/globals.css; then
+  fail "site-header rolling week must not stamp call-after-claim-N"
+fi
+if grep -q 'data-rolling-week' app/layout.tsx src/ui/claim-column.tsx src/ui/outbid-form.tsx src/ui/listing-card.tsx; then
+  fail "site-header rolling week must not stamp occupied data-rolling-week onto empty lanes or Call hops"
+fi
+if grep -q 'data-first-click="call"' app/layout.tsx; then
+  fail "site-header rolling week must not retouch Call this #1"
+fi
+grep -q 'Site header and layout meta name last 7 days' SPEC.md \
+  || fail "SPEC must name site header last 7 days, not this week's Monday paper"
+
 echo "== polar checkout + fixture =="
 for f in src/polar/port.ts src/polar/fake.ts app/api/checkout/route.ts \
   app/return/page.tsx tests/checkout.test.ts src/migrations/004_checkouts.sql; do
@@ -1329,6 +1422,8 @@ if [[ -f package.json ]]; then
     || fail "empty kicker rolling last-7-days test did not run"
   grep -q 'occupied kicker matches rolling last-7-days — not this week Monday paper' "$test_log" \
     || fail "occupied kicker rolling last-7-days test did not run"
+  grep -q 'site header matches rolling last-7-days — not this week Monday paper' "$test_log" \
+    || fail "site header rolling last-7-days test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"
@@ -1477,6 +1572,38 @@ if "This week" in text:
     raise SystemExit("empty kicker still says this week's Monday paper")
 if "Last 7 days" not in text:
     raise SystemExit("empty kicker must name last 7 days")
+PY
+  python3 - "${home_body}" <<'PY' || fail "empty GET / site header must name last 7 days, not this week's Monday paper"
+import re
+import sys
+
+html = open(sys.argv[1], encoding="utf-8").read()
+header = re.search(r'<header class="site-header">(.*?)</header>', html, re.S)
+if not header:
+    raise SystemExit("empty GET / missing site header")
+chrome = header.group(1)
+if "data-rolling-week" in chrome or "week-window" in chrome:
+    raise SystemExit("do not stamp occupied data-rolling-week onto site chrome")
+if "Call this #1" in chrome or 'data-first-click="call"' in chrome:
+    raise SystemExit("site header must not retouch Call this #1")
+tagline = re.search(r'class="tagline"[^>]*>([^<]+)', chrome)
+if not tagline:
+    raise SystemExit("empty GET / missing site-header tagline")
+text = tagline.group(1).replace("&apos;", "'").replace("&#x27;", "'")
+if "Last 7 days" not in text:
+    raise SystemExit("site header still does not name last 7 days")
+if "A weekly classified" in text or "This week" in text:
+    raise SystemExit("site header still names a Monday week")
+meta = re.search(r'<meta[^>]+name="description"[^>]+content="([^"]+)"', html)
+if not meta:
+    meta = re.search(r'<meta[^>]+content="([^"]+)"[^>]+name="description"', html)
+if not meta:
+    raise SystemExit("empty GET / missing layout meta description")
+desc = meta.group(1).replace("&apos;", "'").replace("&#x27;", "'")
+if "Last 7 days" not in desc:
+    raise SystemExit("layout meta still does not name last 7 days")
+if "This week's local classified" in desc or "A weekly classified" in desc:
+    raise SystemExit("layout meta still names a Monday week")
 PY
   if grep -q '24h lock' "${home_body}"; then
     fail "empty GET / must not become a 24h lock on #1"
@@ -1995,6 +2122,40 @@ if "This week" in text:
     raise SystemExit("occupied kicker still says this week's Monday paper")
 if "Last 7 days" not in text:
     raise SystemExit("occupied kicker must name last 7 days")
+PY
+  python3 - "${occupied_home}" <<'PY' || fail "occupied GET / site header must name last 7 days, not this week's Monday paper"
+import re
+import sys
+
+html = open(sys.argv[1], encoding="utf-8").read()
+header = re.search(r'<header class="site-header">(.*?)</header>', html, re.S)
+if not header:
+    raise SystemExit("occupied GET / missing site header")
+chrome = header.group(1)
+if "data-rolling-week" in chrome or "week-window" in chrome:
+    raise SystemExit("do not stamp occupied data-rolling-week onto site chrome")
+if "Call this #1" in chrome or 'data-first-click="call"' in chrome:
+    raise SystemExit("site header must not retouch Call this #1")
+tagline = re.search(r'class="tagline"[^>]*>([^<]+)', chrome)
+if not tagline:
+    raise SystemExit("occupied GET / missing site-header tagline")
+text = tagline.group(1).replace("&apos;", "'").replace("&#x27;", "'")
+if "Last 7 days" not in text:
+    raise SystemExit("site header still does not name last 7 days")
+if "A weekly classified" in text or "This week" in text:
+    raise SystemExit("site header still names a Monday week")
+meta = re.search(r'<meta[^>]+name="description"[^>]+content="([^"]+)"', html)
+if not meta:
+    meta = re.search(r'<meta[^>]+content="([^"]+)"[^>]+name="description"', html)
+if not meta:
+    raise SystemExit("occupied GET / missing layout meta description")
+desc = meta.group(1).replace("&apos;", "'").replace("&#x27;", "'")
+if "Last 7 days" not in desc:
+    raise SystemExit("layout meta still does not name last 7 days")
+if "This week's local classified" in desc or "A weekly classified" in desc:
+    raise SystemExit("layout meta still names a Monday week")
+if "Call this #1" not in html or 'data-first-click="call"' not in html:
+    raise SystemExit("occupied Call this #1 must stay the first occupied click")
 PY
   if grep -q '24h lock' "${occupied_home}"; then
     fail "GET / occupied paper must not become a 24h lock on #1"

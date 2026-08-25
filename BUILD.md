@@ -198,6 +198,11 @@ Each heading is one fleet unit. Do not start the next PR in the same change.
 - **Dependencies:** PR 47
 - **Acceptance:** Empty London `/` masthead kicker names last 7 days, not "This week's" Monday paper. Empty does not stamp occupied `data-rolling-week` or `week-window`. Empty lanes stay No #1. Occupied Call this #1 stays the first occupied click. Occupied kicker stays. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Do not retouch occupied Call this #1. Stamp-only = REJECT.
 
+### PR 49: first-time neighbor — occupied kicker matches rolling last-7-days
+- **Files:** `src/ui/edition.tsx`, `app/globals.css`, `tests/board.test.ts`, `scripts/test.sh`, `SPEC.md`, `BUILD.md`
+- **Dependencies:** PR 48
+- **Acceptance:** Occupied London `/` masthead kicker names last 7 days, not "This week's" Monday paper. Empty kicker stays last 7 days. Empty does not stamp occupied `data-rolling-week` or `week-window`. Empty lanes stay No #1. Occupied Call this #1 stays the first occupied click. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Do not retouch occupied Call this #1. Do not restamp empty last-7-days kicker. Stamp-only = REJECT.
+
 ---
 
 ## 6. Live-smoke (operator)

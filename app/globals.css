@@ -193,6 +193,12 @@ a:hover {
   font-size: 0.82rem;
 }
 
+/* Empty kicker names last 7 days. Not a Monday paper. Occupied kicker stays. */
+.paper-empty[data-paper-empty] .edition-kicker {
+  letter-spacing: 0.12em;
+  text-transform: none;
+}
+
 .paper-occupied[data-paper-occupied] .lane-occupied[data-lane-occupied] .leaderboard[data-rolling-week] {
   list-style: none;
 }

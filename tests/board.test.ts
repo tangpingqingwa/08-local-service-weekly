@@ -23,6 +23,7 @@ import { getCity } from "../src/cities";
 import type { Listing } from "../src/db";
 import { openDatabase } from "../src/db";
 import { currentWeekId, ensureWeek, nowUtc, previousWeekId, ROLLING_WEEK_MS } from "../src/week";
+import AboutPage from "../app/about/page";
 import { ClaimColumn } from "../src/ui/claim-column";
 import { CityHub } from "../src/ui/city-hub";
 import { LaneBoard } from "../src/ui/lane-board";
@@ -5283,6 +5284,153 @@ test("site header matches rolling last-7-days — not this week Monday paper", (
   assert.match(emptyKicker[1] ?? "", /text-transform:\s*none/);
   assert.doesNotMatch(emptyKicker[1] ?? "", /background:|var\(--accent\)/);
   assert.doesNotMatch(css, /background:\s*var\(--accent\)[\s\S]{0,80}site-header/);
+});
+
+test("about copy matches rolling last-7-days — not this week Monday paper", () => {
+  const london = getCity("london");
+  const movers = getCategory("movers");
+  assert.ok(london && movers);
+  const aboutSrc = readFileSync(join(process.cwd(), "app", "about", "page.tsx"), "utf8");
+  const layout = readFileSync(join(process.cwd(), "app", "layout.tsx"), "utf8");
+  const edition = readFileSync(join(process.cwd(), "src", "ui", "edition.tsx"), "utf8");
+  const css = readFileSync(join(process.cwd(), "app", "globals.css"), "utf8");
+  const weekId = currentWeekId();
+  const thisWeekPitch = /paid the most this week/;
+  const weeklyAuction = /public weekly auction/;
+  const weeklyMeta = /Weekly #1/;
+  const lastSeven = /Last 7 days(?:&apos;|&#x27;|')/;
+  const rolling = /Rolling last 7 days\. Not Monday 00:00 Europe\/London\./;
+
+  assert.match(aboutSrc, /data-page="about"/);
+  assert.match(aboutSrc, lastSeven);
+  assert.match(aboutSrc, rolling);
+  assert.doesNotMatch(aboutSrc, thisWeekPitch);
+  assert.doesNotMatch(aboutSrc, weeklyAuction);
+  assert.doesNotMatch(aboutSrc, weeklyMeta);
+  assert.doesNotMatch(aboutSrc, /data-rolling-week|week-window/);
+  assert.doesNotMatch(aboutSrc, /24h lock/);
+  assert.doesNotMatch(aboutSrc, /Call this #1|data-first-click="call"/);
+  assert.doesNotMatch(aboutSrc, /className="site-header"|className="tagline"|className="edition-kicker"/);
+
+  const about = renderToStaticMarkup(createElement(AboutPage));
+  assert.match(about, /data-page="about"/);
+  assert.match(about, /last 7 days/);
+  assert.match(about, rolling);
+  assert.doesNotMatch(about, thisWeekPitch);
+  assert.doesNotMatch(about, /this week/);
+  assert.doesNotMatch(about, weeklyAuction);
+  assert.doesNotMatch(about, /data-rolling-week|week-window/);
+  assert.doesNotMatch(about, /Call this #1|data-first-click="call"/);
+  assert.doesNotMatch(about, /class="site-header"|class="tagline"|class="edition-kicker"/);
+  assert.match(about, /Rank is the bid/);
+  assert.match(about, /outbid\.lol/);
+
+  const lastSevenHeader = /Last 7 days(?:&apos;|&#x27;|') local classified/;
+  assert.match(layout, /className="site-header"/);
+  assert.match(layout, /className="tagline"/);
+  assert.match(layout, lastSevenHeader);
+  assert.doesNotMatch(layout, /This week(?:&apos;|&#x27;|')s local classified/);
+  assert.doesNotMatch(layout, /A weekly classified/);
+  assert.doesNotMatch(layout, /data-rolling-week|week-window/);
+  const tagline = layout.match(/<p className="tagline">(.*?)<\/p>/s);
+  assert.ok(tagline);
+  assert.match(tagline[1] ?? "", lastSevenHeader);
+
+  const kickers = [...edition.matchAll(/<p className="edition-kicker">(.*?)<\/p>/gs)];
+  assert.equal(kickers.length, 2);
+  for (const kicker of kickers) {
+    assert.match(kicker[1] ?? "", lastSevenHeader);
+    assert.doesNotMatch(kicker[1] ?? "", /This week/);
+    assert.doesNotMatch(kicker[1] ?? "", /data-rolling-week|week-window/);
+  }
+
+  const empty = renderToStaticMarkup(
+    createElement(CityHub, {
+      city: london,
+      weekId,
+      lanes: {
+        movers: [],
+        dentists: [],
+        immigration_lawyers: [],
+        tutors: [],
+      },
+    }),
+  );
+  assert.match(empty, lastSevenHeader);
+  assert.match(empty, /data-paper-empty="true"/);
+  assert.doesNotMatch(empty, /data-rolling-week/);
+  assert.doesNotMatch(empty, /week-window/);
+  assert.match(empty, /No #1/);
+  assert.equal((empty.match(/No #1/g) ?? []).length, 4);
+  assert.doesNotMatch(empty, /Call this #1|data-first-click="call"/);
+  assert.doesNotMatch(empty, /class="site-header"|class="tagline"|data-page="about"/);
+
+  const occupied = renderToStaticMarkup(
+    createElement(CityHub, {
+      city: london,
+      weekId,
+      lanes: {
+        movers: [
+          ranked({
+            id: "lst_movers",
+            business: "North London Movers",
+            bidUsd: 20,
+            siteHost: "north.example",
+          }),
+        ],
+        dentists: [],
+        immigration_lawyers: [],
+        tutors: [],
+      },
+    }),
+  );
+  const occupiedHeaderEnd = occupied.indexOf("</header>");
+  const callAt = occupied.indexOf("Call this #1");
+  const firstClickAt = occupied.indexOf('data-first-click="call"');
+  assert.match(occupied, lastSevenHeader);
+  assert.match(occupied, /data-paper-occupied="true"/);
+  assert.match(occupied, /data-rolling-week=""/);
+  assert.match(occupied, /class="folio week-window"/);
+  assert.match(occupied, /Call this #1/);
+  assert.match(occupied, /data-first-click="call"/);
+  assert.ok(callAt > occupiedHeaderEnd && firstClickAt > occupiedHeaderEnd);
+  assert.equal((occupied.match(/data-first-click="call"/g) ?? []).length, 1);
+  assert.equal((occupied.match(/data-empty-honest=""/g) ?? []).length, 3);
+  assert.doesNotMatch(occupied, /class="site-header"|class="tagline"|data-page="about"/);
+  assert.doesNotMatch(occupied, /24h lock/);
+  assert.doesNotMatch(occupied, /data-call-after-claim-N|call-after-claim-N/);
+
+  const emptyLane = renderToStaticMarkup(
+    createElement(LaneBoard, {
+      city: london,
+      category: movers,
+      listings: [],
+    }),
+  );
+  assert.match(emptyLane, /No #1/);
+  assert.doesNotMatch(emptyLane, /data-rolling-week/);
+  assert.doesNotMatch(emptyLane, /week-window/);
+  assert.doesNotMatch(emptyLane, /data-page="about"/);
+
+  assert.match(css, /\.site-header \.tagline\s*\{/);
+  const siteTagline = css.match(/\.site-header \.tagline\s*\{([^}]*)\}/);
+  assert.ok(siteTagline);
+  assert.match(siteTagline[1] ?? "", /text-transform:\s*none/);
+  assert.doesNotMatch(siteTagline[1] ?? "", /background:|var\(--accent\)/);
+  const occupiedKicker = css.match(
+    /\.paper-occupied\[data-paper-occupied\] \.edition-kicker\s*\{([^}]*)\}/,
+  );
+  assert.ok(occupiedKicker);
+  assert.match(occupiedKicker[1] ?? "", /text-transform:\s*none/);
+  assert.doesNotMatch(occupiedKicker[1] ?? "", /background:|var\(--accent\)/);
+  const emptyKicker = css.match(
+    /\.paper-empty\[data-paper-empty\] \.edition-kicker\s*\{([^}]*)\}/,
+  );
+  assert.ok(emptyKicker);
+  assert.match(emptyKicker[1] ?? "", /text-transform:\s*none/);
+  assert.doesNotMatch(emptyKicker[1] ?? "", /background:|var\(--accent\)/);
+  assert.doesNotMatch(css, /background:\s*var\(--accent\)[\s\S]{0,80}(about|doc-page)/);
+  assert.doesNotMatch(css, /data-call-after-claim-N|call-after-claim-N/);
 });
 
 function listing(overrides: Partial<Listing> = {}): Listing {

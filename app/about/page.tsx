@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 export const metadata: Metadata = {
   title: "About · Local Service Weekly",
   description:
-    "Rank is the bid. Weekly #1 local-service provider by city and category. Global English. London v1. Clone of outbid.lol.",
+    "Rank is the bid. Last 7 days' #1 local-service provider by city and category. Global English. London v1. Clone of outbid.lol.",
 };
 
 export default function AboutPage() {
@@ -13,10 +13,11 @@ export default function AboutPage() {
     <main className="doc-page" data-page="about">
       <h1>About</h1>
       <p>
-        Local Service Weekly is a public weekly auction for the{" "}
+        Local Service Weekly is a public auction for the{" "}
         <strong>#1 visible local-service provider</strong> in a city × category.
         The #1 mover, dentist, immigration lawyer, or tutor in town is whoever
-        paid the most this week.
+        paid the most in the last 7 days.{" "}
+        <strong>Rolling last 7 days. Not Monday 00:00 Europe/London.</strong>
       </p>
       <p>
         This is the <strong>outbid.lol</strong> pay-to-rank mechanic for the{" "}

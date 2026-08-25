@@ -1045,6 +1045,21 @@ a:hover {
   display: none;
 }
 
+/* Occupied cancelled Polar return: still occupies at the old bid. */
+.return-page[data-return="cancelled"][data-raise-cancel] .raise-cancel[data-raise-cancel] {
+  margin-top: 0.75rem;
+}
+
+.return-page[data-return="cancelled"][data-raise-cancel] .raise-cancel[data-raise-cancel] [data-occupy-bid-usd] {
+  font-variant-numeric: tabular-nums;
+}
+
+.return-page[data-return="paid"] [data-raise-cancel],
+.return-page[data-return="unknown"] [data-raise-cancel],
+.return-page[data-return="cancelled"]:not([data-raise-cancel]) .raise-cancel {
+  display: none;
+}
+
 .return-page,
 .doc-page {
   padding-bottom: 3rem;

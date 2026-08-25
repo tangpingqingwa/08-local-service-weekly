@@ -397,6 +397,8 @@ test("/return markup shows paid, cancelled, or unknown", async () => {
   );
   assert.match(unknownHtml, /data-return="unknown"/);
   assert.match(unknownHtml, /No rank claimed/);
+  assert.doesNotMatch(unknownHtml, /data-raise-cancel/);
+  assert.doesNotMatch(unknownHtml, /still occupies/);
   assert.doesNotMatch(unknownHtml, /★|⭐|review count/i);
 
   const cancelHtml = renderToStaticMarkup(
@@ -406,6 +408,9 @@ test("/return markup shows paid, cancelled, or unknown", async () => {
   );
   assert.match(cancelHtml, /data-return="cancelled"/);
   assert.match(cancelHtml, /No rank claimed/);
+  assert.match(cancelHtml, /An abandoned checkout does not list/);
+  assert.doesNotMatch(cancelHtml, /data-raise-cancel/);
+  assert.doesNotMatch(cancelHtml, /still occupies/);
 
   const db = openDatabase(":memory:");
   after(() => db.close());
@@ -424,6 +429,8 @@ test("/return markup shows paid, cancelled, or unknown", async () => {
   assert.match(paidHtml, /North London Movers/);
   assert.match(paidHtml, /\$20/);
   assert.doesNotMatch(paidHtml, /data-raise-return/);
+  assert.doesNotMatch(paidHtml, /data-raise-cancel/);
+  assert.doesNotMatch(paidHtml, /still occupies/);
   assert.doesNotMatch(paidHtml, /only the difference, not a full rebid/);
   assert.doesNotMatch(paidHtml, /#1|#2|rank #/i);
   assert.doesNotMatch(paidHtml, /★|⭐|review count/i);
@@ -467,11 +474,21 @@ test("occupied Polar return names difference-only — not a full rebid paid", as
     }),
   );
   assert.match(cancelHtml, /data-return="cancelled"/);
-  assert.match(cancelHtml, /No rank claimed/);
+  assert.match(cancelHtml, /data-raise-cancel=""/);
+  assert.match(cancelHtml, /class="raise-cancel"/);
+  assert.match(
+    cancelHtml,
+    /North London Movers still occupies at \$<span data-occupy-bid-usd="">20<\/span>/,
+  );
+  assert.match(cancelHtml, /An abandoned raise does not unlist/);
+  assert.doesNotMatch(cancelHtml, /No rank claimed/);
+  assert.doesNotMatch(cancelHtml, /does not list/);
   assert.doesNotMatch(cancelHtml, /data-raise-return/);
   assert.doesNotMatch(cancelHtml, /Polar charged/);
   assert.doesNotMatch(cancelHtml, /only the difference, not a full rebid/);
+  assert.doesNotMatch(cancelHtml, /#1|#2|rank #/i);
   assert.equal(listLane("london", "movers", db)[0]?.bidUsd, 20);
+  assert.equal(listLane("london", "movers", db)[0]?.business, "North London Movers");
 
   setPolarPortForTests(polar);
   const raised = await raiseListing(draft({ bidUsd: 25 }), polar, db);
@@ -510,5 +527,96 @@ test("occupied Polar return names difference-only — not a full rebid paid", as
   assert.doesNotMatch(raiseHtml, /data-return="cancelled"/);
   assert.doesNotMatch(raiseHtml, /#1|#2|rank #/i);
   assert.doesNotMatch(raiseHtml, /★|⭐|review count/i);
+  assert.doesNotMatch(raiseHtml, /data-raise-cancel/);
+  assert.doesNotMatch(raiseHtml, /still occupies/);
+  assert.doesNotMatch(raiseHtml, /An abandoned raise does not unlist/);
   assert.doesNotMatch(raiseHtml, /Call this #1/);
 });
+
+test("occupied cancelled Polar return still occupies — not never listed", async () => {
+  const db = openDatabase(":memory:");
+  after(() => db.close());
+  const polar = new FakePolarPort(db);
+  setPolarPortForTests(polar);
+  await polar.createCheckout({
+    amountUsd: 20,
+    listing: draft(),
+  });
+  const { default: ReturnPage } = await import("../app/return/page");
+
+  const unpaidPlace = new FakePolarPort(db, { autoSettle: false });
+  setPolarPortForTests(unpaidPlace);
+  const newListingCancel = await unpaidPlace.createCheckout({
+    amountUsd: 12,
+    listing: draft({
+      business: "Cancelled Van",
+      siteUrl: "https://cancel.example",
+      bidUsd: 12,
+    }),
+  });
+  const newCancelHtml = renderToStaticMarkup(
+    await ReturnPage({
+      searchParams: Promise.resolve({
+        checkout: newListingCancel.id,
+        status: "cancel",
+      }),
+    }),
+  );
+  assert.match(newCancelHtml, /data-return="cancelled"/);
+  assert.match(newCancelHtml, /No rank claimed/);
+  assert.match(newCancelHtml, /An abandoned checkout does not list/);
+  assert.doesNotMatch(newCancelHtml, /data-raise-cancel/);
+  assert.doesNotMatch(newCancelHtml, /still occupies/);
+  assert.doesNotMatch(newCancelHtml, /An abandoned raise does not unlist/);
+  assert.doesNotMatch(newCancelHtml, /data-raise-return/);
+  assert.doesNotMatch(newCancelHtml, /Polar charged/);
+  assert.equal(
+    listLane("london", "movers", db).some((row) => row.business === "Cancelled Van"),
+    false,
+  );
+
+  const unpaidRaise = new FakePolarPort(db, { autoSettle: false });
+  setPolarPortForTests(unpaidRaise);
+  const abandonedRaise = await unpaidRaise.createCheckout({
+    amountUsd: 5,
+    listing: draft({ bidUsd: 25 }),
+    intent: "raise",
+  });
+  const occupyHtml = renderToStaticMarkup(
+    await ReturnPage({
+      searchParams: Promise.resolve({
+        checkout: abandonedRaise.id,
+        status: "cancel",
+      }),
+    }),
+  );
+  assert.match(occupyHtml, /data-return="cancelled"/);
+  assert.match(occupyHtml, /data-raise-cancel=""/);
+  assert.match(occupyHtml, /class="raise-cancel"/);
+  assert.match(
+    occupyHtml,
+    /North London Movers still occupies at \$<span data-occupy-bid-usd="">20<\/span>/,
+  );
+  const occupyFact = occupyHtml.match(
+    /class="raise-cancel"[^>]*>([\s\S]*?)<\/p>/,
+  );
+  assert.ok(occupyFact);
+  assert.match(occupyFact[1] ?? "", /still occupies at \$/);
+  assert.match(occupyFact[1] ?? "", /An abandoned raise does not unlist/);
+  assert.doesNotMatch(occupyFact[1] ?? "", /No rank claimed/);
+  assert.doesNotMatch(occupyFact[1] ?? "", /does not list/);
+  assert.doesNotMatch(occupyFact[1] ?? "", /Polar charged/);
+  assert.doesNotMatch(occupyHtml, /No rank claimed/);
+  assert.doesNotMatch(occupyHtml, /An abandoned checkout does not list/);
+  assert.doesNotMatch(occupyHtml, /data-raise-return/);
+  assert.doesNotMatch(occupyHtml, /Polar charged/);
+  assert.doesNotMatch(occupyHtml, /only the difference, not a full rebid/);
+  assert.doesNotMatch(occupyHtml, /still occupies at \$25/);
+  assert.doesNotMatch(occupyHtml, /#1|#2|rank #/i);
+  assert.doesNotMatch(occupyHtml, /★|⭐|review count/i);
+  assert.doesNotMatch(occupyHtml, /Call this #1/);
+  const stillThere = listLane("london", "movers", db)[0];
+  assert.equal(stillThere?.business, "North London Movers");
+  assert.equal(stillThere?.bidUsd, 20);
+});
+

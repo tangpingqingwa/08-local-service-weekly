@@ -1406,6 +1406,162 @@ fi
 grep -q 'README copy names last 7 days' SPEC.md \
   || fail "SPEC must name README last 7 days, not this week's Monday paper"
 
+echo "== UX: edition dek matches rolling last-7-days — not this edition Monday paper =="
+python3 - src/ui/edition.tsx <<'PY' || fail "edition dek must name last 7 days, not this edition Monday paper"
+import re
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+deks = re.findall(r'<p className="edition-dek">(.*?)</p>', src, re.S)
+if len(deks) != 2:
+    raise SystemExit("empty and occupied deks must both exist")
+empty, occupied = deks
+for label, dek in (("empty", empty), ("occupied", occupied)):
+    if "this edition" in dek:
+        raise SystemExit(f"{label} dek still says this edition Monday paper")
+    if "last 7 days" not in dek:
+        raise SystemExit(f"{label} dek must name last 7 days")
+    if "whoever paid the most in the last 7 days" not in dek:
+        raise SystemExit(f"{label} dek must attach whoever paid the most to last 7 days")
+    if "data-rolling-week" in dek or "week-window" in dek:
+        raise SystemExit(f"{label} dek must not stamp occupied data-rolling-week")
+    if "Rank is the bid" not in dek:
+        raise SystemExit(f"{label} dek must keep rank is the bid")
+kickers = re.findall(r'<p className="edition-kicker">(.*?)</p>', src, re.S)
+if len(kickers) != 2:
+    raise SystemExit("do not restamp empty/occupied last-7-days kickers")
+empty_kicker, occupied_kicker = kickers
+if "Last 7 days" not in empty_kicker or "This week" in empty_kicker:
+    raise SystemExit("do not restamp empty last-7-days kicker")
+if "Last 7 days" not in occupied_kicker or "This week" in occupied_kicker:
+    raise SystemExit("do not restamp occupied last-7-days kicker")
+if "data-rolling-week" in empty_kicker or "week-window" in empty_kicker:
+    raise SystemExit("empty kicker must not stamp occupied rolling chrome")
+if "data-rolling-week" in occupied_kicker or "week-window" in occupied_kicker:
+    raise SystemExit("occupied kicker must not stamp data-rolling-week onto the kicker")
+PY
+grep -q 'edition dek matches rolling last-7-days' tests/board.test.ts \
+  || fail "board tests must cover edition dek rolling last-7-days copy"
+grep -q 'paper-empty\[data-paper-empty\] .edition-dek' app/globals.css \
+  || fail "empty paper CSS must make the last-7-days dek readable"
+grep -q 'paper-occupied\[data-paper-occupied\] .edition-dek' app/globals.css \
+  || fail "occupied paper CSS must make the last-7-days dek readable"
+python3 - app/globals.css <<'PY' || fail "edition dek must name the window, not recolor the paper"
+import re
+import sys
+
+css = open(sys.argv[1], encoding="utf-8").read()
+empty = re.search(
+    r"\.paper-empty\[data-paper-empty\] \.edition-dek\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not empty:
+    raise SystemExit("empty dek last-7-days rule missing")
+if "background:" in empty.group(1) or "var(--accent)" in empty.group(1):
+    raise SystemExit("do not recolor the empty last-7-days dek")
+if "color: inherit" not in empty.group(1):
+    raise SystemExit("empty dek must drop muted this-edition filler so last 7 days is readable")
+occupied = re.search(
+    r"\.paper-occupied\[data-paper-occupied\] \.edition-dek\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not occupied:
+    raise SystemExit("occupied dek last-7-days rule missing")
+if "background:" in occupied.group(1) or "var(--accent)" in occupied.group(1):
+    raise SystemExit("do not recolor the occupied last-7-days dek")
+if "color: inherit" not in occupied.group(1):
+    raise SystemExit("occupied dek must drop muted this-edition filler so last 7 days is readable")
+empty_kicker = re.search(
+    r"\.paper-empty\[data-paper-empty\] \.edition-kicker\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not empty_kicker:
+    raise SystemExit("do not restamp empty last-7-days kicker CSS")
+if "text-transform: none" not in empty_kicker.group(1):
+    raise SystemExit("do not restamp empty last-7-days kicker CSS")
+occupied_kicker = re.search(
+    r"\.paper-occupied\[data-paper-occupied\] \.edition-kicker\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not occupied_kicker:
+    raise SystemExit("do not restamp occupied last-7-days kicker CSS")
+if "text-transform: none" not in occupied_kicker.group(1):
+    raise SystemExit("do not restamp occupied last-7-days kicker CSS")
+site = re.search(r"\.site-header \.tagline\s*\{([^}]*)\}", css, re.S)
+if not site:
+    raise SystemExit("do not restamp site-header last-7-days tagline CSS")
+if "text-transform: none" not in site.group(1):
+    raise SystemExit("do not restamp site-header last-7-days tagline CSS")
+if re.search(r"background:\s*var\(--accent\)[\s\S]{0,80}(about|doc-page|readme|edition-dek)", css):
+    raise SystemExit("do not recolor about or the classified paper")
+PY
+python3 - README.md <<'PY' || fail "dek cut must not restamp README last-7-days"
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+if "Weekly pay-to-rank" in src:
+    raise SystemExit("do not restamp README back to weekly Monday paper")
+if "last 7 days" not in src.lower():
+    raise SystemExit("do not restamp README last-7-days")
+if "Rolling last 7 days. Not Monday 00:00 Europe/London." not in src:
+    raise SystemExit("do not restamp README last-7-days")
+if "data-rolling-week" in src or "week-window" in src:
+    raise SystemExit("do not stamp occupied data-rolling-week onto README")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("do not retouch Call this #1 from dek cut")
+PY
+python3 - app/about/page.tsx <<'PY' || fail "dek cut must not restamp about last-7-days"
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+if "paid the most this week" in src:
+    raise SystemExit("do not restamp about back to this week's Monday paper")
+if "Last 7 days" not in src and "last 7 days" not in src:
+    raise SystemExit("do not restamp about last-7-days")
+if "Rolling last 7 days. Not Monday 00:00 Europe/London." not in src:
+    raise SystemExit("do not restamp about last-7-days")
+if "data-rolling-week" in src or "week-window" in src:
+    raise SystemExit("do not stamp occupied data-rolling-week onto about")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("do not retouch Call this #1 from dek cut")
+if 'className="site-header"' in src or 'className="tagline"' in src:
+    raise SystemExit("about must not retouch site header")
+if 'className="edition-kicker"' in src or 'className="edition-dek"' in src:
+    raise SystemExit("about must not retouch occupied/empty kickers or dek")
+PY
+python3 - app/layout.tsx <<'PY' || fail "dek cut must not retouch site header last 7 days"
+import re
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+if "data-rolling-week" in src or "week-window" in src:
+    raise SystemExit("do not stamp occupied data-rolling-week onto site chrome")
+tagline = re.search(r'<p className="tagline">(.*?)</p>', src, re.S)
+if not tagline:
+    raise SystemExit("site header tagline missing")
+text = tagline.group(1).replace("&apos;", "'").replace("&#x27;", "'")
+if "Last 7 days" not in text:
+    raise SystemExit("do not restamp site header last-7-days tagline")
+if "A weekly classified" in text or "This week" in text:
+    raise SystemExit("do not restamp site header back to a Monday week")
+PY
+if grep -qE 'data-call-after-claim-six|data-claim-after-call-six|call-after-claim-N' \
+  src/ui/edition.tsx app/globals.css; then
+  fail "edition dek rolling week must not stamp call-after-claim-N"
+fi
+if grep -q 'data-rolling-week' src/ui/claim-column.tsx src/ui/outbid-form.tsx src/ui/listing-card.tsx; then
+  fail "edition dek rolling week must not stamp occupied data-rolling-week onto empty lanes or Call hops"
+fi
+if grep -q 'data-first-click="call"' src/ui/edition.tsx README.md app/about/page.tsx; then
+  fail "edition dek rolling week must not retouch Call this #1"
+fi
+grep -q 'Edition dek names last 7 days' SPEC.md \
+  || fail "SPEC must name edition dek last 7 days, not this edition Monday paper"
+
 echo "== polar checkout + fixture =="
 for f in src/polar/port.ts src/polar/fake.ts app/api/checkout/route.ts \
   app/return/page.tsx tests/checkout.test.ts src/migrations/004_checkouts.sql; do
@@ -1651,6 +1807,8 @@ if [[ -f package.json ]]; then
     || fail "about copy rolling last-7-days test did not run"
   grep -q 'README copy matches rolling last-7-days — not weekly Monday paper' "$test_log" \
     || fail "README copy rolling last-7-days test did not run"
+  grep -q 'edition dek matches rolling last-7-days — not this edition Monday paper' "$test_log" \
+    || fail "edition dek rolling last-7-days test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"
@@ -1799,6 +1957,25 @@ if "This week" in text:
     raise SystemExit("empty kicker still says this week's Monday paper")
 if "Last 7 days" not in text:
     raise SystemExit("empty kicker must name last 7 days")
+PY
+  python3 - "${home_body}" <<'PY' || fail "empty GET / dek must name last 7 days, not this edition Monday paper"
+import re
+import sys
+
+html = open(sys.argv[1], encoding="utf-8").read()
+m = re.search(r'class="edition-dek"[^>]*>(.*?)</p>', html, re.S)
+if not m:
+    raise SystemExit("empty GET / missing edition dek")
+text = re.sub(r"<[^>]+>", " ", m.group(1))
+text = text.replace("&apos;", "'").replace("&#x27;", "'")
+if "this edition" in text:
+    raise SystemExit("empty dek still says this edition Monday paper")
+if "last 7 days" not in text:
+    raise SystemExit("empty dek must name last 7 days")
+if "whoever paid the most in the last 7 days" not in text:
+    raise SystemExit("empty dek must attach whoever paid the most to last 7 days")
+if "Rank is the bid" not in text:
+    raise SystemExit("empty dek must keep rank is the bid")
 PY
   python3 - "${home_body}" <<'PY' || fail "empty GET / site header must name last 7 days, not this week's Monday paper"
 import re
@@ -1987,6 +2164,25 @@ if "This week" in text:
     raise SystemExit("empty movers lane kicker still says this week's Monday paper")
 if "Last 7 days" not in text:
     raise SystemExit("empty movers lane kicker must name last 7 days")
+PY
+  python3 - "${lane_body}" <<'PY' || fail "empty movers lane dek must name last 7 days, not this edition Monday paper"
+import re
+import sys
+
+html = open(sys.argv[1], encoding="utf-8").read()
+m = re.search(r'class="edition-dek"[^>]*>(.*?)</p>', html, re.S)
+if not m:
+    raise SystemExit("empty movers lane missing edition dek")
+text = re.sub(r"<[^>]+>", " ", m.group(1))
+text = text.replace("&apos;", "'").replace("&#x27;", "'")
+if "this edition" in text:
+    raise SystemExit("empty movers lane dek still says this edition Monday paper")
+if "last 7 days" not in text:
+    raise SystemExit("empty movers lane dek must name last 7 days")
+if "whoever paid the most in the last 7 days" not in text:
+    raise SystemExit("empty movers lane dek must attach whoever paid the most to last 7 days")
+if "Rank is the bid" not in text:
+    raise SystemExit("empty movers lane dek must keep rank is the bid")
 PY
   if grep -q 'data-rolling-week' "${lane_body}"; then
     fail "empty movers lane must not stamp occupied data-rolling-week"
@@ -2349,6 +2545,27 @@ if "This week" in text:
     raise SystemExit("occupied kicker still says this week's Monday paper")
 if "Last 7 days" not in text:
     raise SystemExit("occupied kicker must name last 7 days")
+PY
+  python3 - "${occupied_home}" <<'PY' || fail "occupied GET / dek must name last 7 days, not this edition Monday paper"
+import re
+import sys
+
+html = open(sys.argv[1], encoding="utf-8").read()
+m = re.search(r'class="edition-dek"[^>]*>(.*?)</p>', html, re.S)
+if not m:
+    raise SystemExit("occupied GET / missing edition dek")
+text = re.sub(r"<[^>]+>", " ", m.group(1))
+text = text.replace("&apos;", "'").replace("&#x27;", "'")
+if "this edition" in text:
+    raise SystemExit("occupied dek still says this edition Monday paper")
+if "last 7 days" not in text:
+    raise SystemExit("occupied dek must name last 7 days")
+if "whoever paid the most in the last 7 days" not in text:
+    raise SystemExit("occupied dek must attach whoever paid the most to last 7 days")
+if "Rank is the bid" not in text:
+    raise SystemExit("occupied dek must keep rank is the bid")
+if "Call this #1" not in html or 'data-first-click="call"' not in html:
+    raise SystemExit("occupied Call this #1 must stay the first occupied click")
 PY
   python3 - "${occupied_home}" <<'PY' || fail "occupied GET / site header must name last 7 days, not this week's Monday paper"
 import re

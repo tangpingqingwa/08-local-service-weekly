@@ -323,8 +323,12 @@ test("last-week archive copy is not this week's #1 card", () => {
   assert.match(html, /data-empty-honest=""/);
   assert.match(html, /No #1/);
   assert.match(html, /data-last-week/);
-  assert.match(html, /Last week #1/);
+  assert.match(html, /data-aged-out/);
+  assert.match(html, /Aged out of the last 7 days/);
   assert.match(html, /Last Week Van/);
+  assert.match(html, /Not current #1 unless they pay again/);
+  assert.doesNotMatch(html, /Last week #1/);
+  assert.doesNotMatch(html, /this week(?:&apos;|&#x27;|')s/i);
   assert.doesNotMatch(html, /data-listing-card/);
   assert.doesNotMatch(html, /data-rank="1"/);
 });

@@ -133,10 +133,10 @@ Occupied rank is the **rolling last 7 days** from paid `createdAt` (`now − 7d`
 At age-out:
 
 - A listing older than 7 days leaves the live board. It is not current rank.
-- Last week’s labeled #1 may be shown as a “last week” archive copy once it is outside the rolling window. It is not this week’s #1 unless they pay again.
+- Last week’s labeled #1 may be shown as a last-7-days archive copy once it is outside the rolling window. It is not current #1 unless they pay again. Archive copy names rolling last-7-days age-out, not this week’s Monday paper.
 - Raise and new bids apply only to the **open** `weekId` label. Occupied rank is the rolling window.
 
-The #1 **visible provider** for a city × category is whoever still occupies the rolling last-7-days window at rank `#1`. That is the product. Occupied and empty classified paper name that window. Empty copy does not present Monday 00:00 Europe/London as the drop. Empty masthead kicker names last 7 days, not this week’s Monday paper. Occupied masthead kicker names last 7 days, not this week’s Monday paper. Site header and layout meta name last 7 days, not this week’s Monday paper. About copy names last 7 days, not this week’s Monday paper. README copy names last 7 days, not this week’s Monday paper. Edition dek names last 7 days, not this edition Monday paper.
+The #1 **visible provider** for a city × category is whoever still occupies the rolling last-7-days window at rank `#1`. That is the product. Occupied and empty classified paper name that window. Empty copy does not present Monday 00:00 Europe/London as the drop. Empty masthead kicker names last 7 days, not this week’s Monday paper. Occupied masthead kicker names last 7 days, not this week’s Monday paper. Site header and layout meta name last 7 days, not this week’s Monday paper. About copy names last 7 days, not this week’s Monday paper. README copy names last 7 days, not this week’s Monday paper. Edition dek names last 7 days, not this edition Monday paper. Last-week archive copy names last 7 days, not this week’s Monday paper.
 
 ---
 

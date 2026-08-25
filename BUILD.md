@@ -218,6 +218,11 @@ Each heading is one fleet unit. Do not start the next PR in the same change.
 - **Dependencies:** PR 52 (README last 7 days on `main`)
 - **Acceptance:** Edition dek names rolling last 7 days, not "this edition" / "whoever paid the most" Monday paper. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Empty does not stamp occupied `data-rolling-week` or `week-window`. Empty lanes stay No #1. Occupied Call this #1 stays the first occupied click. Do not retouch Call, README, About, or site header. Do not restamp occupied/empty last-7-days kickers. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
 
+### PR 54: first-time neighbor — last-week archive copy matches rolling last-7-days
+- **Files:** `src/ui/lane-board.tsx`, `app/globals.css`, `tests/board.test.ts`, `tests/week.test.ts`, `scripts/test.sh`, `SPEC.md`, `BUILD.md`
+- **Dependencies:** PR 53 (edition dek last 7 days on `main`)
+- **Acceptance:** Last-week archive names rolling last-7-days age-out, not "Not this week's #1" Monday paper. Edition dek stays last 7 days. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Empty does not stamp occupied `data-rolling-week` or `week-window`. Empty lanes stay No #1. Occupied Call this #1 stays the first occupied click. Do not retouch Call, README, About, site header, kickers, or edition dek. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
+
 ---
 
 ## 6. Live-smoke (operator)

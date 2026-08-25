@@ -110,11 +110,11 @@ export function LaneBoard({
         </>
       )}
       {lastWeekPaid ? (
-        <aside className="last-week" data-last-week="">
+        <aside className="last-week" data-last-week="" data-aged-out="">
           <p>
-            Last week #1: <strong>{lastWeekPaid.business}</strong> at $
-            {lastWeekPaid.bidUsd}. Not this week&apos;s #1 unless they pay
-            again.
+            Aged out of the last 7 days:{" "}
+            <strong>{lastWeekPaid.business}</strong> at $
+            {lastWeekPaid.bidUsd}. Not current #1 unless they pay again.
           </p>
         </aside>
       ) : null}

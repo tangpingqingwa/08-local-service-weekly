@@ -25,7 +25,7 @@ export default function RulesPage() {
           <tr>
             <th>Rank is the bid</th>
             <td>
-              Inside one lane (city × category × week), sort by{" "}
+              Inside one lane (city × category, rolling last 7 days), sort by{" "}
               <code>bidUsd</code> descending. Nothing else — no recency boost,
               no quality score, no invented ratings.
             </td>
@@ -62,8 +62,9 @@ export default function RulesPage() {
           <tr>
             <th>Identity</th>
             <td>
-              A listing is <code>canonical site URL + category + city + week</code>
-              . Business name may change on raise; the key does not.
+              A listing is <code>canonical site URL + category + city</code>.{" "}
+              <code>weekId</code> stays a Polar/audit label, not a Monday paper.
+              Business name may change on raise; the key does not.
             </td>
           </tr>
           <tr>

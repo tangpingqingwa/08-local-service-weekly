@@ -186,11 +186,18 @@ a:hover {
   font-size: 0.82rem;
 }
 
+/* Empty paper names the same fair window in copy. Occupied rolling chrome stays off. */
+.paper-empty[data-paper-empty] .folio {
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-size: 0.82rem;
+}
+
 .paper-occupied[data-paper-occupied] .lane-occupied[data-lane-occupied] .leaderboard[data-rolling-week] {
   list-style: none;
 }
 
-/* Empty paper / empty lanes do not name a rolling week. */
+/* Occupied rolling-week chrome stays off empty paper / empty lanes. Empty names the window in folio copy. */
 .paper-empty[data-paper-empty] [data-rolling-week],
 .paper-empty[data-paper-empty] .week-window,
 .paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-rolling-week],

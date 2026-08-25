@@ -76,7 +76,11 @@ export function LaneBoard({
             ))}
           </ol>
           {lead ? (
-            <p className="later-claim claim-after-call-line" data-later-claim="">
+            <p
+              className="later-claim claim-after-call-line"
+              data-later-claim=""
+              data-raise-difference=""
+            >
               <a
                 className="claim-after-call claim-after-call-one claim-after-call-two claim-after-call-three claim-after-call-four claim-after-call-five"
                 href={`/c/${city.slug}/${category.slug}#claim`}
@@ -90,8 +94,11 @@ export function LaneBoard({
               >
                 {`Outbid my ${category.display.toLowerCase()} column`}
               </a>{" "}
-              after Call this #1. Paying less than #1 still lists. Rank is the
-              bid.
+              after Call this #1.{" "}
+              <span className="raise-charge" data-raise-charge="">
+                Polar charges only the difference, not a full rebid.
+              </span>{" "}
+              Paying less than #1 still lists. Rank is the bid.
             </p>
           ) : null}
           {lastCall ? (
@@ -125,6 +132,7 @@ export function LaneBoard({
           lockCity
           lockCategory
           emptyPaper={paid.length === 0}
+          topBidUsd={lead?.bidUsd}
         />
       ) : null}
     </section>

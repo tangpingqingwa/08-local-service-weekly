@@ -68,10 +68,10 @@ export function ClaimColumn({ city, emptyPaper = false }: ClaimColumnProps) {
           </span>
         </span>
       </h2>
-      <p className="claim-note">
-        Pick one column. New spots start at ${MIN_BID_USD}. Rank is the bid.
-        Unpaid checkout stays off the board until Polar reports paid. An
-        abandoned listing is not #1.
+      <p className="claim-note" data-raise-difference="">
+        Pick one column. Same site already on a column: Polar charges only the difference, not a full rebid. New spots start at ${MIN_BID_USD}.
+        Rank is the bid. Unpaid checkout stays off the board until Polar
+        reports paid. An abandoned listing is not #1.
       </p>
       {columns}
     </section>

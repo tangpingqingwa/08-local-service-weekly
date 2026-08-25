@@ -233,6 +233,11 @@ Each heading is one fleet unit. Do not start the next PR in the same change.
 - **Dependencies:** PR 55 (rules lane last 7 days on `main`)
 - **Acceptance:** Rules Week heading names last 7 days, not a Monday paper. Ranking still keys the lane as city × category over rolling last 7 days. Identity stays site + category + city; `weekId` stays a Polar/audit label. Last-week archive stays last 7 days. Edition dek stays last 7 days. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Empty does not stamp occupied `data-rolling-week` or `week-window`. Empty lanes stay No #1. Occupied Call this #1 stays the first occupied click. Do not retouch Call, README, About, site header, kickers, edition dek, last-week archive, or the rules Ranking / Identity copy from #55. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
 
+### PR 57: first-time neighbor — occupied raise copy names difference-only
+- **Files:** `src/ui/outbid-form.tsx`, `src/ui/lane-board.tsx`, `src/ui/claim-column.tsx`, `app/globals.css`, `tests/board.test.ts`, `scripts/test.sh`, `SPEC.md`, `BUILD.md`
+- **Dependencies:** PR 56 (rules Week heading last 7 days on `main`)
+- **Acceptance:** Occupied London `/` raise / Outbid copy names Polar charges only the difference, not a full rebid (`data-raise-difference`). Occupied Call this #1 stays the first occupied click. Empty lanes stay No #1 and do not name occupied raise-pays-difference. Empty does not stamp occupied `data-rolling-week` or `week-window`. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Edition dek stays last 7 days. Last-week archive stays last 7 days. Rules Ranking / Identity from #55 stay. Rules Week heading from #56 stays last 7 days. Do not retouch Call, README, About, site header, kickers, edition dek, last-week archive, or the rules Week heading from #56. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
+
 ---
 
 ## 6. Live-smoke (operator)

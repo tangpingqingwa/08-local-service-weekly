@@ -16,7 +16,42 @@ type OutbidFormProps = {
   lockCity?: boolean;
   lockCategory?: boolean;
   emptyPaper?: boolean;
+  topBidUsd?: number;
 };
+
+function OccupiedCheckoutCopy({
+  amount,
+  topBidUsd,
+}: {
+  amount: number;
+  topBidUsd?: number;
+}) {
+  const takesLead = topBidUsd !== undefined && amount > topBidUsd;
+  const raiseChargeUsd =
+    topBidUsd !== undefined && takesLead ? amount - topBidUsd : 0;
+  return (
+    <p className="claim-note" data-raise-difference="">
+      New spots start at ${MIN_BID_USD}. Paying less than #1 still lists at
+      the rank that bid can take. Rank is the bid.{" "}
+      {takesLead ? (
+        <span
+          className="raise-charge"
+          data-raise-charge=""
+          data-current-usd={topBidUsd}
+        >
+          Polar charges $<span data-raise-charge-usd="">{raiseChargeUsd}</span> to raise — only the difference, not a full rebid.{" "}
+        </span>
+      ) : (
+        <span className="raise-charge" data-raise-charge="">
+          Polar charges the difference on a raise — not a full rebid.{" "}
+        </span>
+      )}
+      New listing: Polar charges that full amount. Same site already on this column: Polar charges only the difference, not a full rebid. Unpaid
+      checkout stays off the board until Polar reports paid. An abandoned
+      listing is not #1.
+    </p>
+  );
+}
 
 function clampAmount(value: number): number {
   if (!Number.isFinite(value)) return MIN_BID_USD;
@@ -29,10 +64,15 @@ export function OutbidForm({
   lockCity = false,
   lockCategory = false,
   emptyPaper = false,
+  topBidUsd,
 }: OutbidFormProps) {
   const defaultCity = city ?? CITIES[0]?.slug ?? "london";
   const defaultCategory = category ?? CATEGORIES[0]?.slug ?? "movers";
-  const [amount, setAmount] = useState(MIN_BID_USD);
+  const startingAmount =
+    !emptyPaper && topBidUsd !== undefined
+      ? clampAmount(topBidUsd + 1)
+      : MIN_BID_USD;
+  const [amount, setAmount] = useState(startingAmount);
   const [selectedCity, setSelectedCity] = useState(defaultCity);
   const [selectedCategory, setSelectedCategory] = useState(defaultCategory);
 
@@ -192,11 +232,15 @@ export function OutbidForm({
             </button>
           </span>
         </h2>
-        <p className="claim-note">
-          New spots start at ${MIN_BID_USD}. Paying less than #1 still lists at
-          the rank that bid can take. Rank is the bid. Unpaid checkout stays off
-          the board until Polar reports paid. An abandoned listing is not #1.
-        </p>
+        {emptyPaper ? (
+          <p className="claim-note">
+            New spots start at ${MIN_BID_USD}. Paying less than #1 still lists at
+            the rank that bid can take. Rank is the bid. Unpaid checkout stays off
+            the board until Polar reports paid. An abandoned listing is not #1.
+          </p>
+        ) : (
+          <OccupiedCheckoutCopy amount={amount} topBidUsd={topBidUsd} />
+        )}
         {emptyPaper ? (
           <>
             <div className="bid-row">{outbid}</div>

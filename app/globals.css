@@ -153,7 +153,9 @@ a:hover {
 .paper-empty[data-paper-empty] [data-column-index-after],
 .paper-empty[data-paper-empty] [data-category-tabs],
 .paper-empty[data-paper-empty] [data-rolling-week],
-.paper-empty[data-paper-empty] .week-window {
+.paper-empty[data-paper-empty] .week-window,
+.paper-empty[data-paper-empty] [data-raise-difference],
+.paper-empty[data-paper-empty] [data-raise-charge] {
   display: none;
 }
 
@@ -317,7 +319,9 @@ a:hover {
 .paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-claim-after-call],
 .paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-call-after-claim],
 .paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-later-claim],
-.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] .later-claim {
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] .later-claim,
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-raise-difference],
+.paper-occupied[data-paper-occupied] .lane-empty[data-lane-empty] [data-raise-charge] {
   display: none;
 }
 
@@ -635,6 +639,31 @@ a:hover {
 
 .paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-note {
   font-size: 0.82rem;
+}
+
+/* Occupied raise / Outbid: Polar charges only the difference, not a full rebid. */
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-note[data-raise-difference] {
+  font-size: 0.82rem;
+}
+
+.paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .claim-note[data-raise-difference] .raise-charge[data-raise-charge] {
+  display: block;
+  margin: 0.35rem 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.paper-occupied[data-paper-occupied] .later-claim.claim-after-call-line[data-raise-difference] .raise-charge[data-raise-charge] {
+  display: inline;
+  color: inherit;
+  font-size: inherit;
+}
+
+.paper-empty[data-paper-empty] .claim-note[data-raise-difference],
+.paper-empty[data-paper-empty] .raise-charge[data-raise-charge],
+.lane-empty[data-lane-empty] .claim-note[data-raise-difference],
+.lane-empty[data-lane-empty] .raise-charge[data-raise-charge] {
+  display: none;
 }
 
 .paper-occupied[data-paper-occupied] .later-claim[data-later-claim] .outbid {

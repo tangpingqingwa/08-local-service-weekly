@@ -1183,6 +1183,110 @@ fi
 grep -q 'Site header and layout meta name last 7 days' SPEC.md \
   || fail "SPEC must name site header last 7 days, not this week's Monday paper"
 
+echo "== UX: about copy matches rolling last-7-days — not this week Monday paper =="
+python3 - app/about/page.tsx <<'PY' || fail "about copy must name last 7 days, not this week's Monday paper"
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+if "data-rolling-week" in src or "week-window" in src:
+    raise SystemExit("do not stamp occupied data-rolling-week onto about")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("about must not retouch Call this #1")
+if "paid the most this week" in src:
+    raise SystemExit("about still says whoever paid the most this week")
+if "public weekly auction" in src or "Weekly #1" in src:
+    raise SystemExit("about still names a Monday week")
+if "Last 7 days" not in src and "last 7 days" not in src:
+    raise SystemExit("about must name last 7 days")
+if "Rolling last 7 days. Not Monday 00:00 Europe/London." not in src:
+    raise SystemExit("about must name rolling last 7 days, not London Monday midnight")
+if 'className="site-header"' in src or 'className="tagline"' in src:
+    raise SystemExit("about must not retouch site header")
+if 'className="edition-kicker"' in src:
+    raise SystemExit("about must not retouch occupied/empty kickers")
+PY
+grep -q 'about copy matches rolling last-7-days' tests/board.test.ts \
+  || fail "board tests must cover about rolling last-7-days copy"
+grep -q 'Rolling last 7 days' tests/urls.test.ts \
+  || fail "about page tests must name rolling last 7 days"
+python3 - app/layout.tsx <<'PY' || fail "about cut must not retouch site header last 7 days"
+import re
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+if "data-rolling-week" in src or "week-window" in src:
+    raise SystemExit("do not stamp occupied data-rolling-week onto site chrome")
+tagline = re.search(r'<p className="tagline">(.*?)</p>', src, re.S)
+if not tagline:
+    raise SystemExit("site header tagline missing")
+text = tagline.group(1).replace("&apos;", "'").replace("&#x27;", "'")
+if "Last 7 days" not in text:
+    raise SystemExit("do not restamp site header last-7-days tagline")
+if "A weekly classified" in text or "This week" in text:
+    raise SystemExit("do not restamp site header back to a Monday week")
+PY
+python3 - src/ui/edition.tsx <<'PY' || fail "about cut must keep occupied/empty last-7-days kickers"
+import re
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+kickers = re.findall(r'<p className="edition-kicker">(.*?)</p>', src, re.S)
+if len(kickers) != 2:
+    raise SystemExit("empty and occupied kickers must both exist")
+empty, occupied = kickers
+if "Last 7 days" not in empty or "This week" in empty:
+    raise SystemExit("do not restamp empty last-7-days kicker")
+if "Last 7 days" not in occupied or "This week" in occupied:
+    raise SystemExit("do not restamp occupied last-7-days kicker")
+if "data-rolling-week" in empty or "week-window" in empty:
+    raise SystemExit("empty kicker must not stamp occupied rolling chrome")
+if "data-rolling-week" in occupied or "week-window" in occupied:
+    raise SystemExit("occupied kicker must not stamp data-rolling-week onto the kicker")
+PY
+python3 - app/globals.css <<'PY' || fail "about copy must not recolor the classified paper"
+import re
+import sys
+
+css = open(sys.argv[1], encoding="utf-8").read()
+occupied = re.search(
+    r"\.paper-occupied\[data-paper-occupied\] \.edition-kicker\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not occupied:
+    raise SystemExit("do not restamp occupied last-7-days kicker CSS")
+if "text-transform: none" not in occupied.group(1):
+    raise SystemExit("do not restamp occupied last-7-days kicker CSS")
+empty = re.search(
+    r"\.paper-empty\[data-paper-empty\] \.edition-kicker\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not empty:
+    raise SystemExit("do not restamp empty last-7-days kicker CSS")
+if "text-transform: none" not in empty.group(1):
+    raise SystemExit("do not restamp empty last-7-days kicker CSS")
+site = re.search(r"\.site-header \.tagline\s*\{([^}]*)\}", css, re.S)
+if not site:
+    raise SystemExit("do not restamp site-header last-7-days tagline CSS")
+if "text-transform: none" not in site.group(1):
+    raise SystemExit("do not restamp site-header last-7-days tagline CSS")
+if re.search(r"background:\s*var\(--accent\)[\s\S]{0,80}(about|doc-page)", css):
+    raise SystemExit("do not recolor about or the classified paper")
+PY
+if grep -qE 'data-call-after-claim-six|data-claim-after-call-six|call-after-claim-N' \
+  app/about/page.tsx app/globals.css; then
+  fail "about rolling week must not stamp call-after-claim-N"
+fi
+if grep -q 'data-rolling-week' app/about/page.tsx src/ui/claim-column.tsx src/ui/outbid-form.tsx src/ui/listing-card.tsx; then
+  fail "about rolling week must not stamp occupied data-rolling-week onto empty lanes or Call hops"
+fi
+if grep -q 'data-first-click="call"' app/about/page.tsx; then
+  fail "about rolling week must not retouch Call this #1"
+fi
+grep -q 'About copy names last 7 days' SPEC.md \
+  || fail "SPEC must name about last 7 days, not this week's Monday paper"
+
 echo "== polar checkout + fixture =="
 for f in src/polar/port.ts src/polar/fake.ts app/api/checkout/route.ts \
   app/return/page.tsx tests/checkout.test.ts src/migrations/004_checkouts.sql; do
@@ -1424,6 +1528,8 @@ if [[ -f package.json ]]; then
     || fail "occupied kicker rolling last-7-days test did not run"
   grep -q 'site header matches rolling last-7-days — not this week Monday paper' "$test_log" \
     || fail "site header rolling last-7-days test did not run"
+  grep -q 'about copy matches rolling last-7-days — not this week Monday paper' "$test_log" \
+    || fail "about copy rolling last-7-days test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"
@@ -2772,6 +2878,46 @@ print("yes" if "data-empty-honest" in chunk or "No #1" in chunk else "no")
   if grep -qiE '★|⭐|top rated|review count' "${about_body}"; then
     fail "GET /about must not show stars or review counts"
   fi
+  python3 - "${about_body}" <<'PY' || fail "GET /about must name last 7 days, not this week's Monday paper"
+import re
+import sys
+
+html = open(sys.argv[1], encoding="utf-8").read()
+header = re.search(r'<header class="site-header">(.*?)</header>', html, re.S)
+if not header:
+    raise SystemExit("GET /about missing site header")
+chrome = header.group(1)
+if "data-rolling-week" in chrome or "week-window" in chrome:
+    raise SystemExit("do not stamp occupied data-rolling-week onto site chrome")
+if "Call this #1" in chrome or 'data-first-click="call"' in chrome:
+    raise SystemExit("site header must not retouch Call this #1")
+tagline = re.search(r'class="tagline"[^>]*>([^<]+)', chrome)
+if not tagline:
+    raise SystemExit("GET /about missing site-header tagline")
+text = tagline.group(1).replace("&apos;", "'").replace("&#x27;", "'")
+if "Last 7 days" not in text:
+    raise SystemExit("do not restamp site header last-7-days tagline")
+if "A weekly classified" in text or "This week" in text:
+    raise SystemExit("do not restamp site header back to a Monday week")
+main = re.search(r'<main class="doc-page"[^>]*data-page="about"[^>]*>(.*?)</main>', html, re.S)
+if not main:
+    raise SystemExit("GET /about missing about main")
+body = main.group(1)
+if "data-rolling-week" in body or "week-window" in body:
+    raise SystemExit("do not stamp occupied data-rolling-week onto about")
+if "paid the most this week" in body:
+    raise SystemExit("about still says whoever paid the most this week")
+if "public weekly auction" in body:
+    raise SystemExit("about still names a Monday week")
+if "last 7 days" not in body.lower():
+    raise SystemExit("about body must name last 7 days")
+if "Rolling last 7 days. Not Monday 00:00 Europe/London." not in body:
+    raise SystemExit("about must name rolling last 7 days, not London Monday midnight")
+if "Call this #1" in body or 'data-first-click="call"' in body:
+    raise SystemExit("about must not retouch Call this #1")
+if "edition-kicker" in body:
+    raise SystemExit("about must not retouch occupied/empty kickers")
+PY
 
   rules_body="$(mktemp)"
   rules_code="$(curl -sS -o "${rules_body}" -w '%{http_code}' "http://127.0.0.1:${port}/rules")"

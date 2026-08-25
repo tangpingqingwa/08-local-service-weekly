@@ -15,11 +15,11 @@ Implementation plan (stack, modules, PR DAG): [BUILD.md](./BUILD.md).
 
 ## 1. Product statement
 
-A public weekly auction for the **#1 visible local-service provider** in a **city × category**. Ranking is money. There are no stars, no review scores, and no “top rated” badges.
+A public last-7-days auction for the **#1 visible local-service provider** in a **city × category**. Ranking is money. There are no stars, no review scores, and no “top rated” badges.
 
 v1 city lane is **London**. The data model and ranker are multi-city from day one: adding Manchester or New York is a city row, not a rewrite of ranking.
 
-One-line pitch: **The #1 mover / dentist / immigration lawyer / tutor in town is whoever paid the most this week.**
+One-line pitch: **The #1 mover / dentist / immigration lawyer / tutor in town is whoever paid the most in the last 7 days.**
 
 ---
 
@@ -136,7 +136,7 @@ At age-out:
 - Last week’s labeled #1 may be shown as a “last week” archive copy once it is outside the rolling window. It is not this week’s #1 unless they pay again.
 - Raise and new bids apply only to the **open** `weekId` label. Occupied rank is the rolling window.
 
-The #1 **visible provider** for a city × category is whoever still occupies the rolling last-7-days window at rank `#1`. That is the product. Occupied and empty classified paper name that window. Empty copy does not present Monday 00:00 Europe/London as the drop. Empty masthead kicker names last 7 days, not this week’s Monday paper. Occupied masthead kicker names last 7 days, not this week’s Monday paper. Site header and layout meta name last 7 days, not this week’s Monday paper.
+The #1 **visible provider** for a city × category is whoever still occupies the rolling last-7-days window at rank `#1`. That is the product. Occupied and empty classified paper name that window. Empty copy does not present Monday 00:00 Europe/London as the drop. Empty masthead kicker names last 7 days, not this week’s Monday paper. Occupied masthead kicker names last 7 days, not this week’s Monday paper. Site header and layout meta name last 7 days, not this week’s Monday paper. About copy names last 7 days, not this week’s Monday paper.
 
 ---
 

@@ -263,6 +263,11 @@ test("About page states the outbid.lol local-service-weekly product", () => {
   assert.match(html, /no ads/i);
   assert.match(html, /no stars/);
   assert.match(html, /href="\/rules"/);
+  assert.match(html, /last 7 days/);
+  assert.match(html, /Rolling last 7 days\. Not Monday 00:00 Europe\/London\./);
+  assert.doesNotMatch(html, /paid the most this week/);
+  assert.doesNotMatch(html, /public weekly auction/);
+  assert.doesNotMatch(html, /data-rolling-week|week-window/);
   assert.doesNotMatch(html, /★|⭐|review count/i);
 });
 

@@ -1,6 +1,6 @@
 # Local Service Weekly
 
-Weekly pay-to-rank board for the #1 local-service provider in a city × category. Rank is the bid — not stars.
+Pay-to-rank board for the #1 local-service provider in a city × category over the last 7 days. Rank is the bid — not stars. **Rolling last 7 days. Not Monday 00:00 Europe/London.**
 
 v1 city lane: **London**. Mechanics clone [outbid.lol](https://outbid.lol) (USD, min $5, older wins ties, raise pays the difference, Polar + fixture).
 

@@ -1287,6 +1287,125 @@ fi
 grep -q 'About copy names last 7 days' SPEC.md \
   || fail "SPEC must name about last 7 days, not this week's Monday paper"
 
+echo "== UX: README copy matches rolling last-7-days — not weekly Monday paper =="
+python3 - README.md <<'PY' || fail "README copy must name last 7 days, not weekly Monday paper"
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+if "Weekly pay-to-rank" in src:
+    raise SystemExit("README still says Weekly pay-to-rank Monday paper")
+if "this week's Monday" in src.lower() or "this week’s Monday" in src:
+    raise SystemExit("README still names this week's Monday paper")
+if "last 7 days" not in src.lower():
+    raise SystemExit("README must name last 7 days")
+if "Rolling last 7 days. Not Monday 00:00 Europe/London." not in src:
+    raise SystemExit("README must name rolling last 7 days, not London Monday midnight")
+if "data-rolling-week" in src or "week-window" in src:
+    raise SystemExit("do not stamp occupied data-rolling-week onto README")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("README must not retouch Call this #1")
+if "24h lock" in src:
+    raise SystemExit("README must not name a 24h lock on #1")
+PY
+grep -q 'README copy matches rolling last-7-days' tests/board.test.ts \
+  || fail "board tests must cover README rolling last-7-days copy"
+python3 - app/about/page.tsx <<'PY' || fail "README cut must not restamp about last-7-days"
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+if "paid the most this week" in src:
+    raise SystemExit("do not restamp about back to this week's Monday paper")
+if "Last 7 days" not in src and "last 7 days" not in src:
+    raise SystemExit("do not restamp about last-7-days")
+if "Rolling last 7 days. Not Monday 00:00 Europe/London." not in src:
+    raise SystemExit("do not restamp about last-7-days")
+if "data-rolling-week" in src or "week-window" in src:
+    raise SystemExit("do not stamp occupied data-rolling-week onto about")
+if "Call this #1" in src or 'data-first-click="call"' in src:
+    raise SystemExit("do not retouch Call this #1 from README cut")
+if 'className="site-header"' in src or 'className="tagline"' in src:
+    raise SystemExit("about must not retouch site header")
+if 'className="edition-kicker"' in src:
+    raise SystemExit("about must not retouch occupied/empty kickers")
+PY
+python3 - app/layout.tsx <<'PY' || fail "README cut must not retouch site header last 7 days"
+import re
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+if "data-rolling-week" in src or "week-window" in src:
+    raise SystemExit("do not stamp occupied data-rolling-week onto site chrome")
+tagline = re.search(r'<p className="tagline">(.*?)</p>', src, re.S)
+if not tagline:
+    raise SystemExit("site header tagline missing")
+text = tagline.group(1).replace("&apos;", "'").replace("&#x27;", "'")
+if "Last 7 days" not in text:
+    raise SystemExit("do not restamp site header last-7-days tagline")
+if "A weekly classified" in text or "This week" in text:
+    raise SystemExit("do not restamp site header back to a Monday week")
+PY
+python3 - src/ui/edition.tsx <<'PY' || fail "README cut must keep occupied/empty last-7-days kickers"
+import re
+import sys
+
+src = open(sys.argv[1], encoding="utf-8").read()
+kickers = re.findall(r'<p className="edition-kicker">(.*?)</p>', src, re.S)
+if len(kickers) != 2:
+    raise SystemExit("empty and occupied kickers must both exist")
+empty, occupied = kickers
+if "Last 7 days" not in empty or "This week" in empty:
+    raise SystemExit("do not restamp empty last-7-days kicker")
+if "Last 7 days" not in occupied or "This week" in occupied:
+    raise SystemExit("do not restamp occupied last-7-days kicker")
+if "data-rolling-week" in empty or "week-window" in empty:
+    raise SystemExit("empty kicker must not stamp occupied rolling chrome")
+if "data-rolling-week" in occupied or "week-window" in occupied:
+    raise SystemExit("occupied kicker must not stamp data-rolling-week onto the kicker")
+PY
+python3 - app/globals.css <<'PY' || fail "README copy must not recolor the classified paper"
+import re
+import sys
+
+css = open(sys.argv[1], encoding="utf-8").read()
+occupied = re.search(
+    r"\.paper-occupied\[data-paper-occupied\] \.edition-kicker\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not occupied:
+    raise SystemExit("do not restamp occupied last-7-days kicker CSS")
+if "text-transform: none" not in occupied.group(1):
+    raise SystemExit("do not restamp occupied last-7-days kicker CSS")
+empty = re.search(
+    r"\.paper-empty\[data-paper-empty\] \.edition-kicker\s*\{([^}]*)\}",
+    css,
+    re.S,
+)
+if not empty:
+    raise SystemExit("do not restamp empty last-7-days kicker CSS")
+if "text-transform: none" not in empty.group(1):
+    raise SystemExit("do not restamp empty last-7-days kicker CSS")
+site = re.search(r"\.site-header \.tagline\s*\{([^}]*)\}", css, re.S)
+if not site:
+    raise SystemExit("do not restamp site-header last-7-days tagline CSS")
+if "text-transform: none" not in site.group(1):
+    raise SystemExit("do not restamp site-header last-7-days tagline CSS")
+if re.search(r"background:\s*var\(--accent\)[\s\S]{0,80}(about|doc-page|readme)", css):
+    raise SystemExit("do not recolor about or the classified paper")
+PY
+if grep -qE 'data-call-after-claim-six|data-claim-after-call-six|call-after-claim-N' \
+  README.md app/about/page.tsx app/globals.css; then
+  fail "README rolling week must not stamp call-after-claim-N"
+fi
+if grep -q 'data-rolling-week' README.md app/about/page.tsx src/ui/claim-column.tsx src/ui/outbid-form.tsx src/ui/listing-card.tsx; then
+  fail "README rolling week must not stamp occupied data-rolling-week onto empty lanes or Call hops"
+fi
+if grep -q 'data-first-click="call"' README.md app/about/page.tsx; then
+  fail "README rolling week must not retouch Call this #1"
+fi
+grep -q 'README copy names last 7 days' SPEC.md \
+  || fail "SPEC must name README last 7 days, not this week's Monday paper"
+
 echo "== polar checkout + fixture =="
 for f in src/polar/port.ts src/polar/fake.ts app/api/checkout/route.ts \
   app/return/page.tsx tests/checkout.test.ts src/migrations/004_checkouts.sql; do
@@ -1530,6 +1649,8 @@ if [[ -f package.json ]]; then
     || fail "site header rolling last-7-days test did not run"
   grep -q 'about copy matches rolling last-7-days — not this week Monday paper' "$test_log" \
     || fail "about copy rolling last-7-days test did not run"
+  grep -q 'README copy matches rolling last-7-days — not weekly Monday paper' "$test_log" \
+    || fail "README copy rolling last-7-days test did not run"
 
   echo "== GET / London board and unknown-city 404 =="
   port="${TEST_PORT:-34568}"

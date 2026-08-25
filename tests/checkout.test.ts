@@ -4,6 +4,7 @@ import React, { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { listLane, rankLane } from "../src/board";
 import { openDatabase, type AppDb } from "../src/db";
+import { raiseListing } from "../src/listings";
 import {
   FakePolarPort,
   getPolarPort,
@@ -266,6 +267,8 @@ test("handleCheckoutReturn pays on success and not on cancel", async () => {
     assert.equal(success.state, "paid");
     assert.equal(success.listing?.bidUsd, 20);
     assert.equal(success.listing?.business, "North London Movers");
+    assert.equal(success.checkout?.intent, "place");
+    assert.equal(success.checkout?.amountUsd, 20);
 
     const cancel = await handleCheckoutReturn(
       { checkout: canceled.id, status: "cancel" },
@@ -420,6 +423,92 @@ test("/return markup shows paid, cancelled, or unknown", async () => {
   assert.match(paidHtml, /data-return="paid"/);
   assert.match(paidHtml, /North London Movers/);
   assert.match(paidHtml, /\$20/);
+  assert.doesNotMatch(paidHtml, /data-raise-return/);
+  assert.doesNotMatch(paidHtml, /only the difference, not a full rebid/);
   assert.doesNotMatch(paidHtml, /#1|#2|rank #/i);
   assert.doesNotMatch(paidHtml, /★|⭐|review count/i);
+});
+
+test("occupied Polar return names difference-only — not a full rebid paid", async () => {
+  const db = openDatabase(":memory:");
+  after(() => db.close());
+  const polar = new FakePolarPort(db);
+  setPolarPortForTests(polar);
+  const placed = await polar.createCheckout({
+    amountUsd: 20,
+    listing: draft(),
+  });
+  const { default: ReturnPage } = await import("../app/return/page");
+
+  const placeHtml = renderToStaticMarkup(
+    await ReturnPage({
+      searchParams: Promise.resolve({ checkout: placed.id }),
+    }),
+  );
+  assert.match(placeHtml, /data-return="paid"/);
+  assert.match(placeHtml, /North London Movers is listed at \$20/);
+  assert.doesNotMatch(placeHtml, /data-raise-return/);
+  assert.doesNotMatch(placeHtml, /only the difference, not a full rebid/);
+  assert.doesNotMatch(placeHtml, /Polar charged/);
+
+  const unpaidPolar = new FakePolarPort(db, { autoSettle: false });
+  setPolarPortForTests(unpaidPolar);
+  const unpaidRaise = await unpaidPolar.createCheckout({
+    amountUsd: 5,
+    listing: draft({ bidUsd: 25 }),
+    intent: "raise",
+  });
+  const cancelHtml = renderToStaticMarkup(
+    await ReturnPage({
+      searchParams: Promise.resolve({
+        checkout: unpaidRaise.id,
+        status: "cancel",
+      }),
+    }),
+  );
+  assert.match(cancelHtml, /data-return="cancelled"/);
+  assert.match(cancelHtml, /No rank claimed/);
+  assert.doesNotMatch(cancelHtml, /data-raise-return/);
+  assert.doesNotMatch(cancelHtml, /Polar charged/);
+  assert.doesNotMatch(cancelHtml, /only the difference, not a full rebid/);
+  assert.equal(listLane("london", "movers", db)[0]?.bidUsd, 20);
+
+  setPolarPortForTests(polar);
+  const raised = await raiseListing(draft({ bidUsd: 25 }), polar, db);
+  assert.equal(raised.quote.chargeUsd, 5);
+  assert.equal(raised.listing?.bidUsd, 25);
+  const paidRaise = await handleCheckoutReturn(
+    { checkout: raised.checkoutId },
+    polar,
+  );
+  assert.equal(paidRaise.state, "paid");
+  assert.equal(paidRaise.checkout?.intent, "raise");
+  assert.equal(paidRaise.checkout?.amountUsd, 5);
+  assert.equal(paidRaise.listing?.bidUsd, 25);
+
+  const raiseHtml = renderToStaticMarkup(
+    await ReturnPage({
+      searchParams: Promise.resolve({ checkout: raised.checkoutId }),
+    }),
+  );
+  assert.match(raiseHtml, /data-return="paid"/);
+  assert.match(raiseHtml, /data-raise-return=""/);
+  assert.match(raiseHtml, /class="raise-return"/);
+  assert.match(
+    raiseHtml,
+    /Polar charged \$<span data-raise-charge-usd="">5<\/span> — only the difference, not a full rebid/,
+  );
+  const raiseFact = raiseHtml.match(
+    /class="raise-return"[^>]*>([\s\S]*?)<\/p>/,
+  );
+  assert.ok(raiseFact);
+  assert.match(raiseFact[1] ?? "", /Polar charged/);
+  assert.doesNotMatch(raiseFact[1] ?? "", /is listed at/);
+  assert.match(raiseHtml, /North London Movers is listed at \$25/);
+  assert.match(raiseHtml, /Rank is the bid/);
+  assert.doesNotMatch(raiseHtml, /Polar charged \$25/);
+  assert.doesNotMatch(raiseHtml, /data-return="cancelled"/);
+  assert.doesNotMatch(raiseHtml, /#1|#2|rank #/i);
+  assert.doesNotMatch(raiseHtml, /★|⭐|review count/i);
+  assert.doesNotMatch(raiseHtml, /Call this #1/);
 });

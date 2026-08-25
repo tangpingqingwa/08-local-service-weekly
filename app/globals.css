@@ -1026,6 +1026,25 @@ a:hover {
   margin-top: 0.75rem;
 }
 
+/* Occupied Polar return: Polar charged only the difference, not a full rebid. */
+.return-page[data-return="paid"][data-raise-return] .raise-return[data-raise-return] {
+  margin-top: 0.75rem;
+}
+
+.return-page[data-return="paid"][data-raise-return] .raise-return[data-raise-return] + p {
+  color: var(--muted);
+}
+
+.return-page[data-return="paid"][data-raise-return] .raise-return[data-raise-return] [data-raise-charge-usd] {
+  font-variant-numeric: tabular-nums;
+}
+
+.return-page[data-return="cancelled"] [data-raise-return],
+.return-page[data-return="unknown"] [data-raise-return],
+.return-page[data-return="paid"]:not([data-raise-return]) .raise-return {
+  display: none;
+}
+
 .return-page,
 .doc-page {
   padding-bottom: 3rem;

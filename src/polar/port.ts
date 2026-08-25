@@ -58,6 +58,12 @@ export type PolarPort = {
 
 export type ReturnState = "paid" | "cancelled" | "unknown";
 
+export type CheckoutReturnResult = {
+  state: ReturnState;
+  listing: Listing | null;
+  checkout: CheckoutRecord | null;
+};
+
 export class PolarError extends Error {
   constructor(
     readonly code: string,
@@ -218,7 +224,7 @@ export async function handleCheckoutReturn(
     status?: string | string[];
   },
   port: PolarPort,
-): Promise<{ state: ReturnState; listing: Listing | null }> {
+): Promise<CheckoutReturnResult> {
   const checkoutId =
     firstQuery(params.checkout) ?? firstQuery(params.checkoutId);
   const rawStatus = (firstQuery(params.status) ?? "").toLowerCase();
@@ -231,28 +237,32 @@ export async function handleCheckoutReturn(
     if (checkoutId) {
       await port.abandon(checkoutId);
     }
-    return { state: "cancelled", listing: null };
+    return {
+      state: "cancelled",
+      listing: null,
+      checkout: checkoutId ? (port.getCheckout(checkoutId) ?? null) : null,
+    };
   }
 
   if (!checkoutId) {
-    return { state: "unknown", listing: null };
+    return { state: "unknown", listing: null, checkout: null };
   }
 
   const existing = port.getCheckout(checkoutId);
   if (!existing) {
-    return { state: "unknown", listing: null };
+    return { state: "unknown", listing: null, checkout: null };
   }
   if (existing.status === "cancelled") {
-    return { state: "cancelled", listing: null };
+    return { state: "cancelled", listing: null, checkout: existing };
   }
 
   const listing = await port.settle(checkoutId);
+  const rec = port.getCheckout(checkoutId) ?? existing;
   if (!listing) {
-    const rec = port.getCheckout(checkoutId);
-    if (rec?.status === "cancelled") {
-      return { state: "cancelled", listing: null };
+    if (rec.status === "cancelled") {
+      return { state: "cancelled", listing: null, checkout: rec };
     }
-    return { state: "unknown", listing: null };
+    return { state: "unknown", listing: null, checkout: rec };
   }
-  return { state: "paid", listing };
+  return { state: "paid", listing, checkout: rec };
 }

@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default function HomePage() {
   const city = resolveCity(DEFAULT_CITY_SLUG);
   if (!city.ok) {
-    throw new Error("v1 default city London is missing from the catalog");
+    throw new Error("Default city is unavailable");
   }
 
   const weekId = currentWeekId();

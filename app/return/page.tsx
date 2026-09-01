@@ -1,11 +1,11 @@
 import type { Listing } from "../../src/db";
 import { findListingByIdentity } from "../../src/listings";
-import { getPolarPort } from "../../src/polar/fake";
+import { getPaymentPort } from "../../src/billing/fake";
 import {
   handleCheckoutReturn,
   type CheckoutRecord,
-  type PolarPort,
-} from "../../src/polar/port";
+  type PaymentPort,
+} from "../../src/billing/port";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ type ReturnPageProps = {
 
 function occupyingFromRaiseCheckout(
   checkout: CheckoutRecord | null,
-  port: PolarPort,
+  port: PaymentPort,
 ): Listing | null {
   if (checkout?.intent !== "raise") {
     return null;
@@ -51,7 +51,7 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
   let occupying: Listing | null = null;
 
   try {
-    const port = getPolarPort();
+    const port = getPaymentPort();
     const result = await handleCheckoutReturn(params, port);
     state = result.state;
     business = result.listing?.business ?? null;
@@ -97,14 +97,15 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
       <main className="return-page" data-return="paid" data-raise-return="">
         <h1>Payment received</h1>
         <p className="raise-return" data-raise-return="">
-          Polar charged $<span data-raise-charge-usd="">{raiseChargeUsd}</span> — only the difference, not a full rebid.
+          $<span data-raise-charge-usd="">{raiseChargeUsd}</span> was charged —
+          only the difference, not a full rebid.
         </p>
         <p>
           {business && bidUsd !== null
             ? `${business} is listed at $${bidUsd}. Rank is the bid.`
             : "The listing stays on the board at the rank that bid can take."}
         </p>
-        <p>This page does not invent a rank before the payment settles.</p>
+        <p>The updated position is shown after payment confirmation.</p>
         <p>
           <a href="/">Back to the board</a>
         </p>
@@ -121,7 +122,7 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
             ? `${business} is listed at $${bidUsd}. Rank is the bid.`
             : "The listing is on the board at the rank that bid can take."}
         </p>
-        <p>This page does not invent a rank before the payment settles.</p>
+        <p>The confirmed position is shown on the board.</p>
         <p>
           <a href="/">Back to the board</a>
         </p>

@@ -3,15 +3,15 @@ import type { CategorySlug } from "./categories";
 import { MAX_BID_USD } from "./constants";
 import {
   parseBidUsd,
-  PolarError,
+  PaymentError,
   type ListingDraft,
-  type PolarPort,
-} from "./polar/port";
+  type PaymentPort,
+} from "./billing/port";
 import { requireClaimedLicense, TakedownError } from "./takedown";
 import { canonicalizeSiteUrl, UrlError } from "./urls";
 import { currentWeekId, requireOpenWeek, WeekError } from "./week";
 
-function dbFromPort(port: PolarPort, fallback: AppDb): AppDb {
+function dbFromPort(port: PaymentPort, fallback: AppDb): AppDb {
   if (typeof port.database === "function") {
     return port.database();
   }
@@ -69,7 +69,7 @@ export function listingIdentity(input: ListingIdentity): ListingIdentity {
     };
   } catch (error) {
     if (error instanceof UrlError) {
-      throw new PolarError(error.code, error.httpStatus, error.message);
+      throw new PaymentError(error.code, error.httpStatus, error.message);
     }
     throw error;
   }
@@ -126,14 +126,14 @@ export function quoteRaise(
   newBidUsd: number,
 ): RaiseQuote {
   if (existing.hidden) {
-    throw new PolarError("listing_hidden", 409);
+    throw new PaymentError("listing_hidden", 409);
   }
   const target = parseBidUsd(newBidUsd);
   if (target < existing.bidUsd + 1) {
-    throw new PolarError("bid_too_low", 400);
+    throw new PaymentError("bid_too_low", 400);
   }
   if (target > MAX_BID_USD) {
-    throw new PolarError("bid_too_high", 400);
+    throw new PaymentError("bid_too_high", 400);
   }
   return {
     currentBidUsd: existing.bidUsd,
@@ -154,11 +154,11 @@ export function applyRaise(
   },
 ): Listing {
   if (existing.hidden) {
-    throw new PolarError("listing_hidden", 409);
+    throw new PaymentError("listing_hidden", 409);
   }
   const quote = quoteRaise(existing, input.newBidUsd);
   if (input.chargeUsd !== quote.chargeUsd) {
-    throw new PolarError("bid_too_low", 400);
+    throw new PaymentError("bid_too_low", 400);
   }
   const business = input.business?.trim() || existing.business;
   const nextLicense =
@@ -170,7 +170,7 @@ export function applyRaise(
     licenseId = requireClaimedLicense(existing.category, nextLicense);
   } catch (error) {
     if (error instanceof TakedownError) {
-      throw new PolarError(error.code, error.httpStatus, error.message);
+      throw new PaymentError(error.code, error.httpStatus, error.message);
     }
     throw error;
   }
@@ -198,10 +198,10 @@ export function applyRaise(
   };
 }
 
-/** Same identity, pay the difference via Polar/fixture. */
+/** Same identity, pay the difference via Waffo/fixture. */
 export async function raiseListing(
   draft: ListingDraft,
-  port: PolarPort,
+  port: PaymentPort,
   db?: AppDb,
 ): Promise<RaiseResult> {
   const store = db ?? dbFromPort(port, getDb());
@@ -210,7 +210,7 @@ export async function raiseListing(
     weekId = requireOpenWeek(weekId);
   } catch (error) {
     if (error instanceof WeekError) {
-      throw new PolarError(error.code, error.httpStatus, error.message);
+      throw new PaymentError(error.code, error.httpStatus, error.message);
     }
     throw error;
   }
@@ -221,7 +221,7 @@ export async function raiseListing(
     weekId,
   });
   if (!existing) {
-    throw new PolarError("listing_not_found", 404);
+    throw new PaymentError("listing_not_found", 404);
   }
   const quote = quoteRaise(existing, draft.bidUsd);
   const started = await port.createCheckout({

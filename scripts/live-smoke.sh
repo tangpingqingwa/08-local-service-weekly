@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Operator smoke against a local process. Not called from scripts/test.sh or CI.
 # Walks SPEC §14: healthz, London board, about/rules, checkout, raise, click,
-# takedown. Missing Polar secret → BLOCKED-SECRET: POLAR_ACCESS_TOKEN
+# takedown. Missing Waffo secret → BLOCKED-SECRET: WAFFO_PRIVATE_KEY
 # Fixture listing is allowed so raise / click / takedown can run when live
 # pay is blocked. Empty London lane is honest. Do not invent a provider.
+# Waffo Pancake is the sole production MoR; its API host is api.waffo.ai.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -41,15 +42,27 @@ LIVE_PID=""
 WORKDIR=""
 RESULT_LOG=""
 BASE="${LIVE_SMOKE_BASE:-}"
+LOCAL_FIXTURE=0
 
-# Capture operator Polar flags before the fixture process unsets them.
-OP_POLAR_LIVE="${POLAR_LIVE:-}"
-OP_POLAR_ACCESS_TOKEN="${POLAR_ACCESS_TOKEN:-}"
-OP_POLAR_WEBHOOK_SECRET="${POLAR_WEBHOOK_SECRET:-}"
-OP_POLAR_PRODUCT_ID="${POLAR_PRODUCT_ID:-}"
-OP_POLAR_ORGANIZATION_ID="${POLAR_ORGANIZATION_ID:-${POLAR_ORG_ID:-}}"
-OP_POLAR_FIXTURE_ONLY="${POLAR_FIXTURE_ONLY:-}"
-OP_POLAR_API_BASE="${POLAR_API_BASE:-}"
+# Capture explicit Waffo mode/config before the local fixture process starts.
+# The runtime accepts all three names as equivalent selectors; keep the
+# operator-side precedence identical and let the child validate conflicts.
+OP_WAFFO_MODE="${PAYMENT_MODE:-${WAFFO_MODE:-${PAYMENT_PROVIDER_MODE:-}}}"
+OP_WAFFO_PRIVATE_KEY="${WAFFO_PRIVATE_KEY:-}"
+OP_WAFFO_PRIVATE_KEY_FILE="${WAFFO_PRIVATE_KEY_FILE:-}"
+OP_WAFFO_MERCHANT_ID="${WAFFO_MERCHANT_ID:-}"
+OP_WAFFO_STORE_ID="${WAFFO_STORE_ID:-}"
+OP_WAFFO_PRODUCT_ID="${WAFFO_PRODUCT_ID:-}"
+OP_WAFFO_WEBHOOK_TEST_PUBLIC_KEY="${WAFFO_WEBHOOK_TEST_PUBLIC_KEY:-}"
+OP_WAFFO_WEBHOOK_PROD_PUBLIC_KEY="${WAFFO_WEBHOOK_PROD_PUBLIC_KEY:-}"
+OP_WAFFO_API_BASE="${WAFFO_API_BASE:-https://api.waffo.ai}"
+OP_WAFFO_PUBLIC_BASE_URL="${WAFFO_PUBLIC_BASE_URL:-}"
+
+if [[ -n "${PAYMENT_MODE:-}" && -n "${WAFFO_MODE:-}" && "${PAYMENT_MODE}" != "${WAFFO_MODE}" ]] \
+  || [[ -n "${PAYMENT_MODE:-}" && -n "${PAYMENT_PROVIDER_MODE:-}" && "${PAYMENT_MODE}" != "${PAYMENT_PROVIDER_MODE}" ]] \
+  || [[ -n "${WAFFO_MODE:-}" && -n "${PAYMENT_PROVIDER_MODE:-}" && "${WAFFO_MODE}" != "${PAYMENT_PROVIDER_MODE}" ]]; then
+  fail "Waffo mode selectors must agree"
+fi
 
 kill_tree() {
   local pid="${1:-}"
@@ -133,11 +146,15 @@ ensure_next_build() {
 }
 
 rebuild_next() {
-  echo "building Next.js app for live-smoke"
+  echo "building Next.js app for live-smoke" >&2
   (
     cd "$root"
-    unset POLAR_LIVE POLAR_ACCESS_TOKEN POLAR_WEBHOOK_SECRET POLAR_ORGANIZATION_ID POLAR_PRODUCT_ID POLAR_API_BASE || true
-    export POLAR_FIXTURE_ONLY=1
+    unset POLAR_LIVE POLAR_ACCESS_TOKEN POLAR_WEBHOOK_SECRET POLAR_ORGANIZATION_ID POLAR_PRODUCT_ID POLAR_FIXTURE_ONLY POLAR_API_BASE \
+      WAFFO_LIVE WAFFO_MODE PAYMENT_MODE PAYMENT_PROVIDER_MODE WAFFO_PRIVATE_KEY WAFFO_PRIVATE_KEY_FILE \
+      WAFFO_MERCHANT_ID WAFFO_STORE_ID WAFFO_PRODUCT_ID WAFFO_WEBHOOK_PUBLIC_KEY \
+      WAFFO_WEBHOOK_TEST_PUBLIC_KEY WAFFO_WEBHOOK_PROD_PUBLIC_KEY WAFFO_PUBLIC_BASE_URL WAFFO_API_BASE \
+      NODE_ENV VERCEL_ENV APP_ENV DEPLOY_ENV BUILD_ENV NEXT_PHASE || true
+    export PAYMENT_MODE=fixture
     export NEXT_TELEMETRY_DISABLED=1
     npx --no-install next build
   )
@@ -151,14 +168,19 @@ start_smoke_server() {
   ensure_next_build
   (
     cd "$root"
-    unset POLAR_LIVE POLAR_ACCESS_TOKEN POLAR_WEBHOOK_SECRET POLAR_ORGANIZATION_ID POLAR_PRODUCT_ID POLAR_FIXTURE_ONLY POLAR_API_BASE || true
-    export POLAR_FIXTURE_ONLY=1
+    unset POLAR_LIVE POLAR_ACCESS_TOKEN POLAR_WEBHOOK_SECRET POLAR_ORGANIZATION_ID POLAR_PRODUCT_ID POLAR_FIXTURE_ONLY POLAR_API_BASE \
+      WAFFO_LIVE WAFFO_MODE PAYMENT_MODE PAYMENT_PROVIDER_MODE WAFFO_PRIVATE_KEY WAFFO_PRIVATE_KEY_FILE \
+      WAFFO_MERCHANT_ID WAFFO_STORE_ID WAFFO_PRODUCT_ID WAFFO_WEBHOOK_PUBLIC_KEY \
+      WAFFO_WEBHOOK_TEST_PUBLIC_KEY WAFFO_WEBHOOK_PROD_PUBLIC_KEY WAFFO_PUBLIC_BASE_URL WAFFO_API_BASE \
+      NODE_ENV VERCEL_ENV APP_ENV DEPLOY_ENV BUILD_ENV NEXT_PHASE || true
+    export PAYMENT_MODE=fixture
+    export NODE_ENV=development
     export PORT="${port}"
     export DATABASE_PATH="${db_path}"
     export PUBLIC_BASE_URL="http://127.0.0.1:${port}"
     export OPERATOR_SECRET="${OPERATOR_SECRET:-live-smoke-operator}"
     export NEXT_TELEMETRY_DISABLED=1
-    # bash 3.2: do not `local` this name; export must reach next start.
+    # bash 3.2: do not `local` this name; export must reach the child server.
     while [[ $# -gt 0 ]]; do
       assignment="$1"
       shift
@@ -169,6 +191,9 @@ start_smoke_server() {
       fi
     done
     unset assignment
+    # Exercise the compiled Node server. The non-production NODE_ENV keeps the
+    # offline fixture legal while avoiding the shared next-dev lock, so this
+    # smoke is safe to run beside another local development server.
     exec npx --no-install next start --port "${port}" --hostname 127.0.0.1
   ) >"${log_path}" 2>&1 &
   echo $!
@@ -247,7 +272,9 @@ html_has() {
 
 invented_stars() {
   local file="$1"
-  grep -Eiq '★|⭐|4\.8 stars|star rating|star-rating|data-stars=|review count|top rated' "$file"
+  # Public docs truthfully explain that ratings do not rank. Only treat an
+  # actual rating affordance/value as invented social proof, not that copy.
+  grep -Eiq '★|⭐|[0-9]+(\.[0-9]+)?[[:space:]]+stars|star-rating|data-stars=|data-rating=|review count|top rated' "$file"
 }
 
 listing_count() {
@@ -263,7 +290,7 @@ id_for_business() {
     import { readFileSync } from "node:fs";
     const html = readFileSync(process.argv[1], "utf8");
     const name = process.argv[2];
-    const cards = [...html.matchAll(/<article class="card"[\s\S]*?<\/article>/g)].map((m) => m[0]);
+    const cards = [...html.matchAll(/<article\b[^>]*\bclass="[^"]*\bcard\b[^"]*"[^>]*>[\s\S]*?<\/article>/g)].map((m) => m[0]);
     for (const card of cards) {
       if (card.includes(name)) {
         const id = card.match(/data-listing-id="([^"]+)"/);
@@ -282,7 +309,7 @@ rank_for_business() {
     import { readFileSync } from "node:fs";
     const html = readFileSync(process.argv[1], "utf8");
     const name = process.argv[2];
-    const cards = [...html.matchAll(/<article class="card"[\s\S]*?<\/article>/g)].map((m) => m[0]);
+    const cards = [...html.matchAll(/<article\b[^>]*\bclass="[^"]*\bcard\b[^"]*"[^>]*>[\s\S]*?<\/article>/g)].map((m) => m[0]);
     for (const card of cards) {
       if (card.includes(name)) {
         const rank = card.match(/data-rank="(\d+)"/);
@@ -301,7 +328,7 @@ clicks_for_id() {
     import { readFileSync } from "node:fs";
     const html = readFileSync(process.argv[1], "utf8");
     const id = process.argv[2];
-    const cards = [...html.matchAll(/<article class="card"[\s\S]*?<\/article>/g)].map((m) => m[0]);
+    const cards = [...html.matchAll(/<article\b[^>]*\bclass="[^"]*\bcard\b[^"]*"[^>]*>[\s\S]*?<\/article>/g)].map((m) => m[0]);
     for (const card of cards) {
       if (card.includes(`data-listing-id="${id}"`)) {
         const clicks = card.match(/(\d+) clicks?/);
@@ -328,13 +355,14 @@ echo "root=${root}"
 echo "weekId=${EXPECT_WEEK}"
 
 if [[ -z "${BASE}" ]]; then
+  LOCAL_FIXTURE=1
   PORT="${LIVE_SMOKE_PORT:-$(pick_port)}"
   BASE="http://127.0.0.1:${PORT}"
   DB_PATH="${WORKDIR}/board.sqlite"
   LOG_PATH="${WORKDIR}/server.log"
   echo "starting local fixture process on ${BASE}"
   echo "database=${DB_PATH}"
-  STARTED_PID="$(start_smoke_server "$PORT" "$DB_PATH" "$LOG_PATH" "POLAR_FIXTURE_ONLY=1")"
+  STARTED_PID="$(start_smoke_server "$PORT" "$DB_PATH" "$LOG_PATH" "PAYMENT_MODE=fixture")"
   if ! wait_health "$BASE"; then
     echo "server log:" >&2
     cat "${LOG_PATH}" >&2 || true
@@ -349,17 +377,8 @@ else
 fi
 
 echo "base=${BASE}"
-echo "operator POLAR_LIVE=${OP_POLAR_LIVE:-<unset>}"
-if [[ -n "${OP_POLAR_ACCESS_TOKEN}" ]]; then
-  echo "operator POLAR_ACCESS_TOKEN=<set len=${#OP_POLAR_ACCESS_TOKEN}>"
-else
-  echo "operator POLAR_ACCESS_TOKEN=<unset>"
-fi
-if [[ -n "${OP_POLAR_API_BASE}" ]]; then
-  echo "operator POLAR_API_BASE=${OP_POLAR_API_BASE}"
-else
-  echo "operator POLAR_API_BASE=<unset; live process default is production>"
-fi
+echo "operator PAYMENT_MODE=${OP_WAFFO_MODE:-<unset>}"
+echo "operator WAFFO_API_BASE=${OP_WAFFO_API_BASE}"
 
 # --- Health ---
 health_body="${WORKDIR}/healthz.json"
@@ -368,6 +387,20 @@ if [[ "$health_code" == "200" ]] && grep -q '"ok":true' "$health_body"; then
   record "health" "PASS" "GET /healthz 200"
 else
   record "health" "FAIL" "GET /healthz HTTP ${health_code}"
+fi
+if [[ "$LOCAL_FIXTURE" == "1" ]]; then
+  [[ -f "${DB_PATH}" ]] || fail "local fixture did not open its file-backed DATABASE_PATH"
+  sqlite_report="$(node -e '
+    const Database = require("better-sqlite3");
+    const db = new Database(process.argv[1], { readonly: true });
+    const journal = String(db.pragma("journal_mode", { simple: true })).toLowerCase();
+    const integrity = String(db.pragma("integrity_check", { simple: true })).toLowerCase();
+    const migrations = Number(db.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count);
+    db.close();
+    if (journal !== "wal" || integrity !== "ok" || migrations < 9) process.exit(1);
+    process.stdout.write(`journal=${journal} integrity=${integrity} migrations=${migrations}`);
+  ' "${DB_PATH}")" || fail "local fixture durable SQLite probe failed"
+  echo "durable SQLite: ${sqlite_report}"
 fi
 
 # --- London board: honest empty lane ---
@@ -385,7 +418,7 @@ elif [[ "$board0_count" == "0" ]] \
   && html_has "$board0" "data-week=\"${EXPECT_WEEK}\"" \
   && html_has "$board0" 'data-empty-lane="true"' \
   && html_has "$lane0" 'data-empty-lane="true"' \
-  && html_has "$board0" 'Outbid' \
+  && html_has "$board0" 'Claim #1 for' \
   && ! html_has "$board0" 'North London Movers' \
   && ! html_has "$lane0" 'placeholder provider'; then
   record "london-board" "PASS" "GET / and /c/london/movers 200; empty London lane; no invented provider"
@@ -404,15 +437,22 @@ rules_body="${WORKDIR}/rules.html"
 rules_code="$(http_get "$BASE" "/rules" "$rules_body" || true)"
 if [[ "$about_code" == "200" && "$rules_code" == "200" ]] \
   && html_has "$about_body" 'Rank is the bid' \
-  && html_has "$about_body" 'outbid.lol' \
+  && html_has "$about_body" 'English' \
+  && html_has "$about_body" 'seven days' \
   && html_has "$about_body" 'London' \
-  && html_has "$rules_body" 'min \$5' \
+  && html_has "$rules_body" 'starts at' \
+  && html_has "$rules_body" '\$5' \
   && html_has "$rules_body" 'Rank is the bid' \
-  && html_has "$rules_body" 'older' \
+  && html_has "$rules_body" 'listing placed first wins an equal-bid tie' \
   && html_has "$rules_body" 'difference' \
+  && html_has "$rules_body" 'Each paid placement remains eligible for seven days' \
+  && html_has "$rules_body" 'does not reset for everyone at Monday midnight' \
+  && html_has "$rules_body" 'incomplete or abandoned checkout never appears' \
+  && ! html_has "$about_body" 'outbid\.lol' \
+  && ! html_has "$rules_body" 'outbid\.lol' \
   && ! invented_stars "$about_body" \
   && ! invented_stars "$rules_body"; then
-  record "about-rules" "PASS" "GET /about and /rules 200"
+  record "about-rules" "PASS" "GET /about and /rules 200; current public ranking and seven-day rules"
 else
   record "about-rules" "FAIL" "about HTTP ${about_code} rules HTTP ${rules_code}"
 fi
@@ -454,41 +494,66 @@ else
   record "license-required" "FAIL" "dentist checkout HTTP ${dentist_code} error=${dentist_err}"
 fi
 
-# --- Live Polar: POLAR_LIVE=1 + secrets, else BLOCKED-SECRET ---
-echo "== polar live checkout =="
-if [[ "${OP_POLAR_LIVE}" == "1" ]]; then
-  if [[ -z "${OP_POLAR_ACCESS_TOKEN}" ]]; then
-    echo "BLOCKED-SECRET: POLAR_ACCESS_TOKEN"
-    record "live-checkout" "BLOCKED-SECRET" "POLAR_ACCESS_TOKEN"
+# --- Waffo live: explicit mode + complete secrets, else BLOCKED-SECRET ---
+echo "== Waffo live checkout =="
+if [[ "${OP_WAFFO_MODE}" == "waffo-test" || "${OP_WAFFO_MODE}" == "waffo-prod" ]]; then
+  if [[ -z "${OP_WAFFO_PRIVATE_KEY}" && -z "${OP_WAFFO_PRIVATE_KEY_FILE}" ]]; then
+    echo "BLOCKED-SECRET: WAFFO_PRIVATE_KEY"
+    record "live-checkout" "BLOCKED-SECRET" "WAFFO_PRIVATE_KEY"
+  elif [[ -z "${OP_WAFFO_MERCHANT_ID}" ]]; then
+    echo "BLOCKED-SECRET: WAFFO_MERCHANT_ID"
+    record "live-checkout" "BLOCKED-SECRET" "WAFFO_MERCHANT_ID"
+  elif [[ -z "${OP_WAFFO_STORE_ID}" ]]; then
+    echo "BLOCKED-SECRET: WAFFO_STORE_ID"
+    record "live-checkout" "BLOCKED-SECRET" "WAFFO_STORE_ID"
+  elif [[ -z "${OP_WAFFO_PRODUCT_ID}" ]]; then
+    echo "BLOCKED-SECRET: WAFFO_PRODUCT_ID"
+    record "live-checkout" "BLOCKED-SECRET" "WAFFO_PRODUCT_ID"
+  elif [[ -z "${OP_WAFFO_PUBLIC_BASE_URL}" ]]; then
+    echo "BLOCKED-SECRET: WAFFO_PUBLIC_BASE_URL"
+    record "live-checkout" "BLOCKED-SECRET" "WAFFO_PUBLIC_BASE_URL"
+  elif [[ "${OP_WAFFO_MODE}" == "waffo-test" && -z "${OP_WAFFO_WEBHOOK_TEST_PUBLIC_KEY}" ]]; then
+    echo "BLOCKED-SECRET: WAFFO_WEBHOOK_TEST_PUBLIC_KEY"
+    record "live-checkout" "BLOCKED-SECRET" "WAFFO_WEBHOOK_TEST_PUBLIC_KEY"
+  elif [[ "${OP_WAFFO_MODE}" == "waffo-prod" && -z "${OP_WAFFO_WEBHOOK_PROD_PUBLIC_KEY}" ]]; then
+    echo "BLOCKED-SECRET: WAFFO_WEBHOOK_PROD_PUBLIC_KEY"
+    record "live-checkout" "BLOCKED-SECRET" "WAFFO_WEBHOOK_PROD_PUBLIC_KEY"
   else
     live_port="$(pick_port)"
     live_db="${WORKDIR}/live.sqlite"
-    live_log="${WORKDIR}/polar-live.log"
+    live_log="${WORKDIR}/waffo-live.log"
     live_base="http://127.0.0.1:${live_port}"
     live_env=(
-      "POLAR_LIVE=1"
-      "POLAR_ACCESS_TOKEN=${OP_POLAR_ACCESS_TOKEN}"
-      "POLAR_WEBHOOK_SECRET=${OP_POLAR_WEBHOOK_SECRET:-}"
-      "POLAR_PRODUCT_ID=${OP_POLAR_PRODUCT_ID:-}"
-      "POLAR_ORGANIZATION_ID=${OP_POLAR_ORGANIZATION_ID:-}"
-      "POLAR_FIXTURE_ONLY="
+      "PAYMENT_MODE=${OP_WAFFO_MODE}"
+      "WAFFO_MODE=${OP_WAFFO_MODE}"
+      "NODE_ENV=production"
+      "WAFFO_PRIVATE_KEY=${OP_WAFFO_PRIVATE_KEY}"
+      "WAFFO_PRIVATE_KEY_FILE=${OP_WAFFO_PRIVATE_KEY_FILE}"
+      "WAFFO_MERCHANT_ID=${OP_WAFFO_MERCHANT_ID}"
+      "WAFFO_STORE_ID=${OP_WAFFO_STORE_ID}"
+      "WAFFO_PRODUCT_ID=${OP_WAFFO_PRODUCT_ID}"
+      "WAFFO_API_BASE=${OP_WAFFO_API_BASE}"
+      "WAFFO_PUBLIC_BASE_URL=${OP_WAFFO_PUBLIC_BASE_URL}"
     )
-    if [[ -n "${OP_POLAR_API_BASE}" ]]; then
-      live_env+=("POLAR_API_BASE=${OP_POLAR_API_BASE}")
+    if [[ "${OP_WAFFO_MODE}" == "waffo-test" ]]; then
+      live_env+=("WAFFO_WEBHOOK_TEST_PUBLIC_KEY=${OP_WAFFO_WEBHOOK_TEST_PUBLIC_KEY}")
+    else
+      live_env+=("WAFFO_WEBHOOK_PROD_PUBLIC_KEY=${OP_WAFFO_WEBHOOK_PROD_PUBLIC_KEY}")
     fi
     LIVE_PID="$(start_smoke_server "$live_port" "$live_db" "$live_log" "${live_env[@]}")"
     if ! wait_health "$live_base"; then
-      if grep -q 'BLOCKED-SECRET: POLAR_ACCESS_TOKEN' "${live_log}"; then
-        echo "BLOCKED-SECRET: POLAR_ACCESS_TOKEN"
-        record "live-checkout" "BLOCKED-SECRET" "POLAR_ACCESS_TOKEN"
+      if grep -q 'BLOCKED-SECRET: WAFFO_' "${live_log}"; then
+        blocked_line="$(grep -m1 'BLOCKED-SECRET: WAFFO_' "${live_log}" || true)"
+        echo "${blocked_line}"
+        record "live-checkout" "BLOCKED-SECRET" "Waffo configuration"
       else
-        record "live-checkout" "FAIL" "live Polar process did not become healthy"
+        record "live-checkout" "FAIL" "live Waffo process did not become healthy"
       fi
     else
       live_body="${WORKDIR}/live-checkout.json"
       live_hdrs="${WORKDIR}/live-checkout.hdrs"
       live_code="$(http_post_json "$live_base" "/api/checkout" \
-        "{\"business\":\"Live Polar Van\",\"category\":\"movers\",\"city\":\"london\",\"siteUrl\":\"https://live.example/van-${STAMP}\",\"amount\":5}" \
+        "{\"business\":\"Live Waffo Van\",\"category\":\"movers\",\"city\":\"london\",\"siteUrl\":\"https://live.example/van-${STAMP}\",\"amount\":5}" \
         "$live_body" "$live_hdrs" || true)"
       live_url="$(json_field "$live_body" "url" || true)"
       live_err="$(json_field "$live_body" "error" || true)"
@@ -496,27 +561,16 @@ if [[ "${OP_POLAR_LIVE}" == "1" ]]; then
       live_listing="$(json_field "$live_body" "listingId" || true)"
       live_board="${WORKDIR}/live-board.html"
       http_get "$live_base" "/c/london/movers" "$live_board" >/dev/null || true
-      live_url_host=""
-      if [[ "${live_url}" == https://* ]]; then
-        live_url_host="${live_url#https://}"
-        live_url_host="${live_url_host%%/*}"
-      fi
-      if html_has "$live_board" "Live Polar Van"; then
-        record "live-checkout" "FAIL" "unpaid live Polar session appeared on the board"
+      if html_has "$live_board" "Live Waffo Van"; then
+        record "live-checkout" "FAIL" "unpaid live Waffo session appeared on the board"
       elif [[ -n "${live_listing}" && "${live_listing}" != "null" ]]; then
         record "live-checkout" "FAIL" "live checkout invented a paid listingId without webhook"
-      elif [[ "$live_status" == "paid" ]]; then
-        record "live-checkout" "FAIL" "live checkout returned fixture paid status"
-      elif [[ "$live_url" == /return* ]]; then
-        record "live-checkout" "FAIL" "live checkout returned fixture /return listing, not Polar"
-      elif [[ "$live_code" == "200" && "$live_url" == https://sandbox.polar.sh/checkout/* ]]; then
-        record "live-checkout" "PASS" "sandbox.polar.sh Checkout URL; unpaid session not listed"
-      elif [[ "$live_code" == "200" && "$live_url_host" == *polar.sh ]]; then
-        record "live-checkout" "FAIL" "live checkout host ${live_url_host} is not sandbox.polar.sh"
-      elif [[ "$live_code" == "503" && "$live_err" == "polar_not_live" ]]; then
-        record "live-checkout" "PASS-ERROR" "POLAR_LIVE=1 HTTP 503 polar_not_live; no invented paid rank"
+      elif [[ "$live_status" == "paid" || "$live_url" == /return* ]]; then
+        record "live-checkout" "FAIL" "live checkout returned fixture settlement instead of Waffo open state"
+      elif [[ "$live_code" == "200" && "$live_url" == https://* ]]; then
+        record "live-checkout" "PASS" "Waffo Checkout URL; unpaid session not listed"
       else
-        record "live-checkout" "FAIL" "POLAR_LIVE=1 HTTP ${live_code} error=${live_err} host=${live_url_host:-none}; no invented paid rank"
+        record "live-checkout" "FAIL" "Waffo checkout HTTP ${live_code} error=${live_err}; no invented paid rank"
       fi
     fi
     if [[ -n "${LIVE_PID}" ]]; then
@@ -526,13 +580,13 @@ if [[ "${OP_POLAR_LIVE}" == "1" ]]; then
     LIVE_PID=""
   fi
 else
-  if [[ "${OP_POLAR_FIXTURE_ONLY}" == "1" ]]; then
-    record "live-checkout" "PASS-ERROR" "POLAR_FIXTURE_ONLY=1 wins; live Polar not invoked"
-  elif [[ -z "${OP_POLAR_ACCESS_TOKEN}" ]]; then
-    echo "BLOCKED-SECRET: POLAR_ACCESS_TOKEN"
-    record "live-checkout" "BLOCKED-SECRET" "POLAR_ACCESS_TOKEN"
+  if [[ "${OP_WAFFO_MODE}" == "fixture" ]]; then
+    record "live-checkout" "PASS-ERROR" "explicit fixture mode wins; live Waffo not invoked"
+  elif [[ -z "${OP_WAFFO_PRIVATE_KEY}" && -z "${OP_WAFFO_PRIVATE_KEY_FILE}" ]]; then
+    echo "BLOCKED-SECRET: WAFFO_PRIVATE_KEY"
+    record "live-checkout" "BLOCKED-SECRET" "WAFFO_PRIVATE_KEY"
   else
-    record "live-checkout" "PASS-ERROR" "POLAR_LIVE unset; token present but live Polar not invoked"
+    record "live-checkout" "PASS-ERROR" "Waffo mode unset; provider not invoked"
   fi
 fi
 
@@ -555,7 +609,29 @@ if [[ "$fix_code" == "200" && "$fix_status" == "paid" && -n "$fix_id" ]] \
   && ! html_has "$movers_paid" 'utm_source' \
   && ! html_has "$movers_paid" 'data-empty-lane="true"' \
   && ! invented_stars "$movers_paid"; then
-  record "checkout" "PASS" "fixture paid \$20 lists at rank 1; tracking query stripped"
+  if [[ "$LOCAL_FIXTURE" == "1" ]]; then
+    echo "== durable SQLite restart smoke =="
+    kill_tree "${STARTED_PID}"
+    wait "${STARTED_PID}" 2>/dev/null || true
+    STARTED_PID=""
+    STARTED_PID="$(start_smoke_server "$PORT" "$DB_PATH" "$LOG_PATH" "PAYMENT_MODE=fixture")"
+    if ! wait_health "$BASE"; then
+      record "checkout" "FAIL" "fixture paid listing could not recover after process restart"
+    else
+      restarted_board="${WORKDIR}/movers-restarted.html"
+      restarted_code="$(http_get "$BASE" "/c/london/movers" "$restarted_board" || true)"
+      if [[ "$restarted_code" == "200" ]] \
+        && html_has "$restarted_board" "$BUSINESS" \
+        && [[ "$(rank_for_business "$restarted_board" "$BUSINESS" || true)" == "1" ]]; then
+        echo "durable SQLite restart: paid listing and rank survived"
+        record "checkout" "PASS" "fixture paid \$20 lists at rank 1; tracking query stripped; survives restart"
+      else
+        record "checkout" "FAIL" "fixture paid listing or rank disappeared after process restart"
+      fi
+    fi
+  else
+    record "checkout" "PASS" "fixture paid \$20 lists at rank 1; tracking query stripped"
+  fi
 else
   record "checkout" "FAIL" "fixture checkout HTTP ${fix_code} status=${fix_status} rank=${paid_rank}"
 fi

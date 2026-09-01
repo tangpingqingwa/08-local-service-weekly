@@ -12,11 +12,12 @@ import {
 import { openDatabase, type AppDb } from "../src/db";
 import { getListingById } from "../src/listings";
 import {
-  FakePolarPort,
-  resetPolarFixture,
-  setPolarPortForTests,
-} from "../src/polar/fake";
-import { parseListingDraft, type ListingDraft } from "../src/polar/port";
+  FakePaymentPort,
+  resetPaymentFixture,
+  setPaymentPortForTests,
+} from "../src/billing/fake";
+import { parseListingDraft, type ListingDraft } from "../src/billing/port";
+import { hideListing } from "../src/takedown";
 import { ListingCard } from "../src/ui/listing-card";
 import { currentWeekId } from "../src/week";
 
@@ -25,7 +26,7 @@ import { currentWeekId } from "../src/week";
 process.env.DATABASE_PATH = ":memory:";
 
 afterEach(() => {
-  resetPolarFixture();
+  resetPaymentFixture();
 });
 
 function draft(overrides: Partial<ListingDraft> = {}): ListingDraft {
@@ -42,10 +43,10 @@ function draft(overrides: Partial<ListingDraft> = {}): ListingDraft {
 }
 
 async function withDb(
-  run: (db: AppDb, polar: FakePolarPort) => Promise<void> | void,
+  run: (db: AppDb, polar: FakePaymentPort) => Promise<void> | void,
 ): Promise<void> {
   const db = openDatabase(":memory:");
-  const polar = new FakePolarPort(db);
+  const polar = new FakePaymentPort(db);
   try {
     await run(db, polar);
   } finally {
@@ -78,8 +79,8 @@ test("clicks start at 0 and increment by 1; never invent a starting count", asyn
 test("GET /go/:id 302s to the cleaned URL with no tracking query", async () => {
   const db = openDatabase(":memory:");
   after(() => db.close());
-  const polar = new FakePolarPort(db);
-  setPolarPortForTests(polar);
+  const polar = new FakePaymentPort(db);
+  setPaymentPortForTests(polar);
   const { GET } = await import("../app/go/[id]/route");
 
   const started = await polar.createCheckout({
@@ -118,7 +119,7 @@ test("GET /go/:id 302s to the cleaned URL with no tracking query", async () => {
 test("unknown listing click is 404 and does not invent a hop or a count", async () => {
   const db = openDatabase(":memory:");
   after(() => db.close());
-  setPolarPortForTests(new FakePolarPort(db));
+  setPaymentPortForTests(new FakePaymentPort(db));
   const { GET } = await import("../app/go/[id]/route");
 
   assert.throws(
@@ -151,6 +152,39 @@ test("unknown listing click is 404 and does not invent a hop or a count", async 
     params: Promise.resolve({ id: "   " }),
   });
   assert.equal(blank.status, 404);
+});
+
+test("hidden listing click is unavailable and does not increment its count", async () => {
+  const db = openDatabase(":memory:");
+  after(() => db.close());
+  const payment = new FakePaymentPort(db);
+  setPaymentPortForTests(payment);
+  const { GET } = await import("../app/go/[id]/route");
+  const started = await payment.createCheckout({
+    amountUsd: 20,
+    listing: draft({ siteUrl: "https://hidden.example" }),
+  });
+  assert.ok(started.listingId);
+
+  hideListing(db, { listingId: started.listingId, reason: "other" });
+  assert.equal(getListingById(db, started.listingId)?.clicks, 0);
+  assert.throws(
+    () => incrementPublicClick(db, started.listingId!),
+    (err: unknown) => {
+      assert.ok(err instanceof ClickError);
+      assert.equal(err.code, "listing_not_found");
+      assert.equal(err.httpStatus, 404);
+      return true;
+    },
+  );
+
+  const response = await GET(new Request(`http://127.0.0.1/go/${started.listingId}`), {
+    params: Promise.resolve({ id: started.listingId }),
+  });
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), { error: "listing_not_found" });
+  assert.equal(response.headers.get("location"), null);
+  assert.equal(getListingById(db, started.listingId)?.clicks, 0);
 });
 
 test("a quiet listing does not copy another listing's public click count", async () => {

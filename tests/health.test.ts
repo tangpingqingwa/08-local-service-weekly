@@ -1,16 +1,124 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
 import { after, test } from "node:test";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { CITIES, PUBLIC_CITY_SLUGS, getCity } from "../src/cities";
 import { openDatabase } from "../src/db";
 
 process.env.DATABASE_PATH = ":memory:";
 
+const mutableEnv = process.env as Record<string, string | undefined>;
+const HEALTH_ENV_KEYS = [
+  "PAYMENT_MODE",
+  "WAFFO_MODE",
+  "PAYMENT_PROVIDER_MODE",
+  "NODE_ENV",
+  "VERCEL_ENV",
+  "APP_ENV",
+  "DEPLOY_ENV",
+  "BUILD_ENV",
+  "NEXT_PHASE",
+  "WAFFO_MERCHANT_ID",
+  "WAFFO_STORE_ID",
+  "WAFFO_PRODUCT_ID",
+  "WAFFO_PRIVATE_KEY",
+  "WAFFO_PRIVATE_KEY_FILE",
+  "WAFFO_API_BASE",
+  "WAFFO_PUBLIC_BASE_URL",
+  "PUBLIC_BASE_URL",
+  "WAFFO_WEBHOOK_TEST_PUBLIC_KEY",
+  "WAFFO_WEBHOOK_PROD_PUBLIC_KEY",
+  "DATABASE_PATH",
+] as const;
+type HealthEnvKey = (typeof HEALTH_ENV_KEYS)[number];
+
+function withHealthEnv<T>(
+  values: Partial<Record<HealthEnvKey, string | undefined>>,
+  run: () => T,
+): T {
+  const previous = new Map<HealthEnvKey, string | undefined>();
+  for (const key of HEALTH_ENV_KEYS) {
+    previous.set(key, mutableEnv[key]);
+    delete mutableEnv[key];
+  }
+  for (const key of Object.keys(values) as HealthEnvKey[]) {
+    const value = values[key];
+    if (value === undefined) delete mutableEnv[key];
+    else mutableEnv[key] = value;
+  }
+  try {
+    return run();
+  } finally {
+    for (const key of HEALTH_ENV_KEYS) {
+      const value = previous.get(key);
+      if (value === undefined) delete mutableEnv[key];
+      else mutableEnv[key] = value;
+    }
+  }
+}
+
 test("GET /healthz returns 200 { ok: true }", async () => {
   const { GET } = await import("../app/healthz/route");
-  const response = GET();
+  const response = withHealthEnv(
+    { PAYMENT_MODE: "fixture", NODE_ENV: "development", DATABASE_PATH: ":memory:" },
+    GET,
+  );
 
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { ok: true });
+});
+
+test("GET /healthz returns non-secret 503 for a production fixture", async () => {
+  const { GET } = await import("../app/healthz/route");
+  const response = withHealthEnv(
+    { PAYMENT_MODE: "fixture", NODE_ENV: "production", DATABASE_PATH: ":memory:" },
+    GET,
+  );
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { ok: false, error: "not_ready" });
+});
+
+test("GET /healthz returns non-secret 503 for missing production Waffo configuration", async () => {
+  const { GET } = await import("../app/healthz/route");
+  const response = withHealthEnv(
+    { PAYMENT_MODE: "waffo-prod", NODE_ENV: "production", DATABASE_PATH: ":memory:" },
+    GET,
+  );
+
+  assert.equal(response.status, 503);
+  const body = await response.text();
+  assert.equal(body, JSON.stringify({ ok: false, error: "not_ready" }));
+  assert.doesNotMatch(body, /BLOCKED|SECRET|WAFFO_/i);
+});
+
+test("GET /healthz returns 200 for a valid production Waffo composition", async () => {
+  const { GET } = await import("../app/healthz/route");
+  const directory = mkdtempSync(join(tmpdir(), "local-service-health-"));
+  const databasePath = join(directory, "health.sqlite");
+  try {
+    const response = withHealthEnv(
+      {
+        PAYMENT_MODE: "waffo-prod",
+        NODE_ENV: "production",
+        DATABASE_PATH: databasePath,
+        WAFFO_MERCHANT_ID: "MER_1234567890123456789012",
+        WAFFO_STORE_ID: "STO_1234567890123456789012",
+        WAFFO_PRODUCT_ID: "PROD_1234567890123456789012",
+        WAFFO_PRIVATE_KEY: "health-test-private-key",
+        WAFFO_API_BASE: "https://api.waffo.ai",
+        WAFFO_PUBLIC_BASE_URL: "https://health.example",
+        WAFFO_WEBHOOK_PROD_PUBLIC_KEY: "health-test-webhook-key",
+      },
+      GET,
+    );
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true });
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("cities catalog ships London only as the v1 public lane", () => {
@@ -90,6 +198,9 @@ test("schema has cities, weeks, listings and seeds London", () => {
     "created_at",
     "intent",
     "target_bid_usd",
+    "provider_checkout_id",
+    "provider_product_id",
+    "currency",
   ]);
   assert.equal(checkoutColumns.id.pk, 1);
   assert.match(tableSql(db, "checkouts"), /status IN \('open', 'paid', 'cancelled'\)/);

@@ -10,16 +10,20 @@ import {
 } from "../src/listings";
 import {
   currentWeekId,
-  FakePolarPort,
-  resetPolarFixture,
-  setPolarPortForTests,
-} from "../src/polar/fake";
-import { PolarError, type ListingDraft } from "../src/polar/port";
+  FakePaymentPort,
+  resetPaymentFixture,
+  setPaymentPortForTests,
+} from "../src/billing/fake";
+import {
+  PaymentError,
+  type ListingDraft,
+  type PaymentPort,
+} from "../src/billing/port";
 
 process.env.DATABASE_PATH = ":memory:";
 
 afterEach(() => {
-  resetPolarFixture();
+  resetPaymentFixture();
 });
 
 function draft(overrides: Partial<ListingDraft> = {}): ListingDraft {
@@ -36,10 +40,10 @@ function draft(overrides: Partial<ListingDraft> = {}): ListingDraft {
 }
 
 async function withDb(
-  run: (db: AppDb, polar: FakePolarPort) => Promise<void> | void,
+  run: (db: AppDb, polar: FakePaymentPort) => Promise<void> | void,
 ): Promise<void> {
   const db = openDatabase(":memory:");
-  const polar = new FakePolarPort(db);
+  const polar = new FakePaymentPort(db);
   try {
     await run(db, polar);
   } finally {
@@ -56,19 +60,19 @@ test("quoteRaise charges only the difference and rejects N < current+1", () => {
   });
 
   assert.throws(() => quoteRaise({ bidUsd: 20, hidden: false }, 20), (err) => {
-    assert.ok(err instanceof PolarError);
+    assert.ok(err instanceof PaymentError);
     assert.equal(err.code, "bid_too_low");
     return true;
   });
   assert.throws(() => quoteRaise({ bidUsd: 20, hidden: false }, 19), (err) => {
-    assert.ok(err instanceof PolarError);
+    assert.ok(err instanceof PaymentError);
     assert.equal(err.code, "bid_too_low");
     return true;
   });
   assert.throws(
     () => quoteRaise({ bidUsd: 20, hidden: false }, 1_000_000),
     (err) => {
-      assert.ok(err instanceof PolarError);
+      assert.ok(err instanceof PaymentError);
       assert.equal(err.code, "bid_too_high");
       return true;
     },
@@ -76,7 +80,7 @@ test("quoteRaise charges only the difference and rejects N < current+1", () => {
   assert.throws(
     () => quoteRaise({ bidUsd: 20, hidden: true }, 25),
     (err) => {
-      assert.ok(err instanceof PolarError);
+      assert.ok(err instanceof PaymentError);
       assert.equal(err.code, "listing_hidden");
       assert.equal(err.httpStatus, 409);
       return true;
@@ -135,7 +139,7 @@ test("rival paying only the $5 difference cannot take #1", async () => {
           db,
         ),
       (err: unknown) => {
-        assert.ok(err instanceof PolarError);
+        assert.ok(err instanceof PaymentError);
         assert.equal(err.code, "listing_not_found");
         return true;
       },
@@ -215,7 +219,7 @@ test("applyRaise keeps createdAt and rejects a wrong charge", async () => {
           raisedAt: "2026-08-22T12:00:00.000Z",
         }),
       (err: unknown) => {
-        assert.ok(err instanceof PolarError);
+        assert.ok(err instanceof PaymentError);
         assert.equal(err.code, "bid_too_low");
         return true;
       },
@@ -247,8 +251,8 @@ test("applyRaise keeps createdAt and rejects a wrong charge", async () => {
 test("POST /api/raise fixture JSON charges the difference only", async () => {
   const db = openDatabase(":memory:");
   after(() => db.close());
-  const polar = new FakePolarPort(db);
-  setPolarPortForTests(polar);
+  const polar = new FakePaymentPort(db);
+  setPaymentPortForTests(polar);
   await polar.createCheckout({
     amountUsd: 20,
     listing: draft(),
@@ -339,8 +343,8 @@ test("POST /api/raise fixture JSON charges the difference only", async () => {
 test("POST /api/raise form redirects to /return after fixture pay", async () => {
   const db = openDatabase(":memory:");
   after(() => db.close());
-  const polar = new FakePolarPort(db);
-  setPolarPortForTests(polar);
+  const polar = new FakePaymentPort(db);
+  setPaymentPortForTests(polar);
   await polar.createCheckout({
     amountUsd: 20,
     listing: draft({
@@ -370,4 +374,117 @@ test("POST /api/raise form redirects to /return after fixture pay", async () => 
   assert.equal(ranked.length, 1);
   assert.equal(ranked[0]?.bidUsd, 21);
   assert.equal(ranked[0]?.rank, 1);
+});
+
+test("POST /api/raise recoverable form errors return to the lane", async () => {
+  const db = openDatabase(":memory:");
+  after(() => db.close());
+  const fixture = new FakePaymentPort(db);
+  await fixture.createCheckout({
+    amountUsd: 20,
+    listing: draft(),
+  });
+  const recoverable: PaymentPort = {
+    kind: "live",
+    async createCheckout() {
+      throw new PaymentError("waffo_checkout_unknown", 503);
+    },
+    async settle() {
+      return null;
+    },
+    getCheckout() {
+      return undefined;
+    },
+    async abandon() {},
+    database() {
+      return db;
+    },
+  };
+  setPaymentPortForTests(recoverable);
+  const { POST } = await import("../app/api/raise/route");
+
+  const form = new FormData();
+  form.set("business", "Form Van");
+  form.set("category", "movers");
+  form.set("city", "london");
+  form.set("siteUrl", "https://north.example");
+  form.set("amount", "21");
+
+  const response = await POST(
+    new Request("http://127.0.0.1/api/raise", {
+      method: "POST",
+      body: form,
+    }),
+  );
+  assert.equal(response.status, 303);
+  const location = new URL(response.headers.get("location") ?? "");
+  assert.equal(location.pathname, "/c/london/movers");
+  assert.equal(location.searchParams.get("error"), "waffo_checkout_unknown");
+  assert.equal(location.hash, "#claim");
+  assert.equal(listLane("london", "movers", db)[0]?.bidUsd, 20);
+});
+
+test("fixture claim to raise to /go keeps identity and returns a 302", async () => {
+  const db = openDatabase(":memory:");
+  after(() => db.close());
+  const polar = new FakePaymentPort(db);
+  setPaymentPortForTests(polar);
+  const { POST: checkout } = await import("../app/api/checkout/route");
+  const { POST: raise } = await import("../app/api/raise/route");
+  const { GET: go } = await import("../app/go/[id]/route");
+
+  const claim = new FormData();
+  claim.set("business", "Canonical Movers");
+  claim.set("category", "movers");
+  claim.set("city", "london");
+  claim.set(
+    "siteUrl",
+    "https://canonical.example/van?utm_source=claim&gclid=claim",
+  );
+  claim.set("amount", "20");
+  const claimResponse = await checkout(
+    new Request("http://127.0.0.1/api/checkout", {
+      method: "POST",
+      body: claim,
+    }),
+  );
+  assert.equal(claimResponse.status, 303);
+
+  const [placed] = listLane("london", "movers", db);
+  assert.ok(placed);
+  assert.equal(placed.siteUrl, "https://canonical.example/van");
+  const createdAt = placed.createdAt;
+
+  const outbid = new FormData();
+  outbid.set("business", "Canonical Movers");
+  outbid.set("category", "movers");
+  outbid.set("city", "london");
+  outbid.set(
+    "siteUrl",
+    "https://canonical.example/van?utm_source=raise&fbclid=raise",
+  );
+  outbid.set("amount", "25");
+  const raiseResponse = await raise(
+    new Request("http://127.0.0.1/api/raise", {
+      method: "POST",
+      body: outbid,
+    }),
+  );
+  assert.equal(raiseResponse.status, 303);
+  assert.match(raiseResponse.headers.get("location") ?? "", /\/return\?checkout=/);
+
+  const [raised] = listLane("london", "movers", db);
+  assert.ok(raised);
+  assert.equal(raised.id, placed.id);
+  assert.equal(raised.siteUrl, "https://canonical.example/van");
+  assert.equal(raised.bidUsd, 25);
+  assert.equal(raised.createdAt, createdAt);
+
+  const clickResponse = await go(
+    new Request(`http://127.0.0.1/go/${raised.id}`),
+    { params: Promise.resolve({ id: raised.id }) },
+  );
+  assert.equal(clickResponse.status, 302);
+  assert.equal(clickResponse.headers.get("location"), "https://canonical.example/van");
+  assert.equal(listLane("london", "movers", db)[0]?.clicks, 1);
 });

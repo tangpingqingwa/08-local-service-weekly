@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 export const metadata: Metadata = {
   title: "About · Local Service Weekly",
   description:
-    "Rank is the bid. Last 7 days' #1 local-service provider by city and category. Global English. London v1. Clone of outbid.lol.",
+    "A public London service board where local providers are ranked only by bid.",
 };
 
 export default function AboutPage() {
@@ -14,39 +14,36 @@ export default function AboutPage() {
       <h1>About</h1>
       <p>
         Local Service Weekly is a public auction for the{" "}
-        <strong>#1 visible local-service provider</strong> in a city × category.
-        The #1 mover, dentist, immigration lawyer, or tutor in town is whoever
-        paid the most in the last 7 days.{" "}
-        <strong>Rolling last 7 days. Not Monday 00:00 Europe/London.</strong>
+        <strong>#1 visible local-service provider</strong> in each city and
+        category. Movers, dentists, immigration lawyers, and tutors bid whole
+        US dollars for their position.
       </p>
       <p>
-        This is the <strong>outbid.lol</strong> pay-to-rank mechanic for the{" "}
-        <strong>local-service-weekly</strong> vertical.{" "}
-        <strong>Rank is the bid.</strong> There are no stars, no review scores,
-        and no quality badges. We never invent a rating or
-        &quot;patients served.&quot;
+        <strong>Rank is the bid.</strong> There are no star ratings, review
+        scores, or quality badges in the ranking. A bid below #1 still appears
+        at the position that amount can take, and the listing placed first wins
+        an equal-bid tie.
       </p>
       <p>
-        The market is <strong>global English</strong>. Copy is English. Currency
-        is <strong>USD</strong>. v1 ships the <strong>London</strong> city lane
-        only. Adding another city is a catalog row, not a rewrite of ranking.
-        Unknown city slugs 404 — we do not silently fall back to London.
+        London listings follow <strong>Europe/London</strong> local time. The
+        board is in <strong>English</strong>, bids use <strong>USD</strong>, and
+        each paid placement remains eligible for seven days.
       </p>
       <p>
-        There are <strong>no ads</strong>, <strong>no API keys</strong>, and{" "}
-        <strong>no revenue share</strong> with listed businesses. Polar is
-        merchant of record when live. Tests use a fixture adapter.
+        Anyone can browse without an account. A business appears only after
+        payment is confirmed, and an incomplete or abandoned checkout changes
+        nothing.
       </p>
       <p>
-        Site URLs are cleaned: tracking query strings are stripped. Chat and
-        invite links are rejected. Adult / NSFW hosts are rejected. Link
-        shorteners are not stored. A dentist or immigration lawyer must claim a
-        license id; we do not verify it. Operator takedown hides a listing and
-        vacates rank — we do not invent a replacement #1.
+        Listing links are cleaned before publication. Tracking parameters,
+        shorteners, chat invitations, adult content, and unsafe destinations
+        are rejected. Dentists and immigration lawyers must provide a license
+        identifier, which is shown as a claim rather than independent
+        verification. Listings may be removed for policy or identity concerns.
       </p>
       <p>
-        <a href="/rules">Read the rules</a> for the $5 minimum, older-wins-ties,
-        and raise-pays-the-difference.
+        <a href="/rules">Read the rules</a> for the $5 minimum, ties, raises,
+        license claims, link standards, and removal policy.
       </p>
     </main>
   );

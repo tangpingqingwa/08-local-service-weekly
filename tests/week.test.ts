@@ -12,11 +12,11 @@ import { getCity } from "../src/cities";
 import { openDatabase, type AppDb, type Listing } from "../src/db";
 import { raiseListing } from "../src/listings";
 import {
-  FakePolarPort,
-  resetPolarFixture,
-  setPolarPortForTests,
-} from "../src/polar/fake";
-import { PolarError, type ListingDraft } from "../src/polar/port";
+  FakePaymentPort,
+  resetPaymentFixture,
+  setPaymentPortForTests,
+} from "../src/billing/fake";
+import { PaymentError, type ListingDraft } from "../src/billing/port";
 import { LaneBoard } from "../src/ui/lane-board";
 import {
   ROLLING_WEEK_MS,
@@ -39,7 +39,7 @@ import {
 process.env.DATABASE_PATH = ":memory:";
 
 afterEach(() => {
-  resetPolarFixture();
+  resetPaymentFixture();
 });
 
 /** Sunday 23:59:59.999 BST — still week 2026-08-17. */
@@ -251,6 +251,62 @@ test("Monday 00:00 London opens a new empty week; last week is not current #1", 
   assert.equal(listLane("london", "movers", db)[0]?.id, undefined);
 });
 
+test("last-week archive selects the actual prior-week #1 before age-out filtering", () => {
+  const db = openDatabase(":memory:");
+  after(() => db.close());
+  const now = new Date("2026-08-24T12:00:00.000Z");
+  const lastWeek = previousWeekId(currentWeekId(now));
+
+  insertListing(db, {
+    id: "lst_prior_champion",
+    business: "Prior Week Champion",
+    weekId: lastWeek,
+    bidUsd: 100,
+    siteUrl: "https://prior-champion.example",
+    createdAt: new Date(now.getTime() - 60 * 60 * 1000).toISOString(),
+  });
+  insertListing(db, {
+    id: "lst_prior_aged",
+    business: "Prior Week Aged Row",
+    weekId: lastWeek,
+    bidUsd: 90,
+    siteUrl: "https://prior-aged.example",
+    createdAt: new Date(now.getTime() - ROLLING_WEEK_MS - 1000).toISOString(),
+  });
+
+  assert.equal(lastWeekNumberOne("london", "movers", db, now), undefined);
+});
+
+test("last-week archive returns the prior-week champion when that champion aged out", () => {
+  const db = openDatabase(":memory:");
+  after(() => db.close());
+  const now = new Date("2026-08-24T12:00:00.000Z");
+  const lastWeek = previousWeekId(currentWeekId(now));
+
+  insertListing(db, {
+    id: "lst_prior_champion_old",
+    business: "Prior Week Champion",
+    weekId: lastWeek,
+    bidUsd: 100,
+    siteUrl: "https://prior-champion-old.example",
+    createdAt: new Date(now.getTime() - ROLLING_WEEK_MS - 1000).toISOString(),
+  });
+  insertListing(db, {
+    id: "lst_prior_runner_recent",
+    business: "Prior Week Recent Runner",
+    weekId: lastWeek,
+    bidUsd: 90,
+    siteUrl: "https://prior-runner-recent.example",
+    createdAt: new Date(now.getTime() - 60 * 60 * 1000).toISOString(),
+  });
+
+  const archived = lastWeekNumberOne("london", "movers", db, now);
+  assert.ok(archived);
+  assert.equal(archived.id, "lst_prior_champion_old");
+  assert.equal(archived.business, "Prior Week Champion");
+  assert.equal(archived.rank, 1);
+});
+
 test("ranker stays keyed by city; London shipped; same URL is another lane elsewhere", () => {
   const db = openDatabase(":memory:");
   after(() => db.close());
@@ -336,7 +392,7 @@ test("last-week archive copy is not this week's #1 card", () => {
 test("fixture checkout on a closed week is week_closed 409", async () => {
   const db = openDatabase(":memory:");
   after(() => db.close());
-  const polar = new FakePolarPort(db);
+  const polar = new FakePaymentPort(db);
   await assert.rejects(
     () =>
       polar.createCheckout({
@@ -344,7 +400,7 @@ test("fixture checkout on a closed week is week_closed 409", async () => {
         listing: draft({ weekId: previousWeekId(currentWeekId()) }),
       }),
     (err: unknown) => {
-      assert.ok(err instanceof PolarError);
+      assert.ok(err instanceof PaymentError);
       assert.equal(err.code, "week_closed");
       assert.equal(err.httpStatus, 409);
       return true;
@@ -360,7 +416,7 @@ test("fixture checkout on a closed week is week_closed 409", async () => {
         db,
       ),
     (err: unknown) => {
-      assert.ok(err instanceof PolarError);
+      assert.ok(err instanceof PaymentError);
       assert.equal(err.code, "week_closed");
       return true;
     },
@@ -370,7 +426,7 @@ test("fixture checkout on a closed week is week_closed 409", async () => {
 test("POST /api/checkout closed weekId returns week_closed", async () => {
   const db = openDatabase(":memory:");
   after(() => db.close());
-  setPolarPortForTests(new FakePolarPort(db));
+  setPaymentPortForTests(new FakePaymentPort(db));
   const { POST } = await import("../app/api/checkout/route");
   const response = await POST(
     new Request("http://127.0.0.1/api/checkout", {

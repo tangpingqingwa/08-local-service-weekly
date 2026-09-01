@@ -1,7 +1,7 @@
 import type { AppDb } from "./db";
 
 /**
- * SPEC §6 / BUILD: `weekId` is the Monday 00:00 Europe/London Polar/audit label.
+ * SPEC §6 / BUILD: `weekId` is the Monday 00:00 Europe/London provider/audit label.
  * Occupied rank is rolling last 7 days from paid `createdAt`.
  * Rank does not expire at London Monday midnight. Not a 24h lock on #1.
  */
@@ -43,7 +43,7 @@ export function rollingWeekStart(now: Date = nowUtc()): Date {
 }
 
 /**
- * Polar-paid placement still occupies the paper if `paidAt` is in `[now − 7d, now]`.
+ * provider-paid placement still occupies the paper if `paidAt` is in `[now − 7d, now]`.
  * Monday 00:00 Europe/London is not the drop. Not a 24h lock on #1.
  */
 export function bidInRollingWeek(

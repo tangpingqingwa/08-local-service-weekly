@@ -1,6 +1,6 @@
 import { getDb, type AppDb } from "../../../src/db";
-import { getPolarPort } from "../../../src/polar/fake";
-import { PolarError } from "../../../src/polar/port";
+import { getPaymentPort } from "../../../src/billing/fake";
+import { PaymentError } from "../../../src/billing/port";
 import {
   operatorHideListing,
   parseTakedownReason,
@@ -37,7 +37,7 @@ export async function POST(request: Request): Promise<Response> {
       { status: 200 },
     );
   } catch (error) {
-    if (error instanceof TakedownError || error instanceof PolarError) {
+    if (error instanceof TakedownError || error instanceof PaymentError) {
       return Response.json({ error: error.code }, { status: error.httpStatus });
     }
     throw error;
@@ -45,7 +45,7 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 function listingStore(): AppDb {
-  const port = getPolarPort();
+  const port = getPaymentPort();
   if (typeof port.database === "function") {
     return port.database();
   }

@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 export const metadata: Metadata = {
   title: "Rules · Local Service Weekly",
   description:
-    "Rank is the bid. Min $5. Older wins ties. Raise pays the difference. London v1. Global English.",
+    "Rank is the bid. Minimum $5, older listings win ties, and raises pay only the difference.",
 };
 
 export default function RulesPage() {
@@ -13,10 +13,10 @@ export default function RulesPage() {
     <main className="doc-page" data-page="rules">
       <h1>Rules</h1>
       <p>
-        A bidder can predict rank from this page alone.{" "}
-        <strong>Rank is the bid.</strong> New listings start at{" "}
-        <strong>min $5</strong>. Equal bids: the <strong>older</strong> listing
-        wins. A raise pays only the <strong>difference</strong>.
+        The board follows the published rules below.{" "}
+        <strong>Rank is the bid.</strong> A new listing starts at{" "}
+        <strong>$5</strong>, the listing placed first wins an equal-bid tie,
+        and a raise charges only the difference.
       </p>
 
       <h2>Ranking</h2>
@@ -25,135 +25,106 @@ export default function RulesPage() {
           <tr>
             <th>Rank is the bid</th>
             <td>
-              Inside one lane (city × category, rolling last 7 days), sort by{" "}
-              <code>bidUsd</code> descending. Nothing else — no recency boost,
-              no quality score, no invented ratings.
+              Within each city and category, providers are ordered by bid from
+              highest to lowest. Reviews, clicks, recency, and editorial
+              preference do not affect rank.
             </td>
           </tr>
           <tr>
             <th>Whole dollars</th>
-            <td>Bids are integers. No cents. Step is $1. Currency is USD.</td>
+            <td>Bids use whole US dollars. The step is $1.</td>
           </tr>
           <tr>
             <th>Minimum</th>
             <td>
-              A new listing must be <strong>min $5</strong>.
+              A new listing starts at <strong>$5</strong> or more.
             </td>
           </tr>
           <tr>
             <th>Maximum</th>
             <td>
-              Any bid (first or raise) must be <strong>≤ $999,999</strong>.
+              A bid or raise cannot exceed <strong>$999,999</strong>.
             </td>
           </tr>
           <tr>
             <th>Below #1 still lists</th>
             <td>
-              Paying less than #1 still appears at the rank that bid can take.
+              A bid below the current leader still appears at the rank that
+              amount can take.
             </td>
           </tr>
           <tr>
             <th>Equal bids</th>
-            <td>
-              The <strong>older</strong> listing (smaller{" "}
-              <code>createdAt</code>) keeps the higher rank.
-            </td>
+            <td>The listing placed first keeps the higher rank.</td>
           </tr>
           <tr>
-            <th>Identity</th>
+            <th>Listing identity</th>
             <td>
-              A listing is <code>canonical site URL + category + city</code>.{" "}
-              <code>weekId</code> stays a Polar/audit label, not a Monday paper.
-              Business name may change on raise; the key does not.
+              A business is identified by its cleaned website, category, and
+              city. Reusing that combination during an active placement is a
+              raise, not a duplicate.
             </td>
           </tr>
           <tr>
             <th>Raise</th>
             <td>
-              Same identity, new amount <code>N</code>. Require{" "}
-              <code>N ≥ current + 1</code>. Payer pays only the{" "}
-              <strong>difference</strong> (<code>N − current</code>).{" "}
-              <code>createdAt</code> does not change, so the older stamp still
-              wins ties.
+              The new total must be at least $1 higher. The original payer is
+              charged only the difference between the current and new bid.
             </td>
           </tr>
           <tr>
-            <th>Cannot steal the difference</th>
+            <th>Listing ownership</th>
             <td>
-              A different business cannot take a rank by paying only the
-              difference the occupant would pay to raise. They must bid a
-              strictly higher amount than the occupant&apos;s <code>bidUsd</code>.
+              A different business cannot take over an existing listing for
+              the raise amount. It submits its own listing and pays the full
+              bid.
             </td>
           </tr>
           <tr>
             <th>Payment claims rank</th>
             <td>
-              A completed Polar payment (or fixture <code>paid</code>) claims
-              the rank. Unpaid checkout drafts never appear.
+              Rank changes only after payment is confirmed. An incomplete or
+              abandoned checkout never appears on the board.
             </td>
           </tr>
         </tbody>
       </table>
 
-      <h2>Last 7 days</h2>
+      <h2>Rolling seven-day window</h2>
       <p>
-        Occupied rank is the rolling last 7 days from paid placement.{" "}
-        <strong>Rolling last 7 days. Not Monday 00:00 Europe/London.</strong>{" "}
-        <code>weekId</code> stays that Monday&apos;s ISO date as a Polar/audit
-        label, not public expiry. A listing older than 7 days is not current #1
-        unless they pay again. Not a 24-hour lock on #1. v1 public city is{" "}
-        <strong>London</strong>.
+        Each paid placement remains eligible for seven days from confirmation.
+        The board does not reset for everyone at Monday midnight. When a
+        placement expires, it leaves the live ranking; the business may return
+        with a new full bid.
       </p>
 
-      <h2>Site URLs</h2>
+      <h2>Website links</h2>
       <ol>
+        <li>Use a secure, public business website.</li>
+        <li>Tracking, referral, and affiliate parameters are removed.</li>
+        <li>Link shorteners, chat invitations, and adult content are rejected.</li>
         <li>
-          Require <code>https:</code>. <code>http:</code> is stored as{" "}
-          <code>https:</code> when the host is unchanged.
-        </li>
-        <li>
-          Strip tracking / affiliate query keys (<code>utm_*</code>,{" "}
-          <code>gclid</code>, <code>fbclid</code>, <code>ref</code>,{" "}
-          <code>ref_id</code>, <code>affiliate</code>, <code>via</code>,{" "}
-          <code>mc_cid</code>, <code>mc_eid</code>). Drop the fragment.
-          Lowercase the host. Trailing slash is ignored for identity.
-        </li>
-        <li>
-          Link shorteners are not stored. Unresolved shortener host →{" "}
-          <code>400 url_shortener</code>.
-        </li>
-        <li>
-          Chat / invite hosts (Telegram, <code>t.me</code>, WhatsApp,{" "}
-          <code>wa.me</code>, <code>discord.gg</code>,{" "}
-          <code>discord.com/invite</code>, <code>m.me</code>,{" "}
-          <code>signal.me</code>) → <code>400 chat_link</code>.
-        </li>
-        <li>
-          NSFW / adult hosts and path keywords → <code>400 nsfw</code>.
+          Private, local-only, credentialed, or otherwise unsafe destinations
+          are rejected before checkout.
         </li>
       </ol>
       <p>
-        Clicks go to the cleaned URL with <strong>no</strong> query string added
-        by us.
+        Public clicks go to the cleaned website and never affect ranking.
       </p>
 
-      <h2>Licenses and takedown</h2>
+      <h2>Licenses and removals</h2>
       <p>
-        Dentists and immigration lawyers must submit a claimed{" "}
-        <code>licenseId</code> (2–64 visible characters). Missing →{" "}
-        <code>400 license_required</code>. The site does <strong>not</strong>{" "}
-        assert the license is valid. It is a claimed string, not a
-        verification. v1 does not call a government license API.
+        Dentists and immigration lawyers must provide a visible license
+        identifier. The board presents it as information supplied by the
+        business, not as independent verification. Visitors should confirm
+        credentials with the relevant licensing authority before hiring.
       </p>
       <p>
-        An operator can hide a listing for <code>unlicensed</code>,{" "}
-        <code>impersonation</code>, a written <code>complaint</code> that names
-        the listing + city + category, <code>nsfw</code>,{" "}
-        <code>chat_link</code>, or <code>other</code>. Hidden listings drop off
-        the public board and
-        vacate rank. The bid is <strong>not</strong> auto-refunded. A hidden
-        listing cannot raise until unhidden. A taken-down #1 is not replaced
-        with an invented business.
+        A listing may be removed for an unverified professional claim,
+        impersonation, a specific written complaint, adult content, prohibited
+        links, or another documented policy concern. Removed listings leave
+        the public ranking and cannot raise while hidden. Removal does not
+        automatically create a refund or a replacement #1.
       </p>
 
       <p>

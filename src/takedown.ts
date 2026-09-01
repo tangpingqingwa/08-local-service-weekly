@@ -199,16 +199,19 @@ export function hideListing(
         ? input.complaint.trim()
         : null;
 
-  db.prepare(
-    `UPDATE listings
-        SET hidden = 1,
-            hidden_reason = ?
-      WHERE id = ?`,
-  ).run(reason, listing.id);
-  db.prepare(
-    `INSERT INTO takedowns (id, listing_id, reason, complaint, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(newTakedownId(), listing.id, reason, complaint, now.toISOString());
+  const commitTakedown = db.transaction(() => {
+    db.prepare(
+      `UPDATE listings
+          SET hidden = 1,
+              hidden_reason = ?
+        WHERE id = ?`,
+    ).run(reason, listing.id);
+    db.prepare(
+      `INSERT INTO takedowns (id, listing_id, reason, complaint, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run(newTakedownId(), listing.id, reason, complaint, now.toISOString());
+  });
+  commitTakedown();
 
   return {
     ...listing,

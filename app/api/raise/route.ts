@@ -1,19 +1,21 @@
 import { NextResponse } from "next/server";
 import { raiseListing } from "../../../src/listings";
-import { getPolarPort } from "../../../src/polar/fake";
-import { parseListingDraft, PolarError } from "../../../src/polar/port";
+import { getPaymentPort } from "../../../src/billing/fake";
+import { paymentFormErrorPath } from "../../../src/billing/form-error";
+import { parseListingDraft, PaymentError } from "../../../src/billing/port";
 import { currentWeekId } from "../../../src/week";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<Response> {
+  let input: Record<string, unknown> = {};
   try {
-    const input = await readInput(request);
+    input = await readInput(request);
     const listing = parseListingDraft(input, { requireLicense: false });
     const started = await raiseListing(
       { ...listing, weekId: listing.weekId ?? currentWeekId() },
-      getPolarPort(),
+      getPaymentPort(),
     );
     if (wantsJson(request)) {
       return Response.json({
@@ -28,8 +30,14 @@ export async function POST(request: Request): Promise<Response> {
     }
     return NextResponse.redirect(new URL(started.url, request.url), 303);
   } catch (error) {
-    if (error instanceof PolarError) {
-      return Response.json({ error: error.code }, { status: error.httpStatus });
+    if (error instanceof PaymentError) {
+      if (wantsJson(request)) {
+        return Response.json({ error: error.code }, { status: error.httpStatus });
+      }
+      return NextResponse.redirect(
+        new URL(paymentFormErrorPath(input, error), request.url),
+        303,
+      );
     }
     throw error;
   }
@@ -51,10 +59,10 @@ async function readInput(request: Request): Promise<Record<string, unknown>> {
     try {
       body = await request.json();
     } catch {
-      throw new PolarError("invalid_listing", 400);
+      throw new PaymentError("invalid_listing", 400);
     }
     if (body === null || typeof body !== "object" || Array.isArray(body)) {
-      throw new PolarError("invalid_listing", 400);
+      throw new PaymentError("invalid_listing", 400);
     }
     return body as Record<string, unknown>;
   }

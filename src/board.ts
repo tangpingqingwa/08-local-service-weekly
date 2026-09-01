@@ -49,10 +49,10 @@ export function siteHost(siteUrl: string): string {
 }
 
 /**
- * Polar (or the fixture) has reported paid. Unpaid / abandoned checkout
+ * Waffo (or the fixture) has reported paid. Unpaid / abandoned checkout
  * never ranks and must not paint Call this #1.
  */
-export function isPolarPaidListing(
+export function isProviderPaidListing(
   listing: Pick<Listing, "createdAt">,
 ): boolean {
   const paidAt = listing.createdAt?.trim() ?? "";
@@ -65,7 +65,7 @@ export function isPolarPaidListing(
 export function paidListings<T extends Pick<Listing, "createdAt">>(
   listings: readonly T[],
 ): T[] {
-  return listings.filter(isPolarPaidListing);
+  return listings.filter(isProviderPaidListing);
 }
 
 export function rankLane(listings: readonly Listing[]): RankedListing[] {
@@ -86,7 +86,7 @@ export function rankLane(listings: readonly Listing[]): RankedListing[] {
 }
 
 /**
- * Visible Polar-paid listings in one (city, category) lane.
+ * Visible provider-paid listings in one (city, category) lane.
  * Live occupancy is rolling last 7 days from paid `createdAt`, not `week_id`.
  * Pass `week` to read a labeled archive copy. Ranker stays keyed by city.
  * Unpaid checkout drafts never appear.
@@ -151,9 +151,10 @@ export function lastWeekNumberOne(
   now: Date = nowUtc(),
 ): RankedListing | undefined {
   const lastWeek = previousWeekId(currentWeekId(now));
-  return listLane(city, category, db, lastWeek, now).find(
-    (row) => !bidInRollingWeek(row.createdAt, now),
-  );
+  const [champion] = listLane(city, category, db, lastWeek, now);
+  return champion && !bidInRollingWeek(champion.createdAt, now)
+    ? champion
+    : undefined;
 }
 
 export function listLastWeekChampions(

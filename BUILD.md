@@ -13,11 +13,11 @@ Pay-to-rank clone of outbid.lol for **city × category** local services. Rank is
 |---|---|
 | App | Node 22, TypeScript strict, Next.js App Router |
 | DB | SQLite (`better-sqlite3`) — listings, weeks, clicks, takedowns. City is a column, not a fork |
-| Payments | `PolarPort`. Fixture adapter in tests. Live Polar when `POLAR_LIVE=1` + secrets. `POLAR_FIXTURE_ONLY=1` always wins |
+| Payments | Compatibility payment port. Explicit `PAYMENT_MODE=fixture` for offline tests; explicit `PAYMENT_MODE=waffo-test` or `PAYMENT_MODE=waffo-prod` for Waffo. Historical Polar variables are ignored |
 | Rank | Pure function `rankLane(listings) → ordered[]` — bid desc, older `createdAt` wins ties |
-| Week | `weekId` is Monday 00:00 Europe/London Polar/audit label. Occupied rank is rolling last 7 days from paid `createdAt`. Not London Monday midnight. Not a 24h lock on #1 |
+| Week | `weekId` is Monday 00:00 Europe/London payment/audit label. Occupied rank is rolling last 7 days from paid `createdAt`. Not London Monday midnight. Not a 24h lock on #1 |
 | URLs | `canonicalizeSiteUrl` strips tracking, rejects chat/NSFW/shorteners |
-| Tests | `node:test` + fixture Polar. Offline. No polar.sh in `scripts/test.sh` |
+| Tests | `node:test` + explicit fixture mode. Offline. No provider network in `scripts/test.sh` |
 | Host | One box / Vercel-shaped Node later. Not in this docs unit |
 
 No auth in v1. Payment creates the listing.
@@ -38,6 +38,8 @@ app/
   healthz/route.ts
   api/checkout/route.ts
   api/raise/route.ts
+  api/webhooks/waffo/route.ts
+  checkout/complete/page.tsx
 src/
   rank.ts
   week.ts
@@ -46,9 +48,10 @@ src/
   clicks.ts
   takedown.ts
   cities.ts                # london shipped; more rows without rank edits
-  polar/port.ts
-  polar/fake.ts
-  polar/live.ts
+  billing/port.ts
+  billing/fake.ts
+  billing/live.ts
+  billing/waffo-session.ts
   db.ts
 tests/
   rank.test.ts
@@ -75,7 +78,7 @@ This docs unit does **not** create that tree.
 | `week.ts` | `weekId` label in `Europe/London`. Occupied rank is rolling last 7 days from paid `createdAt`. Closed `weekId` rejects writes (`week_closed`). |
 | `urls.ts` | Strip `utm_*` / gclid / fbclid / ref / affiliate. Reject chat, NSFW, unresolved shorteners. |
 | `listings.ts` | Identity = canonical URL + category + city + weekId. Dentist / immigration lawyer require `licenseId`. |
-| `PolarPort` | `createCheckout({ amountUsd, listing })`, `settle(id)`. Fake settles in-process. Live talks to Polar only if live-enabled. |
+| Payment port | `createCheckout({ amountUsd, listing })`, `settle(id)`. Fixture settles in-process. Waffo is called only in an explicit live mode. |
 | `clicks.ts` | Increment then redirect. Never invent a starting count. |
 | `takedown.ts` | Hide + reason. Vacate rank. No auto-refund. No invented replacement #1. |
 | `cities.ts` | Catalog. v1 public list is `["london"]`. Rank code takes `city` as a string key. |
@@ -99,8 +102,8 @@ UI copy: “Rank is the bid.” Never render stars, `★`, or review counts.
 | week rollover | Monday 00:00 London rolls the `weekId` label; occupied rank is rolling last 7 days; a Sunday pay stays ranked across Monday midnight |
 | multi-city key | same URL in `london` vs future city are different lanes |
 | no invented ratings | board HTML has no star / review-count affordance |
-| Polar fixture | checkout without network; `POLAR_FIXTURE_ONLY=1` wins |
-| live Polar gate | unset / `0` stay fixture; CI must not set `POLAR_LIVE=1` |
+| Waffo fixture | checkout without network; `PAYMENT_MODE=fixture` is explicit |
+| Waffo live gate | explicit `PAYMENT_MODE=waffo-test` or `PAYMENT_MODE=waffo-prod`; CI never supplies provider secrets |
 
 ---
 
@@ -118,8 +121,8 @@ Each heading is one fleet unit. Do not start the next PR in the same change.
 - **Dependencies:** PR 1
 - **Acceptance:** London default. Unknown city `404 city_unknown`. No stars. Empty lane is empty.
 
-### PR 3: Polar checkout + fixture adapter
-- **Files:** `src/polar/port.ts`, `src/polar/fake.ts`, `app/api/checkout`, `app/return`, `tests/checkout.test.ts`
+### PR 3: Waffo checkout + fixture adapter
+- **Files:** `src/billing/port.ts`, `src/billing/fake.ts`, `app/api/checkout`, `app/return`, `tests/checkout.test.ts`
 - **Dependencies:** PR 2
 - **Acceptance:** Fixture `paid` places the listing at the bid’s rank. Min $5. Whole USD. SPEC errors `bid_too_low` / `bid_not_integer`.
 
@@ -148,10 +151,10 @@ Each heading is one fleet unit. Do not start the next PR in the same change.
 - **Dependencies:** PR 7
 - **Acceptance:** Click increments public count and 302s to cleaned URL with no tracking query.
 
-### PR 9: Live Polar gate + live-smoke
-- **Files:** `src/polar/live.ts`, `scripts/live-smoke.sh`, `docs/live-smoke.md`, `tests/live-smoke.test.ts` (offline gate only)
+### PR 9: Live Waffo gate + live-smoke
+- **Files:** `src/billing/live.ts`, `scripts/live-smoke.sh`, `docs/live-smoke.md`, `tests/live-smoke.test.ts` (offline gate only)
 - **Dependencies:** PR 8
-- **Acceptance:** `POLAR_LIVE=1` + secrets selects Polar. `POLAR_FIXTURE_ONLY=1` wins. `scripts/live-smoke.sh` is executable and is **not** called from `scripts/test.sh` or `.github/workflows/ci.yml`. Missing secret → `BLOCKED-SECRET` naming the env var. Empty London board is honest (no invented provider). CI never sets `POLAR_LIVE`.
+- **Acceptance:** An explicit Waffo mode plus complete matching secrets selects Waffo. `PAYMENT_MODE=fixture` remains offline. `scripts/live-smoke.sh` is executable and is **not** called from `scripts/test.sh` or `.github/workflows/ci.yml`. Missing secret → `BLOCKED-SECRET` naming the env var. Empty London board is honest (no invented provider).
 
 ### PR 40: first-time neighbor — empty paper stays Claim #1
 - **Files:** `src/ui/edition.tsx`, `src/ui/city-hub.tsx`, `app/c/[city]/[category]/page.tsx`, `app/globals.css`, `tests/board.test.ts`, `scripts/test.sh`
@@ -176,7 +179,7 @@ Each heading is one fleet unit. Do not start the next PR in the same change.
 ### PR 44: first-time neighbor — unpaid stays off the classified paper
 - **Files:** `src/board.ts`, `src/ui/listing-card.tsx`, `src/ui/lane-board.tsx`, `src/ui/city-hub.tsx`, `src/ui/outbid-form.tsx`, `src/ui/claim-column.tsx`, `app/globals.css`, `tests/board.test.ts`, `scripts/test.sh`, `BUILD.md`
 - **Dependencies:** PR 43
-- **Acceptance:** Unpaid or abandoned listing stays off the board. Empty leftover London `/` stays No #1 / no stars / no map / no Call this #1. Occupied #1 name stays the prize only after Polar reports paid. Call this #1 stays the first occupied click. Rank stays the bid. Column tabs stay after the listing. Empty lanes stay No #1. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Do not re-ship empty-lane isolation or later-call grouping. Stamp-only = REJECT.
+- **Acceptance:** Unpaid or abandoned listing stays off the board. Empty leftover London `/` stays No #1 / no stars / no map / no Call this #1. Occupied #1 name stays the prize only after Waffo reports paid. Call this #1 stays the first occupied click. Rank stays the bid. Column tabs stay after the listing. Empty lanes stay No #1. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Do not re-ship empty-lane isolation or later-call grouping. Stamp-only = REJECT.
 
 ### PR 45: first-time neighbor — occupied paper keeps one first click
 - **Files:** `src/ui/listing-card.tsx`, `src/ui/lane-board.tsx`, `src/ui/claim-column.tsx`, `src/ui/outbid-form.tsx`, `app/globals.css`, `tests/board.test.ts`, `scripts/test.sh`, `BUILD.md`
@@ -186,7 +189,7 @@ Each heading is one fleet unit. Do not start the next PR in the same change.
 ### PR 46: first-time neighbor — occupied week window is rolling last-7-days
 - **Files:** `src/week.ts`, `src/board.ts`, `src/ui/edition.tsx`, `src/ui/lane-board.tsx`, `app/globals.css`, `app/rules/page.tsx`, `tests/week.test.ts`, `tests/board.test.ts`, `scripts/test.sh`, `SPEC.md`, `BUILD.md`
 - **Dependencies:** PR 45
-- **Acceptance:** Occupied London `/` names rolling last 7 days, not Monday 00:00 Europe/London. Live occupancy filters Polar-paid `createdAt` in that window; `weekId` stays a label. Empty lanes stay No #1. Occupied #1 name still reads before `$bid`. Call this #1 stays the first occupied click. Claim stays after the listing. Unpaid stays off. Column tabs stay after the listing. Not a 24h lock on #1. Do not add another named hop. Do not stamp `call-after-claim-N`. Do not recolor. Do not rebuild the classified paper. Do not re-ship unpaid-off, empty-lane isolation, later-call grouping, or Claim-after-listing. Stamp-only = REJECT.
+- **Acceptance:** Occupied London `/` names rolling last 7 days, not Monday 00:00 Europe/London. Live occupancy filters Waffo-paid `createdAt` in that window; `weekId` stays a label. Empty lanes stay No #1. Occupied #1 name still reads before `$bid`. Call this #1 stays the first occupied click. Claim stays after the listing. Unpaid stays off. Column tabs stay after the listing. Not a 24h lock on #1. Do not add another named hop. Do not stamp `call-after-claim-N`. Do not recolor. Do not rebuild the classified paper. Do not re-ship unpaid-off, empty-lane isolation, later-call grouping, or Claim-after-listing. Stamp-only = REJECT.
 
 ### PR 47: first-time neighbor — empty paper copy is rolling last-7-days
 - **Files:** `src/ui/edition.tsx`, `app/globals.css`, `tests/board.test.ts`, `scripts/test.sh`, `SPEC.md`, `BUILD.md`
@@ -226,38 +229,38 @@ Each heading is one fleet unit. Do not start the next PR in the same change.
 ### PR 55: first-time neighbor — rules lane copy matches rolling last-7-days
 - **Files:** `app/rules/page.tsx`, `tests/board.test.ts`, `tests/urls.test.ts`, `scripts/test.sh`, `SPEC.md`, `BUILD.md`
 - **Dependencies:** PR 54 (last-week archive last 7 days on `main`)
-- **Acceptance:** Rules keys the lane as city × category over rolling last 7 days, not "city × category × week" Monday paper. Identity is site + category + city; `weekId` stays a Polar/audit label. Last-week archive stays last 7 days. Edition dek stays last 7 days. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Empty does not stamp occupied `data-rolling-week` or `week-window`. Empty lanes stay No #1. Occupied Call this #1 stays the first occupied click. Do not retouch Call, README, About, site header, kickers, edition dek, or last-week archive. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
+- **Acceptance:** Rules keys the lane as city × category over rolling last 7 days, not "city × category × week" Monday paper. Identity is site + category + city; `weekId` stays a payment/audit label. Last-week archive stays last 7 days. Edition dek stays last 7 days. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Empty does not stamp occupied `data-rolling-week` or `week-window`. Empty lanes stay No #1. Occupied Call this #1 stays the first occupied click. Do not retouch Call, README, About, site header, kickers, edition dek, or last-week archive. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
 
 ### PR 56: first-time neighbor — rules Week heading matches rolling last-7-days
 - **Files:** `app/rules/page.tsx`, `tests/board.test.ts`, `tests/urls.test.ts`, `scripts/test.sh`, `SPEC.md`, `BUILD.md`
 - **Dependencies:** PR 55 (rules lane last 7 days on `main`)
-- **Acceptance:** Rules Week heading names last 7 days, not a Monday paper. Ranking still keys the lane as city × category over rolling last 7 days. Identity stays site + category + city; `weekId` stays a Polar/audit label. Last-week archive stays last 7 days. Edition dek stays last 7 days. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Empty does not stamp occupied `data-rolling-week` or `week-window`. Empty lanes stay No #1. Occupied Call this #1 stays the first occupied click. Do not retouch Call, README, About, site header, kickers, edition dek, last-week archive, or the rules Ranking / Identity copy from #55. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
+- **Acceptance:** Rules Week heading names last 7 days, not a Monday paper. Ranking still keys the lane as city × category over rolling last 7 days. Identity stays site + category + city; `weekId` stays a payment/audit label. Last-week archive stays last 7 days. Edition dek stays last 7 days. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Empty does not stamp occupied `data-rolling-week` or `week-window`. Empty lanes stay No #1. Occupied Call this #1 stays the first occupied click. Do not retouch Call, README, About, site header, kickers, edition dek, last-week archive, or the rules Ranking / Identity copy from #55. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
 
 ### PR 57: first-time neighbor — occupied raise copy names difference-only
 - **Files:** `src/ui/outbid-form.tsx`, `src/ui/lane-board.tsx`, `src/ui/claim-column.tsx`, `app/globals.css`, `tests/board.test.ts`, `scripts/test.sh`, `SPEC.md`, `BUILD.md`
 - **Dependencies:** PR 56 (rules Week heading last 7 days on `main`)
-- **Acceptance:** Occupied London `/` raise / Outbid copy names Polar charges only the difference, not a full rebid (`data-raise-difference`). Occupied Call this #1 stays the first occupied click. Empty lanes stay No #1 and do not name occupied raise-pays-difference. Empty does not stamp occupied `data-rolling-week` or `week-window`. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Edition dek stays last 7 days. Last-week archive stays last 7 days. Rules Ranking / Identity from #55 stay. Rules Week heading from #56 stays last 7 days. Do not retouch Call, README, About, site header, kickers, edition dek, last-week archive, or the rules Week heading from #56. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
+- **Acceptance:** Occupied London `/` raise / Outbid copy names Waffo charges only the difference, not a full rebid (`data-raise-difference`). Occupied Call this #1 stays the first occupied click. Empty lanes stay No #1 and do not name occupied raise-pays-difference. Empty does not stamp occupied `data-rolling-week` or `week-window`. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Edition dek stays last 7 days. Last-week archive stays last 7 days. Rules Ranking / Identity from #55 stay. Rules Week heading from #56 stays last 7 days. Do not retouch Call, README, About, site header, kickers, edition dek, last-week archive, or the rules Week heading from #56. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
 
-### PR 58: first-time neighbor — occupied Polar return names difference-only
-- **Files:** `app/return/page.tsx`, `src/polar/port.ts`, `app/globals.css`, `tests/checkout.test.ts`, `scripts/test.sh`, `SPEC.md`, `BUILD.md`
+### PR 58: first-time neighbor — occupied Waffo return names difference-only
+- **Files:** `app/return/page.tsx`, `src/billing/port.ts`, `app/globals.css`, `tests/checkout.test.ts`, `scripts/test.sh`, `SPEC.md`, `BUILD.md`
 - **Dependencies:** PR 57 (occupied raise / Outbid difference-only on `main`)
-- **Acceptance:** Occupied Polar `/return` after a raise names Polar charged only the difference, not a full rebid (`data-raise-return`). A new listing return still names listed at the bid and does not stamp a raise return. Occupied Call this #1 stays the first occupied click. Empty lanes stay No #1. Empty does not stamp occupied `data-rolling-week` or `week-window`. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Edition dek stays last 7 days. Last-week archive stays last 7 days. Rules Ranking / Identity from #55 stay. Rules Week heading from #56 stays last 7 days. Occupied raise / Outbid difference-only copy from #57 stays. Do not retouch Call, README, About, site header, kickers, edition dek, last-week archive, the rules Week heading from #56, or occupied raise / Outbid from #57. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
+- **Acceptance:** Occupied Waffo `/return` after a raise names Waffo charged only the difference, not a full rebid (`data-raise-return`). A new listing return still names listed at the bid and does not stamp a raise return. Occupied Call this #1 stays the first occupied click. Empty lanes stay No #1. Empty does not stamp occupied `data-rolling-week` or `week-window`. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Edition dek stays last 7 days. Last-week archive stays last 7 days. Rules Ranking / Identity from #55 stay. Rules Week heading from #56 stays last 7 days. Occupied raise / Outbid difference-only copy from #57 stays. Do not retouch Call, README, About, site header, kickers, edition dek, last-week archive, the rules Week heading from #56, or occupied raise / Outbid from #57. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
 
-### PR 59: first-time neighbor — occupied cancelled Polar return still occupies
+### PR 59: first-time neighbor — occupied cancelled Waffo return still occupies
 - **Files:** `app/return/page.tsx`, `app/globals.css`, `tests/checkout.test.ts`, `scripts/test.sh`, `SPEC.md`, `BUILD.md`
-- **Dependencies:** PR 58 (occupied Polar return difference-only on `main`)
-- **Acceptance:** Occupied cancelled Polar `/return` after a raise names they still occupy at the old bid (`data-raise-cancel`). An abandoned raise does not unlist. A new listing cancelled return still names no rank claimed / does not list. Occupied paid Polar return after a raise still names Polar charged only the difference (`data-raise-return`). Occupied Call this #1 stays the first occupied click. Empty lanes stay No #1. Empty does not stamp occupied `data-rolling-week` or `week-window`. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Edition dek stays last 7 days. Last-week archive stays last 7 days. Rules Ranking / Identity from #55 stay. Rules Week heading from #56 stays last 7 days. Occupied raise / Outbid difference-only copy from #57 stays. Occupied Polar return difference-only copy from #58 stays. Do not retouch Call, README, About, site header, kickers, edition dek, last-week archive, the rules Week heading from #56, occupied raise / Outbid from #57, or occupied Polar return difference-only from #58. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
+- **Dependencies:** PR 58 (occupied Waffo return difference-only on `main`)
+- **Acceptance:** Occupied cancelled Waffo `/return` after a raise names they still occupy at the old bid (`data-raise-cancel`). An abandoned raise does not unlist. A new listing cancelled return still names no rank claimed / does not list. Occupied paid Waffo return after a raise still names Waffo charged only the difference (`data-raise-return`). Occupied Call this #1 stays the first occupied click. Empty lanes stay No #1. Empty does not stamp occupied `data-rolling-week` or `week-window`. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Edition dek stays last 7 days. Last-week archive stays last 7 days. Rules Ranking / Identity from #55 stay. Rules Week heading from #56 stays last 7 days. Occupied raise / Outbid difference-only copy from #57 stays. Occupied Waffo return difference-only copy from #58 stays. Do not retouch Call, README, About, site header, kickers, edition dek, last-week archive, the rules Week heading from #56, occupied raise / Outbid from #57, or occupied Waffo return difference-only from #58. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
 
-### PR 60: first-time neighbor — occupied unknown Polar return still occupies
-- **Files:** `app/return/page.tsx`, `src/polar/fake.ts`, `app/globals.css`, `tests/checkout.test.ts`, `scripts/test.sh`, `SPEC.md`, `BUILD.md`
-- **Dependencies:** PR 59 (occupied cancelled Polar return still occupies on `main`)
-- **Acceptance:** Occupied unknown Polar `/return` after an open raise names they still occupy at the old bid (`data-raise-unknown`). An unpaid raise draft does not unlist. A new listing unknown return still names no rank claimed / unpaid drafts never appear. Occupied cancelled Polar return after a raise still names they still occupy at the old bid (`data-raise-cancel`). Occupied paid Polar return after a raise still names Polar charged only the difference (`data-raise-return`). Occupied Call this #1 stays the first occupied click. Empty lanes stay No #1. Empty does not stamp occupied `data-rolling-week` or `week-window`. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Edition dek stays last 7 days. Last-week archive stays last 7 days. Rules Ranking / Identity from #55 stay. Rules Week heading from #56 stays last 7 days. Occupied raise / Outbid difference-only copy from #57 stays. Occupied Polar return difference-only copy from #58 stays. Occupied cancelled Polar return still-occupies copy from #59 stays. Do not retouch Call, README, About, site header, kickers, edition dek, last-week archive, the rules Week heading from #56, occupied raise / Outbid from #57, occupied Polar return difference-only from #58, or occupied cancelled Polar return still-occupies from #59. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
+### PR 60: first-time neighbor — occupied unknown Waffo return still occupies
+- **Files:** `app/return/page.tsx`, `src/billing/fake.ts`, `app/globals.css`, `tests/checkout.test.ts`, `scripts/test.sh`, `SPEC.md`, `BUILD.md`
+- **Dependencies:** PR 59 (occupied cancelled Waffo return still occupies on `main`)
+- **Acceptance:** Occupied unknown Waffo `/return` after an open raise names they still occupy at the old bid (`data-raise-unknown`). An unpaid raise draft does not unlist. A new listing unknown return still names no rank claimed / unpaid drafts never appear. Occupied cancelled Waffo return after a raise still names they still occupy at the old bid (`data-raise-cancel`). Occupied paid Waffo return after a raise still names Waffo charged only the difference (`data-raise-return`). Occupied Call this #1 stays the first occupied click. Empty lanes stay No #1. Empty does not stamp occupied `data-rolling-week` or `week-window`. README stays last 7 days. About stays last 7 days. Site header stays last 7 days. Occupied kicker stays last 7 days. Empty kicker stays last 7 days. Edition dek stays last 7 days. Last-week archive stays last 7 days. Rules Ranking / Identity from #55 stay. Rules Week heading from #56 stays last 7 days. Occupied raise / Outbid difference-only copy from #57 stays. Occupied Waffo return difference-only copy from #58 stays. Occupied cancelled Waffo return still-occupies copy from #59 stays. Do not retouch Call, README, About, site header, kickers, edition dek, last-week archive, the rules Week heading from #56, occupied raise / Outbid from #57, occupied Waffo return difference-only from #58, or occupied cancelled Waffo return still-occupies from #59. Do not add another named hop. Do not stamp `*-after-*-N`. Do not recolor. Do not rebuild the classified paper. Stamp-only = REJECT.
 
 ---
 
 ## 6. Live-smoke (operator)
 
-Local process, live flag on if secrets exist, otherwise fixture path documented as `BLOCKED-SECRET` for Polar.
+Local development uses explicit fixture mode; an operator Waffo process is attempted only with explicit mode and complete secrets, otherwise it is documented as `BLOCKED-SECRET`.
 
 Walk SPEC §14: healthz, London board, about/rules, checkout, raise, click, takedown.  
 Record each flow `PASS` / `PASS-ERROR` / `BLOCKED-SECRET` / `FAIL` in `docs/live-smoke.md`.  
@@ -269,6 +272,6 @@ Record each flow `PASS` / `PASS-ERROR` / `BLOCKED-SECRET` / `FAIL` in `docs/live
 
 - More cities as a marketing push (the **column** is already there)
 - License registry API
-- Refunds via Polar portal (manual)
+- Refunds via Waffo portal (manual)
 - Accounts, comments, chat
 - Non-USD

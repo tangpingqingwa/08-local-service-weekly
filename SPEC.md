@@ -5,7 +5,7 @@
 **Repo:** https://github.com/tangpingqingwa/08-local-service-weekly  
 **Market:** global English  
 **Clone of:** [outbid.lol](https://outbid.lol) pay-to-rank mechanics  
-**Forbidden:** invented ratings, stars, review counts, chat/invite links, NSFW, live Polar in CI
+**Forbidden:** invented ratings, stars, review counts, chat/invite links, NSFW, live Waffo in CI
 
 This document is the product contract. If README and SPEC disagree, SPEC wins until README is updated. If SPEC and code disagree, fix one of them in the same PR.
 
@@ -36,7 +36,8 @@ One-line pitch: **The #1 mover / dentist / immigration lawyer / tutor in town is
 - Strip tracking query strings from listing URLs.
 - No chat or invite links. No NSFW.
 - Clicks on the listing site are counted and **public**.
-- Live payments via **Polar** (merchant of record). Tests use a **fixture** Polar adapter. CI never sets live Polar flags.
+- Live payments via **Waffo** (merchant of record). Tests use an explicitly
+  selected **fixture** adapter. CI never selects a live provider.
 - Pages: board, about, rules, checkout return.
 - USD. English UI. Global English market; v1 ships London only.
 
@@ -120,7 +121,7 @@ Inside one lane `(city, category, weekId)`:
 5. New listing minimum is **$5**. Existing amounts stay until raise or week reset.
 6. **Raise:** same identity key, new amount `N`. Require `N >= currentBid + 1` and `N <= 999999`. Charge **`N - currentBid`** only. `createdAt` does **not** change (the older stamp still wins ties).
 7. A **different** identity cannot take a rank by paying only the difference another listing would pay to raise. They must submit a bid **strictly greater** than the occupant’s `bidUsd`.
-8. Completed Polar payment (or fixture `paid`) is what claims the rank. Unpaid checkout drafts never appear.
+8. Completed Waffo payment (or fixture `paid`) is what claims the rank. Unpaid checkout drafts never appear.
 
 ---
 
@@ -128,7 +129,7 @@ Inside one lane `(city, category, weekId)`:
 
 Occupied rank is the **rolling last 7 days** from paid `createdAt` (`now − 7d` inclusive). **Not** Monday 00:00 Europe/London. **Not** a 24h lock on #1.
 
-`weekId` = that Monday’s ISO date in Europe/London, e.g. `2026-08-17`. It is a Polar/audit label, not public expiry. A Sunday pay still occupies the paper after London Monday midnight if it is inside 7 days.
+`weekId` = that Monday’s ISO date in Europe/London, e.g. `2026-08-17`. It is a payment/audit label, not public expiry. A Sunday pay still occupies the paper after London Monday midnight if it is inside 7 days.
 
 At age-out:
 
@@ -136,7 +137,7 @@ At age-out:
 - Last week’s labeled #1 may be shown as a last-7-days archive copy once it is outside the rolling window. It is not current #1 unless they pay again. Archive copy names rolling last-7-days age-out, not this week’s Monday paper.
 - Raise and new bids apply only to the **open** `weekId` label. Occupied rank is the rolling window.
 
-The #1 **visible provider** for a city × category is whoever still occupies the rolling last-7-days window at rank `#1`. That is the product. Occupied and empty classified paper name that window. Empty copy does not present Monday 00:00 Europe/London as the drop. Empty masthead kicker names last 7 days, not this week’s Monday paper. Occupied masthead kicker names last 7 days, not this week’s Monday paper. Site header and layout meta name last 7 days, not this week’s Monday paper. About copy names last 7 days, not this week’s Monday paper. README copy names last 7 days, not this week’s Monday paper. Edition dek names last 7 days, not this edition Monday paper. Last-week archive copy names last 7 days, not this week’s Monday paper. Rules lane copy names last 7 days, not city × category × week Monday paper. Rules Week heading names last 7 days, not a Monday paper. Occupied raise / Outbid copy names Polar charges only the difference, not a full rebid. Occupied Polar return after a raise names Polar charged only the difference, not a full rebid. Occupied cancelled Polar return after a raise names they still occupy at the old bid. An abandoned raise does not unlist. Occupied unknown Polar return after an open raise names they still occupy at the old bid. An unpaid raise draft does not unlist.
+The #1 **visible provider** for a city × category is whoever still occupies the rolling last-7-days window at rank `#1`. That is the product. Occupied and empty classified paper name that window. Empty copy does not present Monday 00:00 Europe/London as the drop. Empty masthead kicker names last 7 days, not this week’s Monday paper. Occupied masthead kicker names last 7 days, not this week’s Monday paper. Site header and layout meta name last 7 days, not this week’s Monday paper. About copy names last 7 days, not this week’s Monday paper. README copy names last 7 days, not this week’s Monday paper. Edition dek names last 7 days, not this edition Monday paper. Last-week archive copy names last 7 days, not this week’s Monday paper. Rules lane copy names last 7 days, not city × category × week Monday paper. Rules Week heading names last 7 days, not a Monday paper. Occupied raise / Outbid copy names Waffo charges only the difference, not a full rebid. Occupied Waffo return after a raise names Waffo charged only the difference, not a full rebid. Occupied cancelled Waffo return after a raise names they still occupy at the old bid. An abandoned raise does not unlist. Occupied unknown Waffo return after an open raise names they still occupy at the old bid. An unpaid raise draft does not unlist.
 
 ---
 
@@ -159,15 +160,18 @@ On accept:
 
 | Mode | When | Adapter |
 |---|---|---|
-| Fixture | `scripts/test.sh`, CI, default | `PolarPort` fake: checkout returns `paid` immediately, records amount |
-| Live | `POLAR_LIVE=1` + Polar secrets | Polar checkout + webhook; merchant of record |
+| Fixture | `scripts/test.sh`, CI, local development | Compatibility payment port fake: checkout returns `paid` immediately, records amount |
+| Waffo test | Explicit `PAYMENT_MODE=waffo-test` + isolated test secrets | Waffo checkout + signed webhook; no production data |
+| Waffo production | Explicit `PAYMENT_MODE=waffo-prod` + durable production config | Waffo checkout + signed webhook; merchant of record |
 
-`POLAR_FIXTURE_ONLY=1` always wins over live.  
-CI and `scripts/test.sh` must not set `POLAR_LIVE=1` or Polar secrets.
+`PAYMENT_MODE` (or an explicit Waffo mode alias) is the only provider
+selector. Historical Polar variables are quarantined and ignored; they cannot
+select a fixture, provider, settlement, or ranking. Production rejects
+`PAYMENT_MODE=fixture`.
 
 Currency is **USD**. Amounts are integers. No cents.
 
-Checkout return page (`/return`) shows paid / cancelled / unknown. It does not invent a rank before the webhook (live) or fixture settle. Occupied Polar return after a raise names Polar charged only the difference, not a full rebid. Occupied cancelled Polar return after a raise names they still occupy at the old bid. An abandoned raise does not unlist. Occupied unknown Polar return after an open raise names they still occupy at the old bid. An unpaid raise draft does not unlist. A new listing unknown return still names no rank claimed / unpaid drafts never appear. A new listing cancelled return still names no rank claimed / does not list. A new listing return still names listed at the bid.
+Checkout return page (`/return`) shows paid / cancelled / unknown. It does not invent a rank before the webhook (live) or fixture settle. Occupied Waffo return after a raise names Waffo charged only the difference, not a full rebid. Occupied cancelled Waffo return after a raise names they still occupy at the old bid. An abandoned raise does not unlist. Occupied unknown Waffo return after an open raise names they still occupy at the old bid. An unpaid raise draft does not unlist. A new listing unknown return still names no rank claimed / unpaid drafts never appear. A new listing cancelled return still names no rank claimed / does not list. A new listing return still names listed at the bid.
 
 ---
 
@@ -208,10 +212,10 @@ GET  /c/:city                  city hub — four categories
 GET  /c/:city/:category        lane board + bid form
 GET  /about
 GET  /rules
-GET  /return                   Polar / fixture return
+GET  /return                   Waffo / fixture return
 GET  /go/:id                   click + 302
 GET  /healthz                  200 if process up
-POST /checkout                 start Polar or fixture
+POST /checkout                 start Waffo or fixture
 POST /raise                    same identity, pay difference
 ```
 
@@ -237,7 +241,7 @@ Bid form: business, category (if not in the URL), city (if not in the URL), site
 | `url_shortener` | 400 | shortener not resolved |
 | `listing_hidden` | 409 | raise on a taken-down listing |
 | `week_closed` | 409 | bid on a non-open week |
-| `polar_not_live` | 503 | live checkout requested without live Polar |
+| `waffo_not_live` | 503 | live-only operation requested without Waffo |
 | `unpaid` | 402 | checkout not completed |
 
 No stack traces on public pages.
@@ -261,13 +265,13 @@ No stack traces on public pages.
 | 11 | Click `/go/:id` | `clicks` +1 public; 302 to cleaned site |
 | 12 | Non-London city slug in v1 | `404 city_unknown` (ranker still keyed by city) |
 | 13 | UI never shows stars / review counts | asserted in tests |
-| 14 | Fixture checkout in tests; live Polar env-gated | CI unset `POLAR_LIVE` |
+| 14 | Explicit fixture checkout in tests; explicit Waffo mode for live work | CI uses fixture mode and no provider secrets |
 
 ---
 
 ## 14. Live-smoke flows (operator only)
 
-`scripts/live-smoke.sh` is **not** called from `scripts/test.sh` or Actions. Missing Polar secret → `BLOCKED-SECRET: POLAR_ACCESS_TOKEN` (or the exact env BUILD names). Honest empty London lane is allowed.
+`scripts/live-smoke.sh` is **not** called from `scripts/test.sh` or Actions. Missing Waffo secret → `BLOCKED-SECRET` naming the exact required Waffo variable. Honest empty London lane is allowed.
 
 | Flow | Pass |
 |---|---|
@@ -313,4 +317,4 @@ Development is GitHub trunk-based. **`main` is always cloneable, buildable, and 
 
 Full process: [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-Until there is an application binary, `scripts/test.sh` still has to pass: contract files exist, SPEC/CONTRIBUTING agree, no tracked secrets. Adding a server means **extending** that script with unit/contract tests. Live Polar is optional and must not be required for `main` to stay green.
+Until there is an application binary, `scripts/test.sh` still has to pass: contract files exist, SPEC/CONTRIBUTING agree, no tracked secrets. Adding a server means **extending** that script with unit/contract tests. Live Waffo is optional and must not be required for `main` to stay green.

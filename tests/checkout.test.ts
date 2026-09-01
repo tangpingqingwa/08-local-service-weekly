@@ -6,26 +6,27 @@ import { listLane, rankLane } from "../src/board";
 import { openDatabase, type AppDb } from "../src/db";
 import { raiseListing } from "../src/listings";
 import {
-  FakePolarPort,
-  getPolarPort,
-  resetPolarFixture,
-  setPolarPortForTests,
-} from "../src/polar/fake";
+  FakePaymentPort,
+  getPaymentPort,
+  resetPaymentFixture,
+  setPaymentPortForTests,
+} from "../src/billing/fake";
 import {
   handleCheckoutReturn,
-  isPolarLive,
+  isProviderLive,
   parseBidUsd,
-  PolarError,
-  polarFixtureOnly,
+  PaymentError,
+  fixtureOnly,
   type ListingDraft,
-} from "../src/polar/port";
+} from "../src/billing/port";
 
 (globalThis as { React?: typeof React }).React = React;
+const mutableEnv = process.env as Record<string, string | undefined>;
 
 process.env.DATABASE_PATH = ":memory:";
 
 afterEach(() => {
-  resetPolarFixture();
+  resetPaymentFixture();
 });
 
 function draft(overrides: Partial<ListingDraft> = {}): ListingDraft {
@@ -41,10 +42,10 @@ function draft(overrides: Partial<ListingDraft> = {}): ListingDraft {
 }
 
 async function withDb(
-  run: (db: AppDb, polar: FakePolarPort) => Promise<void> | void,
+  run: (db: AppDb, polar: FakePaymentPort) => Promise<void> | void,
 ): Promise<void> {
   const db = openDatabase(":memory:");
-  const polar = new FakePolarPort(db);
+  const polar = new FakePaymentPort(db);
   try {
     await run(db, polar);
   } finally {
@@ -58,74 +59,95 @@ test("parseBidUsd enforces whole USD, min $5, and SPEC error codes", () => {
   assert.equal(parseBidUsd("$15"), 15);
 
   assert.throws(() => parseBidUsd("4"), (err: unknown) => {
-    assert.ok(err instanceof PolarError);
+    assert.ok(err instanceof PaymentError);
     assert.equal(err.code, "bid_too_low");
     assert.equal(err.httpStatus, 400);
     return true;
   });
   assert.throws(() => parseBidUsd(4.5), (err: unknown) => {
-    assert.ok(err instanceof PolarError);
+    assert.ok(err instanceof PaymentError);
     assert.equal(err.code, "bid_not_integer");
     return true;
   });
   assert.throws(() => parseBidUsd("12.50"), (err: unknown) => {
-    assert.ok(err instanceof PolarError);
+    assert.ok(err instanceof PaymentError);
     assert.equal(err.code, "bid_not_integer");
     return true;
   });
   assert.throws(() => parseBidUsd("1e2"), (err: unknown) => {
-    assert.ok(err instanceof PolarError);
+    assert.ok(err instanceof PaymentError);
     assert.equal(err.code, "bid_not_integer");
     return true;
   });
   assert.throws(() => parseBidUsd("1000000"), (err: unknown) => {
-    assert.ok(err instanceof PolarError);
+    assert.ok(err instanceof PaymentError);
     assert.equal(err.code, "bid_too_high");
     return true;
   });
 });
 
-test("POLAR_FIXTURE_ONLY=1 wins; unset / 0 stay fixture", () => {
-  assert.equal(isPolarLive({}), false);
-  assert.equal(isPolarLive({ POLAR_LIVE: "0" }), false);
-  assert.equal(isPolarLive({ POLAR_LIVE: "true" }), false);
-  assert.equal(isPolarLive({ POLAR_LIVE: "1" }), true);
+test("explicit fixture mode is required and legacy provider flags stay inert", () => {
+  assert.equal(isProviderLive({}), false);
+  assert.equal(isProviderLive({ POLAR_LIVE: "0" }), false);
+  assert.equal(isProviderLive({ POLAR_LIVE: "1" }), false);
+  assert.equal(isProviderLive({ PAYMENT_MODE: "waffo-test" }), true);
   assert.equal(
-    isPolarLive({ POLAR_LIVE: "1", POLAR_FIXTURE_ONLY: "1" }),
-    false,
+    isProviderLive({ PAYMENT_MODE: "waffo-test", POLAR_FIXTURE_ONLY: "1" }),
+    true,
   );
-  assert.equal(polarFixtureOnly({ POLAR_FIXTURE_ONLY: "1" }), true);
+  assert.equal(fixtureOnly({ POLAR_FIXTURE_ONLY: "1" }), false);
+  assert.equal(fixtureOnly({ PAYMENT_MODE: "fixture", POLAR_FIXTURE_ONLY: "1" }), true);
 
-  const previousLive = process.env.POLAR_LIVE;
+  const previousMode = process.env.PAYMENT_MODE;
   const previousFixture = process.env.POLAR_FIXTURE_ONLY;
-  process.env.POLAR_LIVE = "1";
+  const previousNode = process.env.NODE_ENV;
+  process.env.PAYMENT_MODE = "fixture";
   process.env.POLAR_FIXTURE_ONLY = "1";
   try {
-    assert.equal(getPolarPort() instanceof FakePolarPort, true);
+    assert.equal(getPaymentPort() instanceof FakePaymentPort, true);
   } finally {
-    if (previousLive === undefined) delete process.env.POLAR_LIVE;
-    else process.env.POLAR_LIVE = previousLive;
+    if (previousMode === undefined) delete process.env.PAYMENT_MODE;
+    else process.env.PAYMENT_MODE = previousMode;
     if (previousFixture === undefined) delete process.env.POLAR_FIXTURE_ONLY;
     else process.env.POLAR_FIXTURE_ONLY = previousFixture;
+    if (previousNode === undefined) delete mutableEnv.NODE_ENV;
+    else mutableEnv.NODE_ENV = previousNode;
+  }
+
+  mutableEnv.NODE_ENV = "production";
+  process.env.PAYMENT_MODE = "fixture";
+  process.env.POLAR_FIXTURE_ONLY = "1";
+  try {
+    assert.throws(
+      () => getPaymentPort(),
+      (error: unknown) => error instanceof PaymentError && error.code === "waffo_fixture_forbidden",
+    );
+  } finally {
+    if (previousMode === undefined) delete process.env.PAYMENT_MODE;
+    else process.env.PAYMENT_MODE = previousMode;
+    if (previousFixture === undefined) delete process.env.POLAR_FIXTURE_ONLY;
+    else process.env.POLAR_FIXTURE_ONLY = previousFixture;
+    if (previousNode === undefined) delete mutableEnv.NODE_ENV;
+    else mutableEnv.NODE_ENV = previousNode;
   }
 });
 
-test("live checkout without Polar secret is BLOCKED-SECRET", () => {
-  const previousLive = process.env.POLAR_LIVE;
+test("live checkout without Waffo secret is BLOCKED-SECRET", () => {
+  const previousMode = process.env.PAYMENT_MODE;
   const previousFixture = process.env.POLAR_FIXTURE_ONLY;
-  const previousToken = process.env.POLAR_ACCESS_TOKEN;
-  process.env.POLAR_LIVE = "1";
+  const previousMerchant = process.env.WAFFO_MERCHANT_ID;
+  process.env.PAYMENT_MODE = "waffo-test";
   delete process.env.POLAR_FIXTURE_ONLY;
-  delete process.env.POLAR_ACCESS_TOKEN;
+  delete process.env.WAFFO_MERCHANT_ID;
   try {
-    assert.throws(() => getPolarPort(), /BLOCKED-SECRET: POLAR_ACCESS_TOKEN/);
+    assert.throws(() => getPaymentPort(), /BLOCKED-SECRET: WAFFO_MERCHANT_ID/);
   } finally {
-    if (previousLive === undefined) delete process.env.POLAR_LIVE;
-    else process.env.POLAR_LIVE = previousLive;
+    if (previousMode === undefined) delete process.env.PAYMENT_MODE;
+    else process.env.PAYMENT_MODE = previousMode;
     if (previousFixture === undefined) delete process.env.POLAR_FIXTURE_ONLY;
     else process.env.POLAR_FIXTURE_ONLY = previousFixture;
-    if (previousToken === undefined) delete process.env.POLAR_ACCESS_TOKEN;
-    else process.env.POLAR_ACCESS_TOKEN = previousToken;
+    if (previousMerchant === undefined) delete process.env.WAFFO_MERCHANT_ID;
+    else process.env.WAFFO_MERCHANT_ID = previousMerchant;
   }
 });
 
@@ -176,7 +198,7 @@ test("min $5 fixture pay lists at #1 with 0 clicks", async () => {
           listing: draft({ bidUsd: 4 }),
         }),
       (err: unknown) => {
-        assert.ok(err instanceof PolarError);
+        assert.ok(err instanceof PaymentError);
         assert.equal(err.code, "bid_too_low");
         return true;
       },
@@ -203,7 +225,7 @@ test("min $5 fixture pay lists at #1 with 0 clicks", async () => {
 
 test("underbid still lists below #1; unpaid drafts never appear", async () => {
   await withDb(async (db) => {
-    const polar = new FakePolarPort(db, { autoSettle: false });
+    const polar = new FakePaymentPort(db, { autoSettle: false });
     const cover = await polar.createCheckout({
       amountUsd: 20,
       listing: draft(),
@@ -249,7 +271,7 @@ test("underbid still lists below #1; unpaid drafts never appear", async () => {
 
 test("handleCheckoutReturn pays on success and not on cancel", async () => {
   await withDb(async (db) => {
-    const polar = new FakePolarPort(db, { autoSettle: false });
+    const polar = new FakePaymentPort(db, { autoSettle: false });
     const paid = await polar.createCheckout({
       amountUsd: 20,
       listing: draft(),
@@ -286,8 +308,8 @@ test("handleCheckoutReturn pays on success and not on cancel", async () => {
 test("POST /api/checkout fixture JSON places the listing", async () => {
   const db = openDatabase(":memory:");
   after(() => db.close());
-  const polar = new FakePolarPort(db);
-  setPolarPortForTests(polar);
+  const polar = new FakePaymentPort(db);
+  setPaymentPortForTests(polar);
   const { POST } = await import("../app/api/checkout/route");
 
   const ok = await POST(
@@ -361,7 +383,7 @@ test("POST /api/checkout fixture JSON places the listing", async () => {
 test("POST /api/checkout form redirects to /return after fixture pay", async () => {
   const db = openDatabase(":memory:");
   after(() => db.close());
-  setPolarPortForTests(new FakePolarPort(db));
+  setPaymentPortForTests(new FakePaymentPort(db));
   const { POST } = await import("../app/api/checkout/route");
 
   const form = new FormData();
@@ -387,8 +409,56 @@ test("POST /api/checkout form redirects to /return after fixture pay", async () 
   assert.equal(ranked[0]?.rank, 1);
 });
 
+test("POST /api/checkout form errors return to the classified lane while JSON stays JSON", async () => {
+  const db = openDatabase(":memory:");
+  after(() => db.close());
+  setPaymentPortForTests(new FakePaymentPort(db));
+  const { POST } = await import("../app/api/checkout/route");
+
+  const form = new FormData();
+  form.set("business", "Too Cheap");
+  form.set("category", "movers");
+  form.set("city", "london");
+  form.set("siteUrl", "https://cheap-form.example");
+  form.set("amount", "4");
+
+  const formResponse = await POST(
+    new Request("http://127.0.0.1/api/checkout", {
+      method: "POST",
+      body: form,
+    }),
+  );
+  assert.equal(formResponse.status, 303);
+  const location = new URL(formResponse.headers.get("location") ?? "");
+  assert.equal(location.pathname, "/c/london/movers");
+  assert.equal(location.searchParams.get("error"), "bid_too_low");
+  assert.equal(location.hash, "#claim");
+  assert.equal(listLane("london", "movers", db).length, 0);
+
+  const jsonResponse = await POST(
+    new Request("http://127.0.0.1/api/checkout", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        business: "Too Cheap",
+        category: "movers",
+        city: "london",
+        siteUrl: "https://cheap-json.example",
+        amount: 4,
+      }),
+    }),
+  );
+  assert.equal(jsonResponse.status, 400);
+  assert.deepEqual(await jsonResponse.json(), { error: "bid_too_low" });
+});
+
 test("/return markup shows paid, cancelled, or unknown", async () => {
   const { default: ReturnPage } = await import("../app/return/page");
+  const previousMode = process.env.PAYMENT_MODE;
+  process.env.PAYMENT_MODE = "fixture";
 
   const unknownHtml = renderToStaticMarkup(
     await ReturnPage({
@@ -416,8 +486,8 @@ test("/return markup shows paid, cancelled, or unknown", async () => {
 
   const db = openDatabase(":memory:");
   after(() => db.close());
-  const polar = new FakePolarPort(db);
-  setPolarPortForTests(polar);
+  const polar = new FakePaymentPort(db);
+  setPaymentPortForTests(polar);
   const started = await polar.createCheckout({
     amountUsd: 20,
     listing: draft(),
@@ -437,13 +507,15 @@ test("/return markup shows paid, cancelled, or unknown", async () => {
   assert.doesNotMatch(paidHtml, /only the difference, not a full rebid/);
   assert.doesNotMatch(paidHtml, /#1|#2|rank #/i);
   assert.doesNotMatch(paidHtml, /★|⭐|review count/i);
+  if (previousMode === undefined) delete process.env.PAYMENT_MODE;
+  else process.env.PAYMENT_MODE = previousMode;
 });
 
-test("occupied Polar return names difference-only — not a full rebid paid", async () => {
+test("occupied return names difference-only without provider copy", async () => {
   const db = openDatabase(":memory:");
   after(() => db.close());
-  const polar = new FakePolarPort(db);
-  setPolarPortForTests(polar);
+  const polar = new FakePaymentPort(db);
+  setPaymentPortForTests(polar);
   const placed = await polar.createCheckout({
     amountUsd: 20,
     listing: draft(),
@@ -459,11 +531,11 @@ test("occupied Polar return names difference-only — not a full rebid paid", as
   assert.match(placeHtml, /North London Movers is listed at \$20/);
   assert.doesNotMatch(placeHtml, /data-raise-return/);
   assert.doesNotMatch(placeHtml, /only the difference, not a full rebid/);
-  assert.doesNotMatch(placeHtml, /Polar charged/);
+  assert.doesNotMatch(placeHtml, /Waffo charged/);
 
-  const unpaidPolar = new FakePolarPort(db, { autoSettle: false });
-  setPolarPortForTests(unpaidPolar);
-  const unpaidRaise = await unpaidPolar.createCheckout({
+  const unpaidPayment = new FakePaymentPort(db, { autoSettle: false });
+  setPaymentPortForTests(unpaidPayment);
+  const unpaidRaise = await unpaidPayment.createCheckout({
     amountUsd: 5,
     listing: draft({ bidUsd: 25 }),
     intent: "raise",
@@ -489,13 +561,13 @@ test("occupied Polar return names difference-only — not a full rebid paid", as
   assert.doesNotMatch(cancelHtml, /data-raise-return/);
   assert.doesNotMatch(cancelHtml, /data-raise-unknown/);
   assert.doesNotMatch(cancelHtml, /An unpaid raise draft does not unlist/);
-  assert.doesNotMatch(cancelHtml, /Polar charged/);
+  assert.doesNotMatch(cancelHtml, /Waffo charged/);
   assert.doesNotMatch(cancelHtml, /only the difference, not a full rebid/);
   assert.doesNotMatch(cancelHtml, /#1|#2|rank #/i);
   assert.equal(listLane("london", "movers", db)[0]?.bidUsd, 20);
   assert.equal(listLane("london", "movers", db)[0]?.business, "North London Movers");
 
-  setPolarPortForTests(polar);
+  setPaymentPortForTests(polar);
   const raised = await raiseListing(draft({ bidUsd: 25 }), polar, db);
   assert.equal(raised.quote.chargeUsd, 5);
   assert.equal(raised.listing?.bidUsd, 25);
@@ -518,17 +590,17 @@ test("occupied Polar return names difference-only — not a full rebid paid", as
   assert.match(raiseHtml, /class="raise-return"/);
   assert.match(
     raiseHtml,
-    /Polar charged \$<span data-raise-charge-usd="">5<\/span> — only the difference, not a full rebid/,
+    /\$<span data-raise-charge-usd="">5<\/span> was charged — only the difference, not a full rebid/,
   );
   const raiseFact = raiseHtml.match(
     /class="raise-return"[^>]*>([\s\S]*?)<\/p>/,
   );
   assert.ok(raiseFact);
-  assert.match(raiseFact[1] ?? "", /Polar charged/);
+  assert.match(raiseFact[1] ?? "", /was charged/);
   assert.doesNotMatch(raiseFact[1] ?? "", /is listed at/);
   assert.match(raiseHtml, /North London Movers is listed at \$25/);
   assert.match(raiseHtml, /Rank is the bid/);
-  assert.doesNotMatch(raiseHtml, /Polar charged \$25/);
+  assert.doesNotMatch(raiseHtml, /Waffo charged \$25/);
   assert.doesNotMatch(raiseHtml, /data-return="cancelled"/);
   assert.doesNotMatch(raiseHtml, /#1|#2|rank #/i);
   assert.doesNotMatch(raiseHtml, /★|⭐|review count/i);
@@ -540,19 +612,19 @@ test("occupied Polar return names difference-only — not a full rebid paid", as
   assert.doesNotMatch(raiseHtml, /Call this #1/);
 });
 
-test("occupied cancelled Polar return still occupies — not never listed", async () => {
+test("occupied cancelled Waffo return still occupies — not never listed", async () => {
   const db = openDatabase(":memory:");
   after(() => db.close());
-  const polar = new FakePolarPort(db);
-  setPolarPortForTests(polar);
+  const polar = new FakePaymentPort(db);
+  setPaymentPortForTests(polar);
   await polar.createCheckout({
     amountUsd: 20,
     listing: draft(),
   });
   const { default: ReturnPage } = await import("../app/return/page");
 
-  const unpaidPlace = new FakePolarPort(db, { autoSettle: false });
-  setPolarPortForTests(unpaidPlace);
+  const unpaidPlace = new FakePaymentPort(db, { autoSettle: false });
+  setPaymentPortForTests(unpaidPlace);
   const newListingCancel = await unpaidPlace.createCheckout({
     amountUsd: 12,
     listing: draft({
@@ -578,14 +650,14 @@ test("occupied cancelled Polar return still occupies — not never listed", asyn
   assert.doesNotMatch(newCancelHtml, /An abandoned raise does not unlist/);
   assert.doesNotMatch(newCancelHtml, /An unpaid raise draft does not unlist/);
   assert.doesNotMatch(newCancelHtml, /data-raise-return/);
-  assert.doesNotMatch(newCancelHtml, /Polar charged/);
+  assert.doesNotMatch(newCancelHtml, /Waffo charged/);
   assert.equal(
     listLane("london", "movers", db).some((row) => row.business === "Cancelled Van"),
     false,
   );
 
-  const unpaidRaise = new FakePolarPort(db, { autoSettle: false });
-  setPolarPortForTests(unpaidRaise);
+  const unpaidRaise = new FakePaymentPort(db, { autoSettle: false });
+  setPaymentPortForTests(unpaidRaise);
   const abandonedRaise = await unpaidRaise.createCheckout({
     amountUsd: 5,
     listing: draft({ bidUsd: 25 }),
@@ -614,13 +686,13 @@ test("occupied cancelled Polar return still occupies — not never listed", asyn
   assert.match(occupyFact[1] ?? "", /An abandoned raise does not unlist/);
   assert.doesNotMatch(occupyFact[1] ?? "", /No rank claimed/);
   assert.doesNotMatch(occupyFact[1] ?? "", /does not list/);
-  assert.doesNotMatch(occupyFact[1] ?? "", /Polar charged/);
+  assert.doesNotMatch(occupyFact[1] ?? "", /Waffo charged/);
   assert.doesNotMatch(occupyHtml, /No rank claimed/);
   assert.doesNotMatch(occupyHtml, /An abandoned checkout does not list/);
   assert.doesNotMatch(occupyHtml, /data-raise-return/);
   assert.doesNotMatch(occupyHtml, /data-raise-unknown/);
   assert.doesNotMatch(occupyHtml, /An unpaid raise draft does not unlist/);
-  assert.doesNotMatch(occupyHtml, /Polar charged/);
+  assert.doesNotMatch(occupyHtml, /Waffo charged/);
   assert.doesNotMatch(occupyHtml, /only the difference, not a full rebid/);
   assert.doesNotMatch(occupyHtml, /still occupies at \$25/);
   assert.doesNotMatch(occupyHtml, /#1|#2|rank #/i);
@@ -631,22 +703,22 @@ test("occupied cancelled Polar return still occupies — not never listed", asyn
   assert.equal(stillThere?.bidUsd, 20);
 });
 
-test("occupied unknown Polar return still occupies — not never listed", async () => {
+test("occupied unknown Waffo return still occupies — not never listed", async () => {
   const db = openDatabase(":memory:");
   after(() => db.close());
-  const polar = new FakePolarPort(db);
-  setPolarPortForTests(polar);
+  const polar = new FakePaymentPort(db);
+  setPaymentPortForTests(polar);
   await polar.createCheckout({
     amountUsd: 20,
     listing: draft(),
   });
   const { default: ReturnPage } = await import("../app/return/page");
 
-  const unpaidPlace = new FakePolarPort(db, {
+  const unpaidPlace = new FakePaymentPort(db, {
     autoSettle: false,
     confirmOpen: false,
   });
-  setPolarPortForTests(unpaidPlace);
+  setPaymentPortForTests(unpaidPlace);
   const newListingUnknown = await unpaidPlace.createCheckout({
     amountUsd: 12,
     listing: draft({
@@ -671,17 +743,17 @@ test("occupied unknown Polar return still occupies — not never listed", async 
   assert.doesNotMatch(newUnknownHtml, /data-raise-cancel/);
   assert.doesNotMatch(newUnknownHtml, /An abandoned raise does not unlist/);
   assert.doesNotMatch(newUnknownHtml, /data-raise-return/);
-  assert.doesNotMatch(newUnknownHtml, /Polar charged/);
+  assert.doesNotMatch(newUnknownHtml, /Waffo charged/);
   assert.equal(
     listLane("london", "movers", db).some((row) => row.business === "Unknown Van"),
     false,
   );
 
-  const unpaidRaise = new FakePolarPort(db, {
+  const unpaidRaise = new FakePaymentPort(db, {
     autoSettle: false,
     confirmOpen: false,
   });
-  setPolarPortForTests(unpaidRaise);
+  setPaymentPortForTests(unpaidRaise);
   const openRaise = await unpaidRaise.createCheckout({
     amountUsd: 5,
     listing: draft({ bidUsd: 25 }),
@@ -717,7 +789,7 @@ test("occupied unknown Polar return still occupies — not never listed", async 
   assert.match(occupyFact[1] ?? "", /An unpaid raise draft does not unlist/);
   assert.doesNotMatch(occupyFact[1] ?? "", /No rank claimed/);
   assert.doesNotMatch(occupyFact[1] ?? "", /never appear/);
-  assert.doesNotMatch(occupyFact[1] ?? "", /Polar charged/);
+  assert.doesNotMatch(occupyFact[1] ?? "", /Waffo charged/);
   assert.doesNotMatch(occupyFact[1] ?? "", /An abandoned raise does not unlist/);
   assert.doesNotMatch(occupyHtml, /No rank claimed/);
   assert.doesNotMatch(occupyHtml, /Unpaid checkout drafts never appear/);
@@ -725,7 +797,7 @@ test("occupied unknown Polar return still occupies — not never listed", async 
   assert.doesNotMatch(occupyHtml, /An abandoned raise does not unlist/);
   assert.doesNotMatch(occupyHtml, /An abandoned checkout does not list/);
   assert.doesNotMatch(occupyHtml, /data-raise-return/);
-  assert.doesNotMatch(occupyHtml, /Polar charged/);
+  assert.doesNotMatch(occupyHtml, /Waffo charged/);
   assert.doesNotMatch(occupyHtml, /only the difference, not a full rebid/);
   assert.doesNotMatch(occupyHtml, /still occupies at \$25/);
   assert.doesNotMatch(occupyHtml, /#1|#2|rank #/i);
@@ -735,4 +807,3 @@ test("occupied unknown Polar return still occupies — not never listed", async 
   assert.equal(stillThere?.business, "North London Movers");
   assert.equal(stillThere?.bidUsd, 20);
 });
-

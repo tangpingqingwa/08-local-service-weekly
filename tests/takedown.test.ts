@@ -4,13 +4,18 @@ import React, { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { listLane, rankLane } from "../src/board";
 import { openDatabase, type AppDb } from "../src/db";
-import { findListingByIdentity, quoteRaise, raiseListing } from "../src/listings";
 import {
-  FakePolarPort,
-  resetPolarFixture,
-  setPolarPortForTests,
-} from "../src/polar/fake";
-import { parseListingDraft, PolarError, type ListingDraft } from "../src/polar/port";
+  findListingByIdentity,
+  getListingById,
+  quoteRaise,
+  raiseListing,
+} from "../src/listings";
+import {
+  FakePaymentPort,
+  resetPaymentFixture,
+  setPaymentPortForTests,
+} from "../src/billing/fake";
+import { parseListingDraft, PaymentError, type ListingDraft } from "../src/billing/port";
 import {
   hideListing,
   listTakedowns,
@@ -27,7 +32,7 @@ import { currentWeekId } from "../src/week";
 process.env.DATABASE_PATH = ":memory:";
 
 afterEach(() => {
-  resetPolarFixture();
+  resetPaymentFixture();
 });
 
 function draft(overrides: Partial<ListingDraft> = {}): ListingDraft {
@@ -44,10 +49,10 @@ function draft(overrides: Partial<ListingDraft> = {}): ListingDraft {
 }
 
 async function withDb(
-  run: (db: AppDb, polar: FakePolarPort) => Promise<void> | void,
+  run: (db: AppDb, polar: FakePaymentPort) => Promise<void> | void,
 ): Promise<void> {
   const db = openDatabase(":memory:");
-  const polar = new FakePolarPort(db);
+  const polar = new FakePaymentPort(db);
   try {
     await run(db, polar);
   } finally {
@@ -94,7 +99,7 @@ test("dentist without licenseId is 400 license_required", () => {
         amount: 20,
       }),
     (err: unknown) => {
-      assert.ok(err instanceof PolarError);
+      assert.ok(err instanceof PaymentError);
       assert.equal(err.code, "license_required");
       assert.equal(err.httpStatus, 400);
       return true;
@@ -122,7 +127,7 @@ test("immigration lawyer without license is license_required; movers stay option
         amount: 20,
       }),
     (err: unknown) => {
-      assert.ok(err instanceof PolarError);
+      assert.ok(err instanceof PaymentError);
       assert.equal(err.code, "license_required");
       return true;
     },
@@ -210,6 +215,34 @@ test("operator takedown on #1 hides the listing and vacates rank", async () => {
   });
 });
 
+test("takedown rolls back hiding when the audit insert fails", async () => {
+  await withDb(async (db, polar) => {
+    const started = await polar.createCheckout({
+      amountUsd: 20,
+      listing: draft(),
+    });
+    assert.ok(started.listingId);
+    db.exec(`
+      CREATE TRIGGER fail_takedown_audit
+      BEFORE INSERT ON takedowns
+      BEGIN
+        SELECT RAISE(ABORT, 'audit unavailable');
+      END
+    `);
+
+    assert.throws(
+      () => hideListing(db, { listingId: started.listingId!, reason: "other" }),
+      (error: unknown) => {
+        assert.match(String(error), /audit unavailable/);
+        return true;
+      },
+    );
+    const listing = getListingById(db, started.listingId);
+    assert.equal(listing?.hidden, false);
+    assert.deepEqual(listTakedowns(db, started.listingId), []);
+  });
+});
+
 test("takedown does not invent a replacement #1 when the lane is empty", async () => {
   await withDb(async (db, polar) => {
     const only = await polar.createCheckout({
@@ -291,7 +324,7 @@ test("hidden listing cannot raise until unhidden", async () => {
     assert.throws(
       () => quoteRaise({ bidUsd: 20, hidden: true }, 25),
       (err: unknown) => {
-        assert.ok(err instanceof PolarError);
+        assert.ok(err instanceof PaymentError);
         assert.equal(err.code, "listing_hidden");
         assert.equal(err.httpStatus, 409);
         return true;
@@ -300,7 +333,7 @@ test("hidden listing cannot raise until unhidden", async () => {
     await assert.rejects(
       () => raiseListing(draft({ bidUsd: 25 }), polar, db),
       (err: unknown) => {
-        assert.ok(err instanceof PolarError);
+        assert.ok(err instanceof PaymentError);
         assert.equal(err.code, "listing_hidden");
         return true;
       },
@@ -357,7 +390,7 @@ test("operator hide path requires the shared secret", async () => {
 test("POST /api/checkout dentist without license is license_required", async () => {
   const db = openDatabase(":memory:");
   after(() => db.close());
-  setPolarPortForTests(new FakePolarPort(db));
+  setPaymentPortForTests(new FakePaymentPort(db));
   const { POST } = await import("../app/api/checkout/route");
 
   const missing = await POST(
@@ -407,8 +440,8 @@ test("POST /api/checkout dentist without license is license_required", async () 
 test("POST /api/takedown hides #1 and next visible bid is #1", async () => {
   const db = openDatabase(":memory:");
   after(() => db.close());
-  const polar = new FakePolarPort(db);
-  setPolarPortForTests(polar);
+  const polar = new FakePaymentPort(db);
+  setPaymentPortForTests(polar);
   const previous = process.env.OPERATOR_SECRET;
   process.env.OPERATOR_SECRET = "operator-test-secret";
   after(() => {

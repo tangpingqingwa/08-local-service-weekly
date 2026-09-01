@@ -1,8 +1,9 @@
-import { isPolarPaidListing, rankLane, type RankedListing } from "../board";
+import { isProviderPaidListing, rankLane, type RankedListing } from "../board";
 import type { Category } from "../categories";
 import type { City } from "../cities";
 import { ListingCard } from "./listing-card";
 import { OutbidForm } from "./outbid-form";
+import { FormErrorNotice } from "./form-error";
 
 type LaneBoardProps = {
   city: City;
@@ -11,6 +12,14 @@ type LaneBoardProps = {
   lastWeek?: RankedListing;
   weekId?: string;
   showForm?: boolean;
+  formError?: string;
+  /**
+   * Retained as a source-compatible prop for older callers. The classified
+   * paper renders every real paid row in its own lane.
+   */
+  canonicalCount?: number;
+  displayRankStart?: number;
+  renderCanonical?: boolean;
 };
 
 export function LaneBoard({
@@ -20,13 +29,13 @@ export function LaneBoard({
   lastWeek,
   weekId,
   showForm = false,
+  formError,
 }: LaneBoardProps) {
   const paid = rankLane(listings);
   const occupied = paid.length > 0;
-  const lead = paid.find((listing) => listing.rank === 1);
-  const lastCall = [...paid].reverse().find((listing) => listing.rank > 1);
+  const lead = paid[0];
   const lastWeekPaid =
-    lastWeek && isPolarPaidListing(lastWeek) ? lastWeek : undefined;
+    lastWeek && isProviderPaidListing(lastWeek) ? lastWeek : undefined;
 
   return (
     <section
@@ -36,6 +45,7 @@ export function LaneBoard({
           : "lane classified-column lane-empty"
       }
       data-lane=""
+      data-slot="lane"
       data-city={city.slug}
       data-category={category.slug}
       data-week={weekId}
@@ -43,23 +53,25 @@ export function LaneBoard({
         ? { "data-lane-occupied": "true" }
         : { "data-lane-empty": "true" })}
     >
-      <header className="lane-header">
+      <header className="lane-header" data-slot="lane-heading">
+        <p className="lane-index">Service desk</p>
         <h2>
-          <a href={`/c/${city.slug}/${category.slug}`}>{category.display}</a>
+          <a href={"/c/" + city.slug + "/" + category.slug}>{category.display}</a>
         </h2>
-        <p>Want ads. Rank is the bid.</p>
+        <p>Paid placement. Rank is the bid.</p>
       </header>
+      {formError ? <FormErrorNotice code={formError} /> : null}
       {paid.length === 0 ? (
         <div
           className="empty-lane"
           data-empty-lane="true"
+          data-slot="empty-lane"
           data-empty-honest=""
         >
           <p className="empty-answer">No #1</p>
           <p className="empty-note">
-            This lane is empty. Rank is the bid. No stars. No map. Unpaid
-            checkout stays off the board until Polar reports paid. An abandoned
-            listing is not #1.
+            No paid listing in this desk yet. Ratings and map position do not
+            affect the board. An incomplete checkout stays off the paper.
           </p>
         </div>
       ) : (
@@ -67,61 +79,46 @@ export function LaneBoard({
           <ol
             className="leaderboard"
             data-leaderboard=""
-            data-rolling-week=""
+            data-slot="paid-card-list"
           >
             {paid.map((listing) => (
-              <li key={listing.id}>
+              <li key={listing.id} data-slot="lane-card">
                 <ListingCard listing={listing} />
               </li>
             ))}
           </ol>
           {lead ? (
             <p
-              className="later-claim claim-after-call-line"
+              className="later-claim"
               data-later-claim=""
+              data-slot="raise-support"
               data-raise-difference=""
             >
               <a
-                className="claim-after-call claim-after-call-one claim-after-call-two claim-after-call-three claim-after-call-four claim-after-call-five"
-                href={`/c/${city.slug}/${category.slug}#claim`}
-                data-claim-after-call=""
-                data-claim-after-call-one=""
-                data-claim-after-call-two=""
-                data-claim-after-call-three=""
-                data-claim-after-call-four=""
-                data-claim-after-call-five=""
+                className="claim-route"
+                href={"/c/" + city.slug + "/" + category.slug + "#claim"}
                 data-claim-job={category.slug}
               >
-                {`Outbid my ${category.display.toLowerCase()} column`}
+                {"Outbid my " + category.display.toLowerCase() + " column"}
               </a>{" "}
-              after Call this #1.{" "}
               <span className="raise-charge" data-raise-charge="">
-                Polar charges only the difference, not a full rebid.
+                A raise charges only the difference, not a full rebid.
               </span>{" "}
               Paying less than #1 still lists. Rank is the bid.
-            </p>
-          ) : null}
-          {lastCall ? (
-            <p className="later-call call-after-claim-line" data-later-call="">
-              <a
-                className="host call-later call-after-claim"
-                href={`/go/${lastCall.id}`}
-                data-call-after-claim=""
-                aria-label={`Call #${lastCall.rank} after the claim hop at ${lastCall.siteHost}`}
-              >
-                {`Call #${lastCall.rank}`}
-              </a>{" "}
-              after the claim hop.
             </p>
           ) : null}
         </>
       )}
       {lastWeekPaid ? (
-        <aside className="last-week" data-last-week="" data-aged-out="">
+        <aside
+          className="last-week"
+          data-last-week=""
+          data-slot="last-week-note"
+          data-aged-out=""
+        >
           <p>
-            Aged out of the last 7 days:{" "}
-            <strong>{lastWeekPaid.business}</strong> at $
-            {lastWeekPaid.bidUsd}. Not current #1 unless they pay again.
+            Aged out of the last 7 days: <strong>{lastWeekPaid.business}</strong>{" "}
+            at {"$" + lastWeekPaid.bidUsd}. Not current #1 unless they pay again.
           </p>
         </aside>
       ) : null}
@@ -131,7 +128,7 @@ export function LaneBoard({
           category={category.slug}
           lockCity
           lockCategory
-          emptyPaper={paid.length === 0}
+          emptyPaper={!occupied}
           topBidUsd={lead?.bidUsd}
         />
       ) : null}

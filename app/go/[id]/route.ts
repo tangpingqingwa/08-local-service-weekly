@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ClickError, incrementPublicClick } from "../../../src/clicks";
 import { getDb, type AppDb } from "../../../src/db";
-import { getPolarPort } from "../../../src/polar/fake";
+import { getPaymentPort } from "../../../src/billing/fake";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ export async function GET(
 }
 
 function listingStore(): AppDb {
-  const port = getPolarPort();
+  const port = getPaymentPort();
   if (typeof port.database === "function") {
     return port.database();
   }

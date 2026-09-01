@@ -45,15 +45,20 @@ export function clickDestinationUrl(siteUrl: string): string {
 export function incrementPublicClick(db: AppDb, listingId: string): ClickHop {
   const id = listingId.trim();
   const listing = id ? getListingById(db, id) : undefined;
-  if (!listing) {
+  if (!listing || listing.hidden) {
     throw new ClickError("listing_not_found", 404);
   }
   const url = clickDestinationUrl(listing.siteUrl);
-  db.prepare("UPDATE listings SET clicks = clicks + 1 WHERE id = ?").run(
-    listing.id,
-  );
+  const result = db
+    .prepare(
+      "UPDATE listings SET clicks = clicks + 1 WHERE id = ? AND hidden = 0",
+    )
+    .run(listing.id);
+  if (result.changes !== 1) {
+    throw new ClickError("listing_not_found", 404);
+  }
   const updated = getListingById(db, listing.id);
-  if (!updated) {
+  if (!updated || updated.hidden) {
     throw new ClickError("listing_not_found", 404);
   }
   return { listing: updated, url };

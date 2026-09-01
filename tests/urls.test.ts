@@ -8,12 +8,12 @@ import { listLane } from "../src/board";
 import { openDatabase } from "../src/db";
 import { findListingByIdentity, listingIdentity } from "../src/listings";
 import {
-  FakePolarPort,
+  FakePaymentPort,
   currentWeekId,
-  resetPolarFixture,
-  setPolarPortForTests,
-} from "../src/polar/fake";
-import { PolarError, parseListingDraft } from "../src/polar/port";
+  resetPaymentFixture,
+  setPaymentPortForTests,
+} from "../src/billing/fake";
+import { PaymentError, parseListingDraft } from "../src/billing/port";
 import {
   canonicalizeSiteUrl,
   isTrackingQueryKey,
@@ -25,7 +25,7 @@ import {
 process.env.DATABASE_PATH = ":memory:";
 
 afterEach(() => {
-  resetPolarFixture();
+  resetPaymentFixture();
 });
 
 function assertUrlError(raw: string, code: string): void {
@@ -146,7 +146,7 @@ test("parseListingDraft stores the stripped URL and rejects chat / NSFW / shorte
         amount: 20,
       }),
     (err: unknown) => {
-      assert.ok(err instanceof PolarError);
+      assert.ok(err instanceof PaymentError);
       assert.equal(err.code, "chat_link");
       assert.equal(err.httpStatus, 400);
       return true;
@@ -163,7 +163,7 @@ test("parseListingDraft stores the stripped URL and rejects chat / NSFW / shorte
         amount: 20,
       }),
     (err: unknown) => {
-      assert.ok(err instanceof PolarError);
+      assert.ok(err instanceof PaymentError);
       assert.equal(err.code, "nsfw");
       return true;
     },
@@ -178,7 +178,7 @@ test("parseListingDraft stores the stripped URL and rejects chat / NSFW / shorte
         amount: 20,
       }),
     (err: unknown) => {
-      assert.ok(err instanceof PolarError);
+      assert.ok(err instanceof PaymentError);
       assert.equal(err.code, "url_shortener");
       return true;
     },
@@ -188,8 +188,8 @@ test("parseListingDraft stores the stripped URL and rejects chat / NSFW / shorte
 test("paid checkout stores the stripped URL; chat / NSFW / shortener never list", async () => {
   const db = openDatabase(":memory:");
   after(() => db.close());
-  const polar = new FakePolarPort(db);
-  setPolarPortForTests(polar);
+  const polar = new FakePaymentPort(db);
+  setPaymentPortForTests(polar);
   const { POST } = await import("../app/api/checkout/route");
 
   const ok = await POST(
@@ -251,24 +251,22 @@ test("paid checkout stores the stripped URL; chat / NSFW / shortener never list"
   assert.doesNotMatch(ranked[0]?.siteUrl ?? "", /utm_|t\.me|onlyfans|bit\.ly/);
 });
 
-test("About page states the outbid.lol local-service-weekly product", () => {
+test("About page explains Local Service Weekly without clone or build copy", () => {
   const html = renderToStaticMarkup(createElement(AboutPage));
   assert.match(html, /data-page="about"/);
   assert.match(html, /<h1>About<\/h1>/);
   assert.match(html, /Rank is the bid/);
-  assert.match(html, /outbid\.lol/);
-  assert.match(html, /local-service-weekly/);
-  assert.match(html, /global English/i);
+  assert.match(html, /Local Service Weekly is a public auction/);
   assert.match(html, /London/);
-  assert.match(html, /no ads/i);
-  assert.match(html, /no stars/);
+  assert.match(html, /no star ratings/);
   assert.match(html, /href="\/rules"/);
-  assert.match(html, /last 7 days/);
-  assert.match(html, /Rolling last 7 days\. Not Monday 00:00 Europe\/London\./);
+  assert.match(html, /eligible for seven days/);
+  assert.match(html, /payment is confirmed/);
   assert.doesNotMatch(html, /paid the most this week/);
   assert.doesNotMatch(html, /public weekly auction/);
   assert.doesNotMatch(html, /data-rolling-week|week-window/);
   assert.doesNotMatch(html, /★|⭐|review count/i);
+  assert.doesNotMatch(html, /outbid\.lol|local-service-weekly|\bclone\b|\bv1\b|\bfixture\b|weekId|createdAt|paidAt|Waffo/i);
 });
 
 test("Rules page states min $5, rank=bid, older wins ties, raise pays difference", () => {
@@ -276,22 +274,17 @@ test("Rules page states min $5, rank=bid, older wins ties, raise pays difference
   assert.match(html, /data-page="rules"/);
   assert.match(html, /<h1>Rules<\/h1>/);
   assert.match(html, /Rank is the bid/);
-  assert.match(html, /min \$5/);
-  assert.match(html, /older/);
+  assert.match(html, /new listing starts at <strong>\$5/);
+  assert.match(html, /listing placed first keeps the higher rank/);
   assert.match(html, /difference/);
-  assert.match(html, /London/);
-  assert.match(html, /chat_link/);
-  assert.match(html, /nsfw/);
-  assert.match(html, /url_shortener/);
-  assert.match(html, /utm_/);
-  assert.match(html, /city × category, rolling last 7 days/);
-  assert.match(html, /canonical site URL \+ category \+ city/);
-  assert.match(html, /Polar\/audit label/);
-  assert.match(html, /<h2>Last 7 days<\/h2>/);
-  assert.match(html, /Rolling last 7 days\. Not Monday 00:00 Europe\/London\./);
+  assert.match(html, /Link shorteners, chat invitations, and adult content are rejected/);
+  assert.match(html, /cleaned website, category, and city/);
+  assert.match(html, /<h2>Rolling seven-day window<\/h2>/);
+  assert.match(html, /does not reset for everyone at Monday midnight/);
   assert.doesNotMatch(html, /<h2>Week<\/h2>/);
   assert.doesNotMatch(html, /city × category × week/);
   assert.doesNotMatch(html, /canonical site URL \+ category \+ city \+ week/);
   assert.doesNotMatch(html, /data-rolling-week|week-window/);
   assert.doesNotMatch(html, /★|⭐|review count/i);
+  assert.doesNotMatch(html, /outbid\.lol|local-service-weekly|\bclone\b|\bv1\b|\bfixture\b|weekId|createdAt|paidAt|Waffo/i);
 });

@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Rules · Local Service Weekly",
   description:
     "Rank is the bid. Minimum $5, older listings win ties, and raises pay only the difference.",
+  alternates: { canonical: "/rules" },
 };
 
 export default function RulesPage() {

@@ -112,6 +112,9 @@ summary:focus-visible {
 }
 
 .logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
   color: var(--ink);
   font-size: 0.82rem;
   font-weight: 700;
@@ -120,6 +123,14 @@ summary:focus-visible {
   text-decoration: none;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.brand-mark {
+  display: block;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 7px;
 }
 
 .tagline {

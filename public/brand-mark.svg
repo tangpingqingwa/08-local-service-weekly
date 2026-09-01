@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Local Service Weekly classified</title>
+  <rect x="2" y="2" width="60" height="60" rx="10" fill="#2a2116"/>
+  <path d="M10 30 32 12l22 18v23H10V30Z" fill="#fff8e6"/>
+  <path d="M23 52V35h18v17" fill="#e8d7b2"/>
+  <path d="m19 45 25-25" stroke="#8b1e12" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="18" cy="46" r="5" fill="none" stroke="#8b1e12" stroke-width="4"/>
+  <path d="m43 19 4-4" stroke="#8b1e12" stroke-width="7" stroke-linecap="round"/>
+</svg>

@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "About · Local Service Weekly",
   description:
     "A public London service board where local providers are ranked only by bid.",
+  alternates: { canonical: "/about" },
 };
 
 export default function AboutPage() {

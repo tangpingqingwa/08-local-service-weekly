@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {
   DEFAULT_CITY_SLUG,
   listCityLanes,
@@ -9,6 +10,7 @@ import { currentWeekId } from "../src/week";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 export default function HomePage() {
   const city = resolveCity(DEFAULT_CITY_SLUG);

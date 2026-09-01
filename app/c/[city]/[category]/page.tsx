@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {
   lastWeekNumberOne,
   listLane,
@@ -18,6 +19,28 @@ type LanePageProps = {
   params: Promise<{ city: string; category: string }>;
   searchParams?: Promise<{ error?: string | string[] }>;
 };
+
+export async function generateMetadata({ params }: Pick<LanePageProps, "params">): Promise<Metadata> {
+  const { city: citySlug, category: categorySlug } = await params;
+  const city = resolveCity(citySlug);
+  const category = resolveCategory(categorySlug);
+  if (!city.ok || !category.ok) return { robots: { index: false, follow: false } };
+  const title = `${category.value.display} in ${city.value.display}`;
+  const description = `Compare paid ${category.value.display.toLowerCase()} listings in ${city.value.display}. Rank is the bid on a rolling seven-day board.`;
+  const canonical = `/c/${city.value.slug}/${category.value.slug}`;
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      images: [{ url: "/brand-mark.png", width: 512, height: 512, alt: `${category.value.display} in ${city.value.display}` }],
+    },
+    twitter: { card: "summary", title, description, images: ["/brand-mark.png"] },
+  };
+}
 
 export default async function LanePage({ params, searchParams }: LanePageProps) {
   const { city: citySlug, category: categorySlug } = await params;

@@ -138,6 +138,44 @@ test("non-http(s) schemes are rejected", () => {
   assertUrlError("javascript:alert(1)", "invalid_listing");
   assertUrlError("data:text/html,hi", "invalid_listing");
   assertUrlError("not a url", "invalid_listing");
+  for (const raw of [
+    "javascript\n://example.com",
+    "java\nscript:123",
+    "javascript\\://example.com",
+    "java\\script:123",
+    "https:\\\\example.com",
+  ]) {
+    assertUrlError(raw, "invalid_listing");
+  }
+});
+
+test("private and local-only destinations are rejected", () => {
+  for (const raw of [
+    "10.0.0.1/van",
+    "172.16.0.1/van",
+    "192.168.1.1/van",
+    "127.0.0.1/van",
+    "169.254.1.1/van",
+    "[::1]/van",
+    "[fe80::1]/van",
+    "[fd00::1]/van",
+    "localhost/van",
+    "vendor.local/van",
+    "vendor.internal/van",
+    "https://10.0.0.1/van",
+    "https://[::ffff:127.0.0.1]/van",
+  ]) {
+    assertUrlError(raw, "invalid_listing");
+  }
+
+  assert.equal(
+    canonicalizeSiteUrl("public.example:8443/van"),
+    "https://public.example:8443/van",
+  );
+  assert.equal(
+    canonicalizeSiteUrl("https://public.example/van"),
+    "https://public.example/van",
+  );
 });
 
 test("parseListingDraft stores the stripped URL and rejects chat / NSFW / shortener", () => {

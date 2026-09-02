@@ -101,7 +101,113 @@ function hostMatches(host: string, listed: string): boolean {
 }
 
 function hostnameOf(parsed: URL): string {
-  return parsed.hostname.toLowerCase().replace(/\.$/, "");
+  return parsed.hostname.toLowerCase().replace(/\.+$/, "");
+}
+
+const CONTROL_OR_BACKSLASH_RE = /[\u0000-\u001f\u007f\\]/;
+
+function parseIpv4(host: string): readonly number[] | null {
+  const octets = host.split(".");
+  if (octets.length !== 4 || octets.some((octet) => !/^\d{1,3}$/.test(octet))) {
+    return null;
+  }
+
+  const parsed = octets.map(Number);
+  return parsed.every((octet) => octet >= 0 && octet <= 255) ? parsed : null;
+}
+
+function isUnsafeIpv4(host: string): boolean {
+  const octets = parseIpv4(host);
+  if (!octets) return false;
+
+  const [first, second, third] = octets;
+  return (
+    first === 0 ||
+    first === 10 ||
+    first === 127 ||
+    (first === 100 && second >= 64 && second <= 127) ||
+    (first === 169 && second === 254) ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 0 && third <= 2) ||
+    (first === 192 && second === 168) ||
+    (first === 198 && second >= 18 && second <= 19) ||
+    (first === 198 && second === 51 && third === 100) ||
+    (first === 203 && second === 0 && third === 113) ||
+    first >= 224
+  );
+}
+
+function parseIpv6(host: string): readonly number[] | null {
+  const value = host.startsWith("[") && host.endsWith("]")
+    ? host.slice(1, -1)
+    : host;
+  if (!value.includes(":")) return null;
+
+  const halves = value.split("::");
+  if (halves.length > 2) return null;
+
+  const parseHalf = (half: string): number[] | null => {
+    if (!half) return [];
+    const groups = half.split(":");
+    const result: number[] = [];
+    for (const group of groups) {
+      if (group.includes(".")) {
+        const octets = parseIpv4(group);
+        if (!octets || result.length !== groups.length - 1) return null;
+        result.push((octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]);
+        continue;
+      }
+      if (!/^[0-9a-f]{1,4}$/i.test(group)) return null;
+      result.push(Number.parseInt(group, 16));
+    }
+    return result;
+  };
+
+  const left = parseHalf(halves[0]);
+  const right = halves.length === 2 ? parseHalf(halves[1]) : [];
+  if (!left || !right) return null;
+
+  if (halves.length === 1) {
+    return left.length === 8 ? left : null;
+  }
+
+  const zeroes = 8 - left.length - right.length;
+  if (zeroes < 1) return null;
+  return [...left, ...Array.from({ length: zeroes }, () => 0), ...right];
+}
+
+function isUnsafeIpv6(host: string): boolean {
+  const groups = parseIpv6(host);
+  if (!groups) return false;
+
+  const first = groups[0];
+  const allZero = groups.every((group) => group === 0);
+  const loopback = groups.slice(0, 7).every((group) => group === 0) && groups[7] === 1;
+  const uniqueLocal = (first & 0xfe00) === 0xfc00;
+  const linkLocal = (first & 0xffc0) === 0xfe80;
+  const siteLocal = (first & 0xffc0) === 0xfec0;
+  const multicast = (first & 0xff00) === 0xff00;
+  const ipv4Mapped = groups.slice(0, 5).every((group) => group === 0) && groups[5] === 0xffff;
+
+  // Keep the mapped range blocked even when its embedded address is public;
+  // the existing public-URL policy fails closed for this representation.
+  return allZero || loopback || uniqueLocal || linkLocal || siteLocal || multicast || ipv4Mapped;
+}
+
+function isLocalOnlyHost(host: string): boolean {
+  return (
+    host === "localhost" ||
+    host === "local" ||
+    host === "internal" ||
+    host === "ip6-loopback" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local") ||
+    host.endsWith(".internal")
+  );
+}
+
+function isUnsafeSiteHost(host: string): boolean {
+  return isLocalOnlyHost(host) || isUnsafeIpv4(host) || isUnsafeIpv6(host);
 }
 
 function looksLikeBareSiteUrl(value: string): boolean {
@@ -174,13 +280,16 @@ export function isShortenerHost(host: string): boolean {
 /**
  * Require https (http → https when the host is unchanged), lowercase host,
  * add a safe https scheme for bare host input, drop fragment and tracking
- * query keys, and ignore trailing slash for identity. Chat, NSFW, and
- * unresolved shorteners are 400.
+ * query keys, and ignore trailing slash for identity. Chat, NSFW, unresolved
+ * shorteners, and private or local-only destinations are 400.
  */
 export function canonicalizeSiteUrl(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) {
     throw new UrlError("invalid_listing", 400, "Site URL is required");
+  }
+  if (CONTROL_OR_BACKSLASH_RE.test(trimmed)) {
+    throw new UrlError("invalid_listing", 400, "Site URL must be http(s)");
   }
 
   let parsed: URL;
@@ -198,6 +307,13 @@ export function canonicalizeSiteUrl(raw: string): string {
   const host = hostnameOf(parsed);
   if (!host) {
     throw new UrlError("invalid_listing", 400, "Site URL host is required");
+  }
+  if (isUnsafeSiteHost(host)) {
+    throw new UrlError(
+      "invalid_listing",
+      400,
+      "Private or local-only destinations are not allowed",
+    );
   }
 
   if (isShortenerHost(host)) {

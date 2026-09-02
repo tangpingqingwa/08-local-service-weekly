@@ -266,6 +266,8 @@ summary:focus-visible {
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
+  width: fit-content;
+  max-width: 100%;
   gap: 0.45rem 0.65rem;
   margin: 0;
   color: var(--ink);
@@ -273,6 +275,10 @@ summary:focus-visible {
   letter-spacing: -0.03em;
   line-height: 1.1;
   text-align: center;
+}
+
+.claim h2 > span:first-child {
+  white-space: nowrap;
 }
 
 .claim-note {
@@ -287,7 +293,11 @@ summary:focus-visible {
 .amount-stepper {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 0.35rem;
+  width: max-content;
+  max-width: 100%;
+  white-space: nowrap;
 }
 
 .amount-field {
@@ -333,7 +343,7 @@ summary:focus-visible {
 .fields,
 .want-ad-fields {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(9rem, 1fr) minmax(0, 1.3fr) minmax(7rem, 0.7fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(9rem, 1fr) minmax(0, 1.3fr) minmax(8rem, 0.85fr) max-content;
   gap: 0.7rem;
   width: 100%;
   margin-top: 0.8rem;
@@ -371,6 +381,11 @@ summary:focus-visible {
   width: 100%;
 }
 
+.claim-form form[data-bid-form] {
+  width: max-content;
+  max-width: 100%;
+}
+
 .locked-field > span,
 .city-field.locked-field > span {
   display: flex;
@@ -399,7 +414,9 @@ summary:focus-visible {
 
 .bid-row {
   display: flex;
-  justify-content: flex-end;
+  grid-column: 5;
+  grid-row: 1;
+  justify-content: stretch;
   align-items: end;
   min-height: 2.5rem;
 }
@@ -419,6 +436,10 @@ summary:focus-visible {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
+}
+
+.bid-row .outbid {
+  width: 100%;
 }
 
 .outbid:disabled {
@@ -974,7 +995,13 @@ summary:focus-visible {
   }
 
   .bid-row {
+    grid-column: auto;
+    grid-row: auto;
     justify-content: stretch;
+  }
+
+  .claim-form form[data-bid-form] {
+    width: 100%;
   }
 
   .bid-row .outbid {

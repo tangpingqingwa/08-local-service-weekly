@@ -279,7 +279,7 @@ if [[ -f package.json ]]; then
     'occupied mixed paper keeps empty lanes honest' \
     'occupied paper keeps one first Call and one quiet claim route' \
     'unpaid and abandoned listings stay off the classified paper' \
-    'empty paper sends identity fields directly to one Outbid submit' \
+    'empty paper sends identity fields directly to one Claim rank submit' \
     'claim and occupied forms post to their distinct payment intents' \
     'occupied raise copy names difference-only' \
     'the ordinary renderer and runtime shell contain no shared reference fixture'; do
@@ -356,7 +356,7 @@ if [[ -f package.json ]]; then
   grep -q 'data-checkout-intent="place"' "$home_body" || fail "empty home must post a place checkout"
   grep -q 'name="business"' "$home_body" || fail "empty home must expose Business"
   grep -q 'name="siteUrl"' "$home_body" || fail "empty home must expose Site URL"
-  grep -q '>Outbid<' "$home_body" || fail "empty home must expose Outbid"
+  grep -q '>Claim rank<' "$home_body" || fail "empty home must expose Claim rank"
   grep -q 'href="/c/london/movers#claim"' "$home_body" || fail "home must link the local movers claim route"
   if grep -q 'Call this #1' "$home_body"; then
     fail "empty home must not invent Call this #1"

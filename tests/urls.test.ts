@@ -64,6 +64,22 @@ test("strips tracking query keys, fragment, and lowercases host", () => {
   assert.equal(isTrackingQueryKey("keep"), false);
 });
 
+test("bare service domains receive a safe https scheme before cleaning", () => {
+  assert.equal(
+    canonicalizeSiteUrl("North.Example/van?utm_source=directory#home"),
+    "https://north.example/van",
+  );
+  assert.equal(
+    canonicalizeSiteUrl("north.example:8443/van"),
+    "https://north.example:8443/van",
+  );
+  assert.equal(
+    canonicalizeSiteUrl("//north.example/van"),
+    "https://north.example/van",
+  );
+  assertUrlError("///north.example/van", "invalid_listing");
+});
+
 test("trailing slash is ignored for identity", () => {
   assert.equal(
     canonicalizeSiteUrl("https://north.example/van/"),
@@ -135,6 +151,15 @@ test("parseListingDraft stores the stripped URL and rejects chat / NSFW / shorte
   assert.equal(draft.siteUrl, "https://north.example/van");
   assert.doesNotMatch(draft.siteUrl, /utm_/);
   assert.doesNotMatch(draft.siteUrl, /fbclid/);
+
+  const bareDomain = parseListingDraft({
+    business: "Bare Domain Movers",
+    category: "movers",
+    city: "london",
+    siteUrl: "bare.example/van",
+    amount: 20,
+  });
+  assert.equal(bareDomain.siteUrl, "https://bare.example/van");
 
   assert.throws(
     () =>

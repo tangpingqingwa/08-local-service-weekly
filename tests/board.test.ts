@@ -273,7 +273,7 @@ test("four empty lanes stay honest and Claim #1 leads the want-ad desk", () => {
   assert.match(html, /data-form-state="new"/);
   assert.match(html, /data-checkout-intent="place"/);
   assert.match(html, /Claim #1 for/);
-  assert.match(html, />Outbid</);
+  assert.match(html, /aria-label="Claim rank"[^>]*>Claim rank</);
   assert.match(html, /name="business"/);
   assert.match(html, /name="siteUrl"/);
   assert.match(html, /name="amount"/);
@@ -470,7 +470,7 @@ test("ListingCard shows rank, business, site, $bid, real clicks, and claimed-lic
   assert.equal(unpaid, "");
 });
 
-test("empty paper sends identity fields directly to one Outbid submit", () => {
+test("empty paper sends identity fields directly to one Claim rank submit", () => {
   const html = renderToStaticMarkup(
     createElement(OutbidForm, {
       city: "london",
@@ -490,8 +490,10 @@ test("empty paper sends identity fields directly to one Outbid submit", () => {
   assert.match(html, /name="category"/);
   assert.match(html, /name="siteUrl"/);
   assert.match(html, /name="amount"/);
+  assert.match(html, /type="text" inputMode="url"/);
   assert.match(html, /class="outbid"/);
-  assert.match(html, />Outbid</);
+  assert.match(html, /aria-label="Claim rank"[^>]*>Claim rank</);
+  assert.doesNotMatch(html, />Outbid</);
   assert.match(html, /Increase bid by one dollar/);
   assert.match(html, /Decrease bid by one dollar/);
   assert.doesNotMatch(html, /data-raise-difference|data-raise-charge/);

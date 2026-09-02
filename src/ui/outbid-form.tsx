@@ -136,6 +136,9 @@ export function OutbidForm({
                 pattern="[0-9]*"
                 min={minimumBid}
                 max={MAX_BID_USD}
+                style={{
+                  width: `${Math.max(2.25, String(amount).length + 0.65)}ch`,
+                }}
                 value={amount}
                 onChange={(event) => {
                   const next = Number(event.target.value.replace(/[^\d]/g, ""));
@@ -244,8 +247,9 @@ export function OutbidForm({
               Site URL
               <input
                 name="siteUrl"
-                type="url"
-                placeholder="https://your-business.example"
+                type="text"
+                inputMode="url"
+                placeholder="your-business.example"
                 required
                 autoComplete="url"
                 spellCheck={false}
@@ -273,11 +277,12 @@ export function OutbidForm({
               <button
                 type="submit"
                 className="outbid"
+                aria-label="Claim rank"
                 disabled={!canSubmit}
                 data-submit-ready={canSubmit ? "true" : "false"}
                 data-slot="claim-button"
               >
-                Outbid
+                Claim rank
               </button>
             </div>
           </div>

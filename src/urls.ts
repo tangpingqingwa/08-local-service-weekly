@@ -104,6 +104,40 @@ function hostnameOf(parsed: URL): string {
   return parsed.hostname.toLowerCase().replace(/\.$/, "");
 }
 
+function looksLikeBareSiteUrl(value: string): boolean {
+  if (!value || /\s/.test(value) || /^[a-z][a-z\d+.-]*:\/\//i.test(value)) {
+    return false;
+  }
+
+  const authority = value.match(/^[^/?#]*/)?.[0] ?? "";
+  if (!authority) return false;
+
+  try {
+    const candidate = value.startsWith("//")
+      ? new URL(`https:${value}`)
+      : new URL(`https://${value}`);
+    const host = hostnameOf(candidate);
+    return (
+      host === "localhost" ||
+      host.includes(".") ||
+      (host.startsWith("[") && host.endsWith("]"))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function urlCandidate(value: string): string {
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith("//") && !value.startsWith("///")) return `https:${value}`;
+
+  // A host with a port (for example, example.com:8443) looks like a URI
+  // scheme to the generic scheme parser. Let the host parser decide first so
+  // those bare service URLs still receive the safe HTTPS default.
+  if (looksLikeBareSiteUrl(value)) return `https://${value}`;
+  return value;
+}
+
 export function isTrackingQueryKey(key: string): boolean {
   const lowered = key.toLowerCase();
   return lowered.startsWith("utm_") || TRACKING_KEY_SET.has(lowered);
@@ -139,8 +173,9 @@ export function isShortenerHost(host: string): boolean {
 
 /**
  * Require https (http → https when the host is unchanged), lowercase host,
- * drop fragment and tracking query keys, ignore trailing slash for identity.
- * Chat, NSFW, and unresolved shorteners are 400.
+ * add a safe https scheme for bare host input, drop fragment and tracking
+ * query keys, and ignore trailing slash for identity. Chat, NSFW, and
+ * unresolved shorteners are 400.
  */
 export function canonicalizeSiteUrl(raw: string): string {
   const trimmed = raw.trim();
@@ -150,7 +185,7 @@ export function canonicalizeSiteUrl(raw: string): string {
 
   let parsed: URL;
   try {
-    parsed = new URL(trimmed);
+    parsed = new URL(urlCandidate(trimmed));
   } catch {
     throw new UrlError("invalid_listing", 400, "Site URL must be http(s)");
   }
@@ -193,6 +228,6 @@ export function canonicalizeSiteUrl(raw: string): string {
     parsed.port === "443" || parsed.port === "80" || parsed.port === "";
   const port = dropDefaultPort ? "" : `:${parsed.port}`;
   const query = kept.toString();
-  const hostForUrl = host.includes(":") ? `[${host}]` : host;
+  const hostForUrl = host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
   return `https://${hostForUrl}${port}${path}${query ? `?${query}` : ""}`;
 }

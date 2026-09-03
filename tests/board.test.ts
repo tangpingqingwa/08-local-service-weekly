@@ -34,7 +34,11 @@ import { CityHub } from "../src/ui/city-hub";
 import { LaneBoard } from "../src/ui/lane-board";
 import { ListingCard } from "../src/ui/listing-card";
 import { NotFoundCode } from "../src/ui/not-found-code";
-import { OutbidForm } from "../src/ui/outbid-form";
+import {
+  clampAmount,
+  minimumBidForForm,
+  OutbidForm,
+} from "../src/ui/outbid-form";
 
 process.env.DATABASE_PATH = ":memory:";
 
@@ -355,6 +359,12 @@ test("occupied mixed paper keeps empty lanes honest", () => {
   assert.ok(lanesAt >= 0 && indexAt > lanesAt);
   assert.equal((html.match(/data-category-tabs=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-bid-form=""/g) ?? []).length, 1);
+  assert.match(html, /data-new-listing=""/);
+  assert.match(html, /data-form-state="new"/);
+  assert.match(html, /action="\/api\/checkout"/);
+  assert.match(html, /data-checkout-intent="place"/);
+  assert.match(html, /data-slot="category-control"/);
+  assert.doesNotMatch(html, /action="\/api\/raise"/);
   assert.match(html, /data-raise-difference=""/);
   assert.match(html, /A raise charges only the difference/);
   assert.doesNotMatch(html, /★|⭐|presentation|top-three|today-strip|activity-strip/i);
@@ -385,6 +395,8 @@ test("occupied paper keeps one first Call and one quiet claim route", () => {
   assert.match(html, /data-raise-difference=""/);
   assert.match(html, /A raise charges only the difference, not a full rebid/);
   assert.match(html, /data-form-state="raise"/);
+  assert.match(html, /data-raise-only=""/);
+  assert.match(html, /Raise your listing to/);
   assert.match(html, /action="\/api\/raise"/);
   assert.match(html, /name="business"/);
   assert.match(html, /name="siteUrl"/);
@@ -525,6 +537,65 @@ test("claim and occupied forms post to their distinct payment intents", () => {
   assert.match(occupied, /data-checkout-intent="raise"/);
   assert.match(occupied, /value="21"/);
   assert.match(occupied, /data-raise-difference/);
+});
+
+test("occupied raise controls share a top-plus-one floor", () => {
+  const html = renderToStaticMarkup(
+    createElement(OutbidForm, {
+      city: "london",
+      category: "movers",
+      lockCity: true,
+      lockCategory: true,
+      emptyPaper: false,
+      topBidUsd: 20,
+    }),
+  );
+
+  assert.equal(minimumBidForForm(false, 20), 21);
+  assert.equal(minimumBidForForm(true, 20), 5);
+  assert.equal(minimumBidForForm(false, 999_999), 1_000_000);
+  assert.equal(clampAmount(5, 21), 21);
+  assert.equal(clampAmount(Number.NaN, 21), 21);
+  assert.equal(clampAmount(1_000_000, 1_000_000), 999_999);
+  assert.match(html, /data-amount-floor="21"/);
+  assert.match(html, /type="number"/);
+  assert.match(html, /min="21"/);
+  assert.match(html, /max="999999"/);
+  assert.match(html, /step="1"/);
+  assert.match(html, /value="21"/);
+  assert.match(html, /data-submit-ready="false"/);
+  assert.match(html, /aria-label="Decrease bid by one dollar" disabled=""/);
+});
+
+test("occupied home form is a clear new-listing path, while raises stay lane-scoped", () => {
+  const london = getCity("london");
+  assert.ok(london);
+  const html = renderToStaticMarkup(
+    createElement(CityHub, {
+      city: london,
+      weekId: currentWeekId(),
+      lanes: {
+        ...emptyLanes(),
+        movers: [
+          ranked({
+            id: "lead",
+            business: "North London Movers",
+            bidUsd: 20,
+            siteUrl: "https://north.example",
+          }),
+        ],
+      },
+    }),
+  );
+
+  assert.match(html, /New listing: choose a service desk/);
+  assert.match(html, /If this site is already listed, use that desk/);
+  assert.match(html, /data-new-listing=""/);
+  assert.match(html, /action="\/api\/checkout"/);
+  assert.match(html, /data-checkout-intent="place"/);
+  assert.match(html, /data-slot="category-control"/);
+  assert.doesNotMatch(html, /action="\/api\/raise"/);
+  assert.match(html, /Outbid my movers column/);
 });
 
 test("occupied raise copy names difference-only — not a full rebid", () => {

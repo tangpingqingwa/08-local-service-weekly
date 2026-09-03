@@ -129,6 +129,7 @@ export function LaneBoard({
           lockCity
           lockCategory
           emptyPaper={!occupied}
+          mode={occupied ? "raise" : "new"}
           topBidUsd={lead?.bidUsd}
         />
       ) : null}

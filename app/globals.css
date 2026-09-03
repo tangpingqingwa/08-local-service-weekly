@@ -340,6 +340,13 @@ summary:focus-visible {
   color: var(--accent);
 }
 
+.step:disabled {
+  border-color: var(--rule-soft);
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .fields,
 .want-ad-fields {
   display: grid;

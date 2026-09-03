@@ -31,18 +31,12 @@ export function CityHub({ city, lanes, lastWeek, weekId }: CityHubProps) {
   const emptyPaper = CATEGORIES.every(
     (category) => paidLanes[category.slug].length === 0,
   );
-  const firstOccupied = CATEGORIES.find(
-    (category) => paidLanes[category.slug].length > 0,
-  );
-  const firstLead = firstOccupied
-    ? paidLanes[firstOccupied.slug][0]
-    : undefined;
-
   const paperClaim = emptyPaper ? (
     <OutbidForm
       city={city.slug}
       lockCity
       emptyPaper
+      mode="new"
       hero
     />
   ) : undefined;
@@ -54,13 +48,12 @@ export function CityHub({ city, lanes, lastWeek, weekId }: CityHubProps) {
       emptyPaper={emptyPaper}
       claim={paperClaim}
     >
+      {/* Home remains the new-listing entry point; raises stay lane-scoped. */}
       {!emptyPaper ? (
         <OutbidForm
           city={city.slug}
-          category={firstOccupied?.slug}
           lockCity
-          emptyPaper={false}
-          topBidUsd={firstLead?.bidUsd}
+          mode="new"
         />
       ) : null}
 

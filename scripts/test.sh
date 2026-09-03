@@ -281,6 +281,8 @@ if [[ -f package.json ]]; then
     'unpaid and abandoned listings stay off the classified paper' \
     'empty paper sends identity fields directly to one Claim rank submit' \
     'claim and occupied forms post to their distinct payment intents' \
+    'occupied raise controls share a top-plus-one floor' \
+    'occupied home form is a clear new-listing path' \
     'occupied raise copy names difference-only' \
     'the ordinary renderer and runtime shell contain no shared reference fixture'; do
     grep -q "$contract" "$test_log" || fail "unit contract did not run: $contract"
@@ -388,6 +390,11 @@ if [[ -f package.json ]]; then
   grep -q 'class="paper classified paper-occupied"' "$occupied_home" || fail "occupied home must use occupied paper"
   grep -q 'data-classified-columns=""' "$occupied_home" || fail "occupied home must use four columns"
   grep -q 'North London Movers' "$occupied_home" || fail "occupied home must show paid business"
+  grep -q 'data-new-listing=""' "$occupied_home" || fail "occupied home must expose a new-listing path"
+  grep -q 'data-checkout-intent="place"' "$occupied_home" || fail "occupied home new listing must post a place checkout"
+  if grep -q 'action="/api/raise"' "$occupied_home"; then
+    fail "occupied home must not submit the new-listing form to raise"
+  fi
   if grep -qE 'OutbidReferenceActivity|REFERENCE_RAIL|presentation-card|today-strip|activity-strip' "$occupied_home"; then
     fail "occupied home must not render target fixture UI"
   fi

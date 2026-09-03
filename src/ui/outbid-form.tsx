@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CATEGORIES,
   categoryRequiresLicense,
@@ -17,11 +17,30 @@ type OutbidFormProps = {
   emptyPaper?: boolean;
   topBidUsd?: number;
   hero?: boolean;
+  /** Explicitly choose a new listing or same-identity raise flow. */
+  mode?: "new" | "raise";
 };
 
-function clampAmount(value: number): number {
-  if (!Number.isFinite(value)) return MIN_BID_USD;
-  return Math.min(MAX_BID_USD, Math.max(MIN_BID_USD, Math.trunc(value)));
+export function minimumBidForForm(
+  newListing: boolean,
+  topBidUsd?: number,
+): number {
+  if (
+    newListing ||
+    topBidUsd === undefined ||
+    !Number.isSafeInteger(topBidUsd) ||
+    topBidUsd < MIN_BID_USD
+  ) {
+    return MIN_BID_USD;
+  }
+  return topBidUsd + 1;
+}
+
+export function clampAmount(value: number, minimumBid = MIN_BID_USD): number {
+  if (!Number.isFinite(value)) {
+    return minimumBid > MAX_BID_USD ? MAX_BID_USD : minimumBid;
+  }
+  return Math.min(MAX_BID_USD, Math.max(minimumBid, Math.trunc(value)));
 }
 
 function OccupiedCheckoutCopy({
@@ -37,8 +56,9 @@ function OccupiedCheckoutCopy({
 
   return (
     <p className="claim-note" data-raise-difference="">
-      New spots start at {"$" + MIN_BID_USD}. Paying less than #1 still lists at
-      the rank that bid can take. Rank is the bid.{" "}
+      Only a listing with this exact site URL in this service desk can raise.
+      Paying less than #1 still lists at the rank that bid can take. Rank is
+      the bid.{" "}
       {takesLead ? (
         <span className="raise-charge" data-raise-charge="" data-current-usd={topBidUsd}>
           {"Raise charge: " + "$" + raiseChargeUsd} — only the difference,
@@ -50,7 +70,7 @@ function OccupiedCheckoutCopy({
         </span>
       )}{" "}
       A new listing is charged its full bid. An incomplete checkout stays off
-      the board.
+      the board. New listings use Claim rank on the home paper.
     </p>
   );
 }
@@ -63,13 +83,14 @@ export function OutbidForm({
   emptyPaper = false,
   topBidUsd,
   hero = false,
+  mode,
 }: OutbidFormProps) {
+  const isNewListing = mode ? mode === "new" : emptyPaper;
   const defaultCity = city ?? CITIES[0]?.slug ?? "london";
   const defaultCategory = category ?? CATEGORIES[0]?.slug ?? "movers";
+  const minimumBid = minimumBidForForm(isNewListing, topBidUsd);
   const [amount, setAmount] = useState(
-    !emptyPaper && topBidUsd !== undefined
-      ? clampAmount(topBidUsd + 1)
-      : MIN_BID_USD,
+    clampAmount(minimumBid, minimumBid),
   );
   const [selectedCity, setSelectedCity] = useState(defaultCity);
   const [selectedCategory, setSelectedCategory] = useState<CategorySlug | "">(
@@ -79,49 +100,64 @@ export function OutbidForm({
   const [siteUrl, setSiteUrl] = useState("");
   const [licenseId, setLicenseId] = useState("");
 
+  useEffect(() => {
+    setAmount((current) => clampAmount(current, minimumBid));
+  }, [minimumBid]);
+
   const activeCategory = selectedCategory || defaultCategory;
   const categoryInfo = CATEGORIES.find((item) => item.slug === activeCategory);
   const licenseNeeded =
     Boolean(selectedCategory) && categoryRequiresLicense(activeCategory);
-  const formAction = emptyPaper ? "/api/checkout" : "/api/raise";
+  const formAction = isNewListing ? "/api/checkout" : "/api/raise";
+  const amountIsValid =
+    Number.isSafeInteger(amount) &&
+    minimumBid <= MAX_BID_USD &&
+    amount >= minimumBid &&
+    amount <= MAX_BID_USD;
   const formId =
-    (hero ? "claim-desk-form" : "claim-" + (emptyPaper ? "new" : "raise")) +
+    (hero ? "claim-desk-form" : "claim-" + (isNewListing ? "new" : "raise")) +
     "-" +
     defaultCity +
     "-" +
     activeCategory;
-  const minimumBid =
-    !emptyPaper && topBidUsd !== undefined
-      ? clampAmount(topBidUsd + 1)
-      : MIN_BID_USD;
   const canSubmit =
+    amountIsValid &&
     business.trim().length > 0 &&
     siteUrl.trim().length > 0 &&
     selectedCategory.length > 0 &&
     (!licenseNeeded || licenseId.trim().length >= 2);
 
   function bump(delta: number): void {
-    setAmount((current) => clampAmount(current + delta));
+    setAmount((current) => clampAmount(current + delta, minimumBid));
   }
 
   return (
     <section
-      className={emptyPaper ? "claim claim-form" : "claim claim-form later-claim"}
+      className={isNewListing ? "claim claim-form" : "claim claim-form later-claim"}
       id="claim"
       data-slot={hero ? "claim-hero" : "claim-support"}
-      data-form-state={emptyPaper ? "new" : "raise"}
+      data-form-state={isNewListing ? "new" : "raise"}
+      data-form-mode={isNewListing ? "new" : "raise"}
+      data-amount-floor={minimumBid}
       {...(hero ? { "data-hero-form": "" } : {})}
-      {...(emptyPaper ? { "aria-label": "Claim #1" } : { "data-later-claim": "" })}
+      {...(isNewListing
+        ? { "aria-label": "Claim #1", "data-new-listing": "" }
+        : {
+            "aria-label": "Raise an existing listing",
+            "data-later-claim": "",
+            "data-raise-only": "",
+          })}
     >
       <div className="claim-desk-heading">
         <p className="claim-kicker">Want ad desk</p>
         <h2 data-slot="claim-heading">
-          <span>Claim #1 for</span>
+          <span>{isNewListing ? "Claim #1 for" : "Raise your listing to"}</span>
           <span className="amount-stepper" data-slot="amount-stepper">
             <button
               type="button"
               className="step"
               aria-label="Decrease bid by one dollar"
+              disabled={amount <= minimumBid}
               onClick={() => bump(-1)}
             >
               −
@@ -132,17 +168,20 @@ export function OutbidForm({
               <input
                 form={formId}
                 name="amount"
+                type="number"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 min={minimumBid}
                 max={MAX_BID_USD}
+                step={1}
+                required
                 style={{
                   width: `${Math.max(2.25, String(amount).length + 0.65)}ch`,
                 }}
                 value={amount}
                 onChange={(event) => {
                   const next = Number(event.target.value.replace(/[^\d]/g, ""));
-                  setAmount(clampAmount(next || MIN_BID_USD));
+                  setAmount(clampAmount(next || minimumBid, minimumBid));
                 }}
               />
             </label>
@@ -150,6 +189,7 @@ export function OutbidForm({
               type="button"
               className="step"
               aria-label="Increase bid by one dollar"
+              disabled={amount >= MAX_BID_USD || minimumBid > MAX_BID_USD}
               onClick={() => bump(1)}
             >
               +
@@ -157,10 +197,12 @@ export function OutbidForm({
           </span>
         </h2>
       </div>
-      {emptyPaper ? (
-        <p className="claim-note">
-          Choose a service desk. New spots start at {"$" + MIN_BID_USD}. Rank is
-          the bid. An incomplete checkout stays off the paper.
+      {isNewListing ? (
+        <p className="claim-note" data-new-listing-note="">
+          New listing: choose a service desk. New spots start at {"$" + MIN_BID_USD}.
+          Rank is the bid. If this site is already listed, use that desk&apos;s
+          Outbid form to raise the same identity. An incomplete checkout stays
+          off the paper.
         </p>
       ) : (
         <OccupiedCheckoutCopy amount={amount} topBidUsd={topBidUsd} />
@@ -170,7 +212,8 @@ export function OutbidForm({
         method="post"
         action={formAction}
         data-bid-form=""
-        data-checkout-intent={emptyPaper ? "place" : "raise"}
+        data-checkout-intent={isNewListing ? "place" : "raise"}
+        data-amount-floor={minimumBid}
         data-city={lockCity ? defaultCity : selectedCity}
         data-category={selectedCategory || activeCategory}
         data-submit-ready={canSubmit ? "true" : "false"}
@@ -277,12 +320,12 @@ export function OutbidForm({
               <button
                 type="submit"
                 className="outbid"
-                aria-label="Claim rank"
+                aria-label={isNewListing ? "Claim rank" : "Outbid"}
                 disabled={!canSubmit}
                 data-submit-ready={canSubmit ? "true" : "false"}
                 data-slot="claim-button"
               >
-                Claim rank
+                {isNewListing ? "Claim rank" : "Outbid"}
               </button>
             </div>
           </div>

@@ -86,6 +86,15 @@ test("quoteRaise charges only the difference and rejects N < current+1", () => {
       return true;
     },
   );
+
+  assert.throws(
+    () => quoteRaise({ bidUsd: 15, hidden: false }, 16, 21),
+    (err) => {
+      assert.ok(err instanceof PaymentError);
+      assert.equal(err.code, "bid_too_low");
+      return true;
+    },
+  );
 });
 
 test("#1 at $20 raises to $25: charged $5, stays #1, createdAt unchanged", async () => {
@@ -164,6 +173,66 @@ test("rival paying only the $5 difference cannot take #1", async () => {
     assert.equal(ranked[1]?.bidUsd, 5);
     assert.equal(ranked[1]?.rank, 2);
     assert.notEqual(ranked[1]?.rank, 1);
+  });
+});
+
+test("raise below the board leader is rejected before provider call or intent", async () => {
+  await withDb(async (db, polar) => {
+    await polar.createCheckout({ amountUsd: 20, listing: draft() });
+    await polar.createCheckout({
+      amountUsd: 15,
+      listing: draft({
+        business: "Second Van",
+        siteUrl: "https://second.example",
+        bidUsd: 15,
+      }),
+    });
+
+    let providerCalls = 0;
+    const provider: PaymentPort = {
+      kind: "live",
+      async createCheckout() {
+        providerCalls += 1;
+        throw new Error("provider must not be called for an under-floor raise");
+      },
+      async settle() {
+        return null;
+      },
+      getCheckout() {
+        return undefined;
+      },
+      async abandon() {},
+      database() {
+        return db;
+      },
+    };
+
+    await assert.rejects(
+      () =>
+        raiseListing(
+          draft({
+            business: "Second Van",
+            siteUrl: "https://second.example",
+            bidUsd: 16,
+          }),
+          provider,
+          db,
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof PaymentError);
+        assert.equal(err.code, "bid_too_low");
+        return true;
+      },
+    );
+    assert.equal(providerCalls, 0);
+    assert.equal(
+      (db.prepare("SELECT COUNT(*) AS count FROM checkouts WHERE intent = 'raise'").get() as { count: number }).count,
+      0,
+    );
+    assert.equal(
+      (db.prepare("SELECT COUNT(*) AS count FROM waffo_intents").get() as { count: number }).count,
+      0,
+    );
   });
 });
 

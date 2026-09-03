@@ -1,5 +1,6 @@
 import { getDb, type AppDb, type Listing, type TakedownReason } from "./db";
 import type { CategorySlug } from "./categories";
+import { listLane } from "./board";
 import { MAX_BID_USD } from "./constants";
 import {
   parseBidUsd,
@@ -124,12 +125,14 @@ export function getListingById(db: AppDb, id: string): Listing | undefined {
 export function quoteRaise(
   existing: Pick<Listing, "bidUsd" | "hidden">,
   newBidUsd: number,
+  minimumBidUsd = existing.bidUsd + 1,
 ): RaiseQuote {
   if (existing.hidden) {
     throw new PaymentError("listing_hidden", 409);
   }
   const target = parseBidUsd(newBidUsd);
-  if (target < existing.bidUsd + 1) {
+  const floor = Math.max(existing.bidUsd + 1, minimumBidUsd);
+  if (target < floor) {
     throw new PaymentError("bid_too_low", 400);
   }
   if (target > MAX_BID_USD) {
@@ -223,7 +226,14 @@ export async function raiseListing(
   if (!existing) {
     throw new PaymentError("listing_not_found", 404);
   }
-  const quote = quoteRaise(existing, draft.bidUsd);
+  // The occupied form promises a #1 claim, so an existing identity must clear
+  // both its own current bid and the visible board leader before any payment
+  // intent or provider checkout is opened. New listings use `/api/checkout`
+  // and retain the documented lower-rank path.
+  const boardTopBidUsd = listLane(draft.city, draft.category, store)[0]?.bidUsd;
+  const boardFloor =
+    boardTopBidUsd === undefined ? existing.bidUsd + 1 : boardTopBidUsd + 1;
+  const quote = quoteRaise(existing, draft.bidUsd, boardFloor);
   const started = await port.createCheckout({
     amountUsd: quote.chargeUsd,
     listing: {

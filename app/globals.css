@@ -319,6 +319,12 @@ summary:focus-visible {
   outline: none;
 }
 
+.amount-field input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 0.15rem;
+}
+
 .step {
   display: inline-grid;
   place-items: center;

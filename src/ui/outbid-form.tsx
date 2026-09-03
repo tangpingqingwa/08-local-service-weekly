@@ -57,8 +57,8 @@ function OccupiedCheckoutCopy({
   return (
     <p className="claim-note" data-raise-difference="">
       Only a listing with this exact site URL in this service desk can raise.
-      Paying less than #1 still lists at the rank that bid can take. Rank is
-      the bid.{" "}
+      A raise must clear the current #1. For a lower-rank spot, use the new
+      listing path on the home paper. Rank is the bid.{" "}
       {takesLead ? (
         <span className="raise-charge" data-raise-charge="" data-current-usd={topBidUsd}>
           {"Raise charge: " + "$" + raiseChargeUsd} — only the difference,

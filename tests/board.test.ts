@@ -717,6 +717,7 @@ test("classified CSS owns the dark canvas, tan stock, four columns, and responsi
   assert.match(css, /local-ad-slip/);
   assert.match(css, /text-decoration: underline dashed/);
   assert.match(css, /\.step[\s\S]*min-height:\s*2\.75rem/);
+  assert.match(css, /\.amount-field input:focus-visible[\s\S]*outline:\s*3px solid var\(--accent\)/);
   assert.doesNotMatch(css, /presentation|today-strip|activity-strip|reference-rail|outbid-mark/i);
 });
 

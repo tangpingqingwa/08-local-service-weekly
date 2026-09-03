@@ -99,7 +99,7 @@ export function LaneBoard({
                 href={"/c/" + city.slug + "/" + category.slug + "#claim"}
                 data-claim-job={category.slug}
               >
-                {"Outbid my " + category.display.toLowerCase() + " column"}
+                {"Claim rank in " + category.display.toLowerCase() + " column"}
               </a>{" "}
               <span className="raise-charge" data-raise-charge="">
                 A raise charges only the difference, not a full rebid.

@@ -43,7 +43,7 @@ function ColumnLinks({
         >
           {visualOnly || emptyPaper
             ? item.display
-            : "Outbid my " + item.display.toLowerCase() + " column"}
+            : "Claim rank in " + item.display.toLowerCase() + " column"}
         </a>
       ))}
     </nav>

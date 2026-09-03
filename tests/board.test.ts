@@ -537,6 +537,8 @@ test("claim and occupied forms post to their distinct payment intents", () => {
   assert.match(occupied, /data-checkout-intent="raise"/);
   assert.match(occupied, /value="21"/);
   assert.match(occupied, /data-raise-difference/);
+  assert.match(occupied, /aria-label="Claim rank"[^>]*>Claim rank</);
+  assert.doesNotMatch(occupied, />Outbid</);
 });
 
 test("occupied raise controls share a top-plus-one floor", () => {
@@ -595,7 +597,8 @@ test("occupied home form is a clear new-listing path, while raises stay lane-sco
   assert.match(html, /data-checkout-intent="place"/);
   assert.match(html, /data-slot="category-control"/);
   assert.doesNotMatch(html, /action="\/api\/raise"/);
-  assert.match(html, /Outbid my movers column/);
+  assert.match(html, /Claim rank in movers column/);
+  assert.match(html, /use that desk(?:&apos;|&#x27;)s Claim rank form/);
 });
 
 test("occupied raise copy names difference-only — not a full rebid", () => {

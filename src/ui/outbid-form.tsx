@@ -201,7 +201,7 @@ export function OutbidForm({
         <p className="claim-note" data-new-listing-note="">
           New listing: choose a service desk. New spots start at {"$" + MIN_BID_USD}.
           Rank is the bid. If this site is already listed, use that desk&apos;s
-          Outbid form to raise the same identity. An incomplete checkout stays
+          Claim rank form to raise the same identity. An incomplete checkout stays
           off the paper.
         </p>
       ) : (
@@ -320,12 +320,12 @@ export function OutbidForm({
               <button
                 type="submit"
                 className="outbid"
-                aria-label={isNewListing ? "Claim rank" : "Outbid"}
+                aria-label="Claim rank"
                 disabled={!canSubmit}
                 data-submit-ready={canSubmit ? "true" : "false"}
                 data-slot="claim-button"
               >
-                {isNewListing ? "Claim rank" : "Outbid"}
+                Claim rank
               </button>
             </div>
           </div>
